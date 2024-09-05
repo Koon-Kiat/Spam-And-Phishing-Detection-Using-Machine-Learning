@@ -79,6 +79,9 @@ nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('wordnet')
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+
 # Load the dataset
 dataset = load_dataset('talby/spamassassin', split='train')
 
@@ -89,8 +92,6 @@ check_missing_values = df.isnull().sum()
 print(f"\nCheck missing values:\n{check_missing_values}\n")
 
 # Remove duplicate data
-
-
 def remove_duplicate(df):
     # Identify duplicate rows
     duplicate_text = df[df.duplicated(subset=['text'], keep=False)]

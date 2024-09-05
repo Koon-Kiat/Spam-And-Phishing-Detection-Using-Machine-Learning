@@ -1,0 +1,12 @@
+numpy
+pandas
+matplotlib
+seaborn
+wordcloud
+beautifulsoup4
+tqdm
+contractions
+nltk
+spellchecker
+scikit-learn
+datasets
