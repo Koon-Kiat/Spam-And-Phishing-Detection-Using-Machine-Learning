@@ -16,6 +16,7 @@ from wordcloud import WordCloud
 import os
 # Manage email message
 import email
+import email.policy
 # String formatting and manipulation etc.
 import string
 # Provide regex
@@ -27,13 +28,22 @@ from tqdm import tqdm
 # Log message
 import logging
 
+import contractions
+import codecs
+import json
+import urllib.parse
+
 # Natural Language Toolkit
 import nltk
 # For lemmatizing and stemming words
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 # A list of common stopwords (like, and, the)
 from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
 
+from typing import List, Dict, Union
+from textblob import Word
+from concurrent.futures import ThreadPoolExecutor
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_extraction.text import CountVectorizer
@@ -53,6 +63,9 @@ from keras.layers import Dense, Dropout
 import tensorflow as tf
 import warnings
 
+import datasets
+from datasets import load_dataset
+
 warnings.filterwarnings('ignore')
 
 # Set random seed for reproducibility
@@ -62,199 +75,249 @@ np.random.seed(49)
 BOLD = '\033[1m'
 RESET = '\033[0m'
 
-# Define paths to email datasets
-easy_ham_path = r"C:\Users\Koon Kiat\OneDrive\Cloud\Projects\Phishing Email Detection\Spam Assassin\easy_ham\easy_ham"
-hard_ham_path = r"C:\Users\Koon Kiat\OneDrive\Cloud\Projects\Phishing Email Detection\Spam Assassin\hard_ham\hard_ham"
-spam_path = r"C:\Users\Koon Kiat\OneDrive\Cloud\Projects\Phishing Email Detection\Spam Assassin\spam_2\spam_2"
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('wordnet')
 
-# Initialize NLTK tools
-stemmer = PorterStemmer()
-lemmatizer = WordNetLemmatizer()
+# Load the dataset
+dataset = load_dataset('talby/spamassassin', split='train')
 
-# Configure logging
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+# Assuming you want to view the first few rows of the 'train' split
+df = dataset.to_pandas()
 
-# Get data from emails dataset in directory
-def get_data(path):
-    data = []
-    # List files in the directory
-    files = os.listdir(path)
-    for file in files:
-        # Join the path and file name
-        file_path = os.path.join(path, file)
-        # Open and read the file
-        with open(file_path, encoding="ISO-8859-1") as f:
-            email_content = f.read()
-            # Append and return the data
-            data.append(email_content)
-    return data
+check_missing_values = df.isnull().sum()
+print(f"\nCheck missing values:\n{check_missing_values}\n")
 
-# Extract information from data without cleaning
-class email_data_extraction:
-    def __init__(self):
-        self.stop_words = set(stopwords.words('english'))
+# Remove duplicate data
 
-    def extract_email_info(self, emails):
-        """Extracts specific headers and additional information from a list of emails."""
-        extracted_data = []
 
-        for mail in tqdm(emails, desc="Extracting Headers"):
-            b = email.message_from_string(mail)
+def remove_duplicate(df):
+    # Identify duplicate rows
+    duplicate_text = df[df.duplicated(subset=['text'], keep=False)]
 
-            header_info = {
-                'From': b.get('From', 'N/A'),
-                'To': b.get('To', 'N/A'),
-                'Delivered-To': b.get('Delivered-To', 'N/A'),
-                'Subject': b.get('Subject', 'N/A'),
-                'Reply-To': b.get('Reply-To', 'N/A'),
-                'Content-Type': b.get('Content-Type', 'N/A'),
-                'Return-Path': b.get('Return-Path', 'N/A'),
-                'Received': b.get('Received', 'N/A'),
-                'Message-ID': b.get('Message-ID', 'N/A'),
-                'MIME': b.get('MIME-Version', 'N/A'),
-                'DKIM-Signature': b.get('DKIM-Signature', 'N/A'),
-                'Authentication-Results': b.get('Authentication-Results', 'N/A'),
-                'Links': self.extract_links(mail)
-            }
-            extracted_data.append(header_info)
+    # Count of duplicates before dropping
+    num_duplicates_before = duplicate_text.shape[0]
 
-        # Convert list of dicts to DataFrame
-        return pd.DataFrame(extracted_data)
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates(subset=['text'], keep='first')
+    num_duplicates_after = df_cleaned.shape[0]
 
-    def extract_links(self, mail):
-        """Extracts URLs from the email text."""
-        b = email.message_from_string(mail)
-        body = self._get_body(b)
-        text = BeautifulSoup(body, "html.parser").get_text()
-        links = re.findall(r'(https?://\S+)', text)
-        return ', '.join(links)
+    # Count of duplicates after dropping
+    remaining_duplicate = num_duplicates_before - num_duplicates_after
 
-    def _get_body(self, email_msg):
-        """Extracts the body of the email message, handling multipart content."""
-        body = ""
-        if email_msg.is_multipart():
-            for part in email_msg.walk():
-                ctype = part.get_content_type()
-                cdispo = str(part.get('Content-Disposition'))
-                if ctype == 'text/plain' and 'attachment' not in cdispo:
-                    body = part.get_payload(decode=True)
-                    break
-        else:
-            body = email_msg.get_payload(decode=True)
-        return body
+    # Print results
+    print("\nTotal number of rows identified as duplicates based on 'text':",
+          num_duplicates_before)
+    print("Number of rows removed due to duplication:", remaining_duplicate)
 
-    def save_to_csv(self, df, filename):
-        """Saves the DataFrame to a CSV file."""
-        df.to_csv(filename, index=False)
-        print(f"Data saved to {filename}")
-
-# Perform data cleaning
-class email_to_clean_text(BaseEstimator, TransformerMixin):
-    def __init__(self):
-        pass
-
-    def fit(self, X, y=None):
-        return self
-
-    def transform(self, X):
-        text_list = []
-        for mail in X:
-            # Converts raw email string into email message object
-            b = email.message_from_string(mail)
-            body = ""
-
-            if b.is_multipart():
-                for part in b.walk():
-                    ctype = part.get_content_type()
-                    cdispo = str(part.get('Content-Disposition'))
-
-                    # Skip any text/plain (txt) attachments
-                    if ctype == 'text/plain' and 'attachment' not in cdispo:
-                        body = part.get_payload(
-                            decode=True)  # get body of email
-                        break
-            # Not multipart - i.e. plain text, no attachments
-            else:
-                # Get body of email
-                body = b.get_payload(decode=True)
-
-            # Get text from body (HTML/text)
-            soup = BeautifulSoup(body, "html.parser")
-            # Convert text to lowercase
-            text = soup.get_text().lower()
-            # Remove links
-            text = re.sub(
-                r'(https|http)?:\/\/(\w|\.|\/|\?|\=|\&|\%)*\b', '', text, flags=re.MULTILINE)
-            # Remove email address
-            text = re.sub(
-                r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '', text, flags=re.MULTILINE)
-            # Remove punctuation
-            text = text.translate(str.maketrans(
-                '', '', string.punctuation))  # remove punctuation
-            # Remove digits
-            text = ''.join([i for i in text if not i.isdigit()])
-            # Loads a list of stopwords
-            stop_words = stopwords.words('english')
-            # Remove stop words
-            words_list = [w for w in text.split() if w not in stop_words]
-            # Lemmatize (Reduce word to base form, while retaining context)
-            words_list = [lemmatizer.lemmatize(w) for w in words_list]
-            # Stemming (Reduce word to base from by removing suffixes and prefixes)
-            words_list = [stemmer.stem(w) for w in words_list]  # Stemming
-            text_list.append(' '.join(words_list))
-        return text_list
-
-    def save_to_csv_cleaned(self, text_list, filename):
-        """Saves the DataFrame to a CSV file."""
-        df = pd.DataFrame(text_list, columns=['cleaned_text'])
-        df.to_csv(filename, index=False)
-        print(f"Data saved to {filename}")
+    return df_cleaned
 
 # Plot graph to visualise distribution of data across ham and spam using matplotlib.pyplot
-def data_visualisation_plt(ham, spam):
-    data = [len(ham)/len(ham+spam), len(spam)/len(ham+spam)]
-    labels = ['ham', 'spam']
+def visualize_data(df):
+
+    # Map class labels to meaningful names
+    label_map = {1: 'Ham', 0: 'Spam'}
+
+    # Count the number of ham and spam emails
+    label_counts = df['label'].value_counts()
+
+    # Extract counts for ham (1) and spam (0) with default value of 0 if missing
+    ham_count = label_counts.get(1, 0)
+    spam_count = label_counts.get(0, 0)
+
+    # Calculate total count and check for zero division
+    total_count = ham_count + spam_count
+    if total_count == 0:
+        print("No data to visualize.")
+        return
+
+    # Calculate distribution percentages
+    data = [ham_count / total_count, spam_count / total_count]
+    labels = ['Ham', 'Spam']
     colors = ['blue', 'red']
 
-    # Pie chart of the distribution of ham and spam
+    # Pie chart
     plt.figure(figsize=(12, 5))
     plt.pie(data, labels=labels, autopct='%.0f%%', colors=colors)
+    plt.title('Distribution of Ham and Spam Emails')
     plt.show()
 
     # Count plot
     plt.figure(figsize=(8, 5))
-    sns.countplot(x=['ham']*len(ham) + ['spam']*len(spam), palette=colors)
+    sns.countplot(x='label', data=df, palette=colors, order=[1, 0])
+    plt.title('Ham vs Spam Email Count')
+    plt.xlabel('Label')
+    plt.ylabel('Count')
+    plt.xticks(ticks=[0, 1], labels=['Ham', 'Spam'])
     plt.show()
 
-# Plot graph to visualise distribution of data across ham and spam using plotly.express
-def data_visualisation_px(ham, spam):
-    # Data for the pie chart
-    data = [len(ham), len(spam)]
-    labels = ['Ham', 'Spam']
-    colors = ['blue', 'red']
+# Extract information from data without cleaning
+class email_information_extractor:
+    def __init__(self, input_data: Union[str, pd.DataFrame], num_workers: int = 3):
+        self.input_data = input_data
+        self.num_workers = num_workers
 
-    # Pie chart using Plotly
-    fig_pie = go.Figure(data=[go.Pie(
-        labels=labels, values=data, textinfo='label+percent', marker=dict(colors=colors))])
-    fig_pie.update_layout(title='Distribution of Ham and Spam')
-    fig_pie.show()
+    def extract_email_info(self) -> pd.DataFrame:
+        if isinstance(self.input_data, str):
+            df = pd.read_csv(self.input_data)
+        elif isinstance(self.input_data, pd.DataFrame):
+            df = self.input_data
+        else:
+            raise ValueError(
+                "input_data should be either a file path or a DataFrame.")
 
-    # Data for the count plot
-    categories = ['Ham'] * len(ham) + ['Spam'] * len(spam)
+        extracted_df = pd.DataFrame(columns=[
+            'From', 'To', 'Delivered-To', 'Subject', 'Reply-To', 'Content-Type',
+            'Return-Path', 'Received', 'Message-ID', 'MIME', 'DKIM-Signature',
+            'Authentication-Results', 'Links', 'Keywords'
+        ])
 
-    # Count plot using Plotly
-    fig_count = px.histogram(x=categories, color=categories, color_discrete_map={
-                             'Ham': 'blue', 'Spam': 'red'})
-    fig_count.update_layout(title='Count Plot of Ham and Spam',
-                            xaxis_title='Category', yaxis_title='Count')
-    fig_count.show()
+        email_texts = df['text'].values.tolist()
 
-# Shows word frequency
-def plot_WordCloud(text_list, title):
-    unique_string = (" ").join(text_list)
+        # Print the number of available CPU cores and threads used
+        num_cores = os.cpu_count()
+        print(f"Number of available CPU cores: {num_cores}")
+        print(f"Number of threads used for extraction: {self.num_workers}")
+
+        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+            results = list(tqdm(executor.map(self._extract_info_from_text, email_texts), total=len(
+                email_texts), desc="Extracting email info"))
+
+        extracted_df = pd.concat(
+            [extracted_df, pd.DataFrame(results)], ignore_index=True)
+
+        return extracted_df
+
+    def _extract_info_from_text(self, text: str) -> Dict[str, str]:
+        info = {
+            'From': self._extract_header(text, 'From:'),
+            'To': self._extract_header(text, 'To:'),
+            'Delivered-To': self._extract_header(text, 'Delivered-To:'),
+            'Subject': self._extract_header(text, 'Subject:'),
+            'Reply-To': self._extract_header(text, 'Reply-To:'),
+            'Content-Type': self._extract_header(text, 'Content-Type:'),
+            'Return-Path': self._extract_header(text, 'Return-Path:'),
+            'Received': self._extract_header(text, 'Received:'),
+            'Message-ID': self._extract_header(text, 'Message-ID:'),
+            'MIME': self._extract_header(text, 'MIME-Version:'),
+            'DKIM-Signature': self._extract_header(text, 'DKIM-Signature:'),
+            'Authentication-Results': self._extract_header(text, 'Authentication-Results:'),
+            'Links': self._extract_links(text),
+            'Keywords': self._extract_keywords(text)
+        }
+        return info
+
+    def _extract_header(self, text: str, header: str) -> str:
+        pattern = re.compile(rf'{header}\s*(.*)', re.MULTILINE)
+        match = pattern.search(text)
+        return match.group(1).strip() if match else ''
+
+    def _extract_links(self, text: str) -> str:
+        links = re.findall(r'http[s]?://\S+', text)
+        return ', '.join(links)
+
+    def _extract_keywords(self, text: str) -> str:
+        words = re.findall(r'\b\w+\b', text)
+        keywords = [word.lower() for word in words if len(word) > 3]
+        return ', '.join(set(keywords))
+
+    def save_to_csv(self, output_file: str):
+        df = self.extract_email_info()
+        df.to_csv(output_file, index=False)
+
+# Data cleaning
+class email_text_cleaner(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        # Initialize NLTK tools
+        self.lemmatizer = WordNetLemmatizer()
+        self.stop_words = set(stopwords.words('english'))
+        # Add additional custom stop words if necessary
+        self.custom_stop_words = {'url', 'http', 'https', 'www'}
+        self.stop_words.update(self.custom_stop_words)
+
+    def fit(self, X, y=None):
+        # No fitting is needed for text cleaning
+        return self
+    
+    def expand_contractions(self, text):
+        return contractions.fix(text)
+    
+    def correct_spelling(self, text):
+        return ' '.join([str(Word(word).correct()) for word in text.split()])
+
+    def transform(self, X, y=None):
+        cleaned_text_list = []
+
+    def expand_contractions(self, text):
+        return contractions.fix(text)
+    
+    def correct_spelling(self, text):
+        # Use textblob to correct spelling
+        return ' '.join([str(Word(word).correct()) for word in text.split()])
+
+    def transform(self, X, y=None):
+        cleaned_text_list = []
+
+        # Initialize tqdm progress bar
+        for body in tqdm(X, desc='Cleaning Text', unit='email'):
+            # Convert HTML to plain text
+            soup = BeautifulSoup(body, "html.parser")
+            text = soup.get_text()
+
+            # Expand contractions
+            text = self.expand_contractions(text)
+
+            # Convert to lowercase
+            text = text.lower()
+
+            # Remove URLs
+            text = re.sub(r'https?://\S+', '', text)
+
+            # Remove email addresses
+            text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '', text)
+
+            # Remove multiple newlines and extra whitespace
+            text = re.sub(r'\s+', ' ', text).strip()
+
+            # Remove punctuation
+            text = text.translate(str.maketrans('', '', string.punctuation))
+
+            # Remove digits
+            text = re.sub(r'\d+', '', text)
+
+            # Tokenization
+            words_list = word_tokenize(text)
+
+            # Remove stop words
+            words_list = [w for w in words_list if w not in self.stop_words]
+
+            # Correct spelling errors (optional, depending on performance)
+            # words_list = [str(Word(word).correct()) for word in words_list]
+
+            # Lemmatization
+            words_list = [self.lemmatizer.lemmatize(w) for w in words_list]
+
+            # Join cleaned words into a single string
+            cleaned_text_list.append(' '.join(words_list))
+
+        return cleaned_text_list
+            
+
+    def save_to_csv_cleaned(self, text_list, filename):
+        df = pd.DataFrame(text_list, columns=['cleaned_text'])
+        df.to_csv(filename, index=False)
+        print(f"Data saved to {filename}")
+
+# Show word frequency
+def plot_word_cloud(text_list, title):
+    # Combine all text into a single string
+    unique_string = " ".join(text_list)
+
+    # Generate the word cloud
     wordcloud = WordCloud(width=1000, height=500,
                           background_color='white').generate(unique_string)
+
+    # Plot the word cloud
     plt.figure(figsize=(15, 8))
     plt.imshow(wordcloud, interpolation='bilinear')
     plt.axis("off")
@@ -262,47 +325,31 @@ def plot_WordCloud(text_list, title):
     plt.show()
 
 
-# Get email data
-easy_ham = get_data(easy_ham_path)
-hard_ham = get_data(hard_ham_path)
-ham = easy_ham + hard_ham
-spam = get_data(spam_path)
+if __name__ == "__main__":
+    extracted_email_file = 'extracted_email_info.csv'
+    clean_email_file = 'clean_email_info.csv'
 
-# Shuffle email data
-np.random.shuffle(ham)
-np.random.shuffle(spam)
+    df_original_text = df['text']
 
-# Structure of the data
-# print(spam[49])
+    # Remove duplicate
+    df_remove_duplicate = remove_duplicate(df)
+    print("Total number of rows remaining in the cleaned DataFrame:",
+          df_remove_duplicate.shape[0])
 
-# Run the class to extract key information from dataset
-processor = email_data_extraction()
-# Extract key information and save to separate files for ham and spam (No data cleaning)
-hamdf = processor.extract_email_info(ham)
-spamdf = processor.extract_email_info(spam)
-processor.save_to_csv(hamdf, 'HamExtraction.csv')
-processor.save_to_csv(spamdf, 'SpamExtraction.csv')
+    # Compare amount of data before and after removing duplicates
+    visualize_data(df_remove_duplicate)
 
-# Run class to clean the data set
-email_to_text = email_to_clean_text()
-# Process each email in ham (easy+hard) to clean the text and return a list of cleaned string)
-text_ham = email_to_text.transform(ham)
-print(f"{BOLD}Sample email content of HAM:{RESET}\n{text_ham[0]}")
-text_spam = email_to_text.transform(spam)
-print(f"{BOLD}Sample email content of SPAM:{RESET}\n{text_spam[0]}")
+    # Converts to dataframe
+    df_remove_duplicate = pd.DataFrame(df_remove_duplicate)
 
-email_to_text.save_to_csv_cleaned(text_ham, 'CleanedHamText.csv')
-email_to_text.save_to_csv_cleaned(text_spam, 'CleanedSpamText.csv')
+    # Extract important information from email
+    extractor = email_information_extractor(df_remove_duplicate)
+    extractor.save_to_csv(extracted_email_file)
 
-# For visualisation
-text_easy_ham = email_to_text.transform(easy_ham)
-text_hard_ham = email_to_text.transform(hard_ham)
+    # Peforms data cleaning
+    clean_email = email_text_cleaner()
+    df_clean = clean_email.transform(df_remove_duplicate['text'])
+    clean_email.save_to_csv_cleaned(df_clean, clean_email_file)
 
-# Shows distribution of ham and spam
-data_visualisation_plt(ham, spam)
-
-# Show the common words used in each of the datasets
-plot_WordCloud(text_easy_ham, "Easy Ham")
-plot_WordCloud(text_hard_ham, "Hard Ham")
-plot_WordCloud(text_ham, "Ham")
-plot_WordCloud(text_spam, "Spam")
+    plot_word_cloud(df_original_text, "Original Dataset")
+    plot_word_cloud(df_clean, "Cleaned Dataset")
