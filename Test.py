@@ -205,6 +205,12 @@ class email_to_clean_text(BaseEstimator, TransformerMixin):
             text_list.append(' '.join(words_list))
         return text_list
 
+    def save_to_csv_cleaned(self, text_list, filename):
+        """Saves the DataFrame to a CSV file."""
+        df = pd.DataFrame(text_list, columns=['cleaned_text'])
+        df.to_csv(filename, index=False)
+        print(f"Data saved to {filename}")
+
 # Plot graph to visualise distribution of data across ham and spam using matplotlib.pyplot
 def data_visualisation_plt(ham, spam):
     data = [len(ham)/len(ham+spam), len(spam)/len(ham+spam)]
@@ -284,6 +290,9 @@ text_ham = email_to_text.transform(ham)
 print(f"{BOLD}Sample email content of HAM:{RESET}\n{text_ham[0]}")
 text_spam = email_to_text.transform(spam)
 print(f"{BOLD}Sample email content of SPAM:{RESET}\n{text_spam[0]}")
+
+email_to_text.save_to_csv_cleaned(text_ham, 'CleanedHamText.csv')
+email_to_text.save_to_csv_cleaned(text_spam, 'CleanedSpamText.csv')
 
 # For visualisation
 text_easy_ham = email_to_text.transform(easy_ham)
