@@ -25,9 +25,9 @@ nltk.download('wordnet')
 nltk.download('omw-1.4')
 
 # Define paths to email datasets
-easy_ham_path = r"C:\Users\Koon Kiat\OneDrive\Cloud\Projects\Phishing Email Detection\Spam Assassin\easy_ham\easy_ham"
-hard_ham_path = r"C:\Users\Koon Kiat\OneDrive\Cloud\Projects\Phishing Email Detection\Spam Assassin\hard_ham\hard_ham"
-spam_path = r"C:\Users\Koon Kiat\OneDrive\Cloud\Projects\Phishing Email Detection\Spam Assassin\spam_2\spam_2"
+easy_ham_path = r"filepath"
+hard_ham_path = r"filepath"
+spam_path = r"filepath"
 
 # Initialize NLTK tools
 stemmer = PorterStemmer()
