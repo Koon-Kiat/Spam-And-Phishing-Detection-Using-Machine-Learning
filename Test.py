@@ -75,9 +75,7 @@ lemmatizer = WordNetLemmatizer()
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Get email datasets from directory
-
-
+# Get data from emails dataset in directory
 def get_data(path):
     data = []
     # List files in the directory
@@ -92,7 +90,7 @@ def get_data(path):
             data.append(email_content)
     return data
 
-
+# Extract information from data without cleaning
 class email_data_extraction:
     def __init__(self):
         self.stop_words = set(stopwords.words('english'))
@@ -151,7 +149,7 @@ class email_data_extraction:
         df.to_csv(filename, index=False)
         print(f"Data saved to {filename}")
 
-
+# Perform data cleaning
 class email_to_clean_text(BaseEstimator, TransformerMixin):
     def __init__(self):
         pass
@@ -207,7 +205,7 @@ class email_to_clean_text(BaseEstimator, TransformerMixin):
             text_list.append(' '.join(words_list))
         return text_list
 
-
+# Plot graph to visualise distribution of data across ham and spam using matplotlib.pyplot
 def data_visualisation_plt(ham, spam):
     data = [len(ham)/len(ham+spam), len(spam)/len(ham+spam)]
     labels = ['ham', 'spam']
@@ -223,7 +221,7 @@ def data_visualisation_plt(ham, spam):
     sns.countplot(x=['ham']*len(ham) + ['spam']*len(spam), palette=colors)
     plt.show()
 
-
+# Plot graph to visualise distribution of data across ham and spam using plotly.express
 def data_visualisation_px(ham, spam):
     # Data for the pie chart
     data = [len(ham), len(spam)]
@@ -246,7 +244,7 @@ def data_visualisation_px(ham, spam):
                             xaxis_title='Category', yaxis_title='Count')
     fig_count.show()
 
-
+# Shows word frequency
 def plot_WordCloud(text_list, title):
     unique_string = (" ").join(text_list)
     wordcloud = WordCloud(width=1000, height=500,
