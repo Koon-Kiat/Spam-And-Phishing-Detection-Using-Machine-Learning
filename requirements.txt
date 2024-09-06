@@ -10,3 +10,4 @@ nltk
 spellchecker
 scikit-learn
 datasets
+tf-keras
