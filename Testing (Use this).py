@@ -52,8 +52,27 @@ from functools import lru_cache  # Least Recently Used (LRU) cache
 # Spell checking
 from spellchecker import SpellChecker  # Spell checking
 
+from sklearn.base import BaseEstimator, TransformerMixin
+
 # Machine learning libraries
-from sklearn.base import BaseEstimator, TransformerMixin  # Scikit-learn base classes
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.feature_extraction.text import TfidfVectorizer
+from transformers import BertTokenizer, BertForSequenceClassification, Trainer, TrainingArguments
+from transformers import DataCollatorWithPadding
+
+import torch
+
+# Handling imbalanced datasets
+from imblearn.over_sampling import SMOTE  # Synthetic Minority Over-sampling Technique
+
+# Warnings
+import warnings  # Warning control
+
+# Datasets
+from datasets import load_dataset  # Load datasets
 
 # Warnings
 import warnings  # Warning control
@@ -68,7 +87,7 @@ BOLD = '\033[1m'
 RESET = '\033[0m'
 
 # Download necessary NLTK resources
-nltk.download('punkt')
+nltk.download('punkt') # Tokenizer
 nltk.download('stopwords')
 nltk.download('wordnet')
 
@@ -343,7 +362,119 @@ def plot_word_cloud(text_list, title, width=1000, height=500, background_color='
         wordcloud.to_file(save_to_file)
         logging.info(f"Word cloud saved to {save_to_file}")
 
-# Main function
+def handle_class_imbalance(df_clean, labels, random_state=42):
+    smote = SMOTE(random_state=random_state)
+    df_clean_resampled, labels_resampled = smote.fit_resample(pd.DataFrame({'text': df_clean}), labels)
+    return df_clean_resampled['text'], labels_resampled
+
+def process_and_train_bert_model(df_clean, labels):
+    try:
+        # Initialize the BERT tokenizer
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+        # Tokenize the text data
+        def tokenize_function(examples):
+            return tokenizer(examples['text'], truncation=True)
+
+        # Create a Hugging Face Dataset using df_clean
+        dataset = Dataset.from_pandas(pd.DataFrame({'text': df_clean, 'label': labels}))
+        tokenized_datasets = dataset.map(tokenize_function, batched=True)
+
+        # Split the dataset into training and test sets
+        train_test_split = tokenized_datasets.train_test_split(test_size=0.2, seed=42)
+        train_dataset = train_test_split['train']
+        test_dataset = train_test_split['test']
+
+        # Define the data collator
+        data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+        # Initialize the BERT model
+        model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2)
+
+        # Define the training arguments
+        training_args = TrainingArguments(
+            output_dir='./results',
+            evaluation_strategy='epoch',
+            learning_rate=2e-5,
+            per_device_train_batch_size=8,
+            per_device_eval_batch_size=8,
+            num_train_epochs=3,
+            weight_decay=0.01,
+        )
+
+        # Initialize the Trainer
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=test_dataset,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+        )
+
+        # Train the model
+        trainer.train()
+
+        # Evaluate the model
+        eval_results = trainer.evaluate()
+        print(f"Evaluation results: {eval_results}")
+
+        # Make predictions
+        predictions = trainer.predict(test_dataset)
+        preds_bert = np.argmax(predictions.predictions, axis=-1)
+
+        # Evaluate the model
+        y_test = test_dataset['label']
+        print("BERT Model Accuracy:", accuracy_score(y_test, preds_bert))
+        print("BERT Model Confusion Matrix:\n", confusion_matrix(y_test, preds_bert))
+        print("BERT Model Classification Report:\n", classification_report(y_test, preds_bert))
+
+        return preds_bert, y_test
+
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        return None, None
+
+def train_random_forest(df_clean, labels):
+    try:
+        # Encode labels
+        le = LabelEncoder()
+        labels_encoded = le.fit_transform(labels)
+
+        # Vectorize text data
+        vectorizer = TfidfVectorizer(max_features=5000)
+        X = vectorizer.fit_transform(df_clean).toarray()
+
+        # Split the dataset into training and test sets
+        X_train, X_test, y_train, y_test = train_test_split(X, labels_encoded, test_size=0.2, random_state=42)
+
+        # Train the Random Forest model
+        rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+        rf_model.fit(X_train, y_train)
+
+        # Make predictions
+        preds_rf = rf_model.predict(X_test)
+
+        # Evaluate the model
+        print("Random Forest Model Accuracy:", accuracy_score(y_test, preds_rf))
+        print("Random Forest Model Confusion Matrix:\n", confusion_matrix(y_test, preds_rf))
+        print("Random Forest Model Classification Report:\n", classification_report(y_test, preds_rf))
+
+        return preds_rf, y_test
+
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        return None, None
+
+def ensemble_predictions(preds_bert, preds_rf, y_test):
+    # Combine predictions using majority voting
+    combined_preds = np.array([np.bincount([p1, p2]).argmax() for p1, p2 in zip(preds_bert, preds_rf)])
+
+    # Evaluate the ensemble model
+    print("Ensemble Model Accuracy:", accuracy_score(y_test, combined_preds))
+    print("Ensemble Model Confusion Matrix:\n", confusion_matrix(y_test, combined_preds))
+    print("Ensemble Model Classification Report:\n", classification_report(y_test, combined_preds))
+
 if __name__ == "__main__":
     # Define the base directory
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -366,11 +497,11 @@ if __name__ == "__main__":
         logging.info(f"Total number of rows remaining in the cleaned DataFrame: {df_remove_duplicate.shape[0]}")
 
         # Visualize data
-        visualize_data(df_remove_duplicate)
+        #visualize_data(df_remove_duplicate)
 
         # Extract email information
-        extractor = EmailInformationExtractor(df_remove_duplicate)
-        extractor.save_to_csv(extracted_email_file)
+        #extractor = EmailInformationExtractor(df_remove_duplicate)
+        #extractor.save_to_csv(extracted_email_file)
 
         # Text processing
         processor = TextProcessor()
@@ -379,8 +510,25 @@ if __name__ == "__main__":
         logging.info("Text processing and saving completed.")
 
         # Plot word clouds
-        plot_word_cloud(df_original_text, "Original Dataset")
-        plot_word_cloud(df_clean, "Cleaned Dataset")
+        #plot_word_cloud(df_original_text, "Original Dataset")
+        #plot_word_cloud(df_clean, "Cleaned Dataset")
+        
+        # Fix class imbalance using the new function
+        df_clean_resampled, labels_resampled = handle_class_imbalance(df_clean, df_remove_duplicate['label'])
+
+        # Train BERT model and get predictions
+        preds_bert, y_test = process_and_train_bert_model(df_clean_resampled, labels_resampled)
+
+        # Train Random Forest model and get predictions
+        preds_rf, y_test_rf = train_random_forest(df_clean_resampled, labels_resampled)
+
+        # Ensure both models have the same test set
+        if np.array_equal(y_test, y_test_rf):
+            # Combine predictions using ensemble method
+            ensemble_predictions(preds_bert, preds_rf, y_test)
+        else:
+            logging.error("Test sets for BERT and Random Forest models do not match.")
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")
+        
