@@ -62,18 +62,26 @@ import warnings  # Warning control
 from datasets import load_dataset  # Load datasets
 
 # Import necessary libraries for the model
+from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, VotingClassifier  # Example classifier
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn.feature_extraction.text import TfidfVectorizer
-
+from sklearn.utils import resample
 from imblearn.over_sampling import SMOTE
-from transformers import BertTokenizer, BertModel
+from transformers import  BertTokenizer, BertForSequenceClassification, Trainer, TrainingArguments, BertModel
+from transformers import AdamW 
 import torch
 from torch.utils.data import DataLoader, Dataset
 from imblearn.over_sampling import SMOTE
 from typing import Union
 from tqdm import tqdm  # Import tqdm for progress bars
+import joblib
+
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+
 warnings.filterwarnings('ignore')
 
 # ANSI escape codes for text formatting
@@ -81,14 +89,14 @@ BOLD = '\033[1m'
 RESET = '\033[0m'
 
 # Download necessary NLTK resources
-nltk.download('punkt')
-nltk.download('punkt_tab')
-nltk.download('stopwords')
-nltk.download('wordnet')
+nltk.download('punkt', quiet=True)
+nltk.download('stopwords', quiet=True)
+nltk.download('wordnet', quiet=True)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow logging
+
 # Remove duplicate data
 def remove_duplicate(df):
     num_duplicates_before = df.duplicated(subset=['text'], keep=False).sum()
@@ -332,11 +340,13 @@ class TextProcessor(BaseEstimator, TransformerMixin):
                 logging.error(f"Error processing text: {e}")
                 cleaned_text_list.append('')
 
-        return cleaned_text_list
+        if y is not None:
+            return pd.DataFrame({'cleaned_text': cleaned_text_list, 'label': y})
+        else:
+            return pd.DataFrame({'cleaned_text': cleaned_text_list})
 
-    def save_to_csv_cleaned(self, text_list, filename):
+    def save_to_csv_cleaned(self, df, filename):
         try:
-            df = pd.DataFrame(text_list, columns=['cleaned_text'])
             df.to_csv(filename, index=False)
             logging.info(f"Data successfully saved to {filename}")
         except Exception as e:
@@ -357,7 +367,44 @@ def plot_word_cloud(text_list, title, width=1000, height=500, background_color='
         wordcloud.to_file(save_to_file)
         logging.info(f"Word cloud saved to {save_to_file}")
 
+# Handle imbalance with PCA and SMOTE
+def handle_imbalance_with_pca_smote(df_clean):
+    try:
+        # Separate features and labels
+        X = df_clean['cleaned_text']
+        y = df_clean['label']
 
+        # Convert text data to numerical data using TF-IDF
+        tfidf = TfidfVectorizer(max_features=5000)  # You can adjust max_features as needed
+        X_tfidf = tfidf.fit_transform(X)
+
+        # Apply PCA for dimensionality reduction
+        pca = PCA(n_components=0.95)  # Retain 95% of variance
+        X_pca = pca.fit_transform(X_tfidf.toarray())
+
+        # Apply SMOTE to balance the dataset
+        smote = SMOTE(random_state=42)
+        X_resampled, y_resampled = smote.fit_resample(X_pca, y)
+
+        # Calculate and print the percentage of spam and ham after handling imbalance
+        spam_percentage = (pd.Series(y_resampled).value_counts(normalize=True) * 100)[0]
+        ham_percentage = (pd.Series(y_resampled).value_counts(normalize=True) * 100)[1]
+        print(f"Percentage of Spam (0) after SMOTE: {spam_percentage:.2f}%")
+        print(f"Percentage of Ham (1) after SMOTE: {ham_percentage:.2f}%")
+
+        # Split the resampled data into training and testing sets
+        X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
+
+        # Print the shape of the resampled data
+        logging.info(f"Resampled X shape: {X_resampled.shape}")
+        logging.info(f"Resampled y shape: {y_resampled.shape}")
+
+        return X_train, X_test, y_train, y_test
+
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        return None, None, None, None
+    
 class TextDataset(Dataset):
     def __init__(self, texts, labels, tokenizer, max_length):
         self.texts = texts
@@ -369,54 +416,72 @@ class TextDataset(Dataset):
         return len(self.texts)
 
     def __getitem__(self, idx):
-        text = self.texts[idx]
-        label = self.labels[idx]
-        encoding = self.tokenizer.encode_plus(
-            text,
+        inputs = self.tokenizer.encode_plus(
+            self.texts[idx],
             add_special_tokens=True,
             max_length=self.max_length,
-            return_token_type_ids=False,
             padding='max_length',
             truncation=True,
-            return_attention_mask=True,
-            return_tensors='pt',
+            return_tensors='pt'
         )
+        input_ids = inputs['input_ids'].squeeze()
+        attention_mask = inputs['attention_mask'].squeeze()
+
         return {
-            'text': text,
-            'input_ids': encoding['input_ids'].flatten(),
-            'attention_mask': encoding['attention_mask'].flatten(),
-            'label': torch.tensor(label, dtype=torch.long)
+            'input_ids': input_ids,
+            'attention_mask': attention_mask,
+            'labels': torch.tensor(self.labels[idx], dtype=torch.long)
         }
 
-# Function to extract features using BERT
-def extract_features(texts, tokenizer, model, max_length, batch_size=16):
-    dataset = TextDataset(texts, [0]*len(texts), tokenizer, max_length)
-    dataloader = DataLoader(dataset, batch_size=batch_size)
-    features = []
+class BERTFeatureExtractor:
+    def __init__(self, model_name='bert-base-uncased', max_length=128, batch_size=512):
+        self.tokenizer = BertTokenizer.from_pretrained(model_name)
+        self.model = BertModel.from_pretrained(model_name)
+        self.max_length = max_length
+        self.batch_size = batch_size
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model.to(self.device)
+        print(f"Using device: {self.device}")
 
-    model.eval()
-    with torch.no_grad():
-        for batch in tqdm(dataloader, desc="Extracting BERT features"):
-            input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
-            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
-            features.append(outputs.last_hidden_state[:, 0, :].cpu().numpy())
+    def extract_features(self, texts, labels):
+        # Validate texts input
+        if isinstance(texts, str):
+            texts = [texts]
+        elif not isinstance(texts, (list, tuple)) or not all(isinstance(t, str) for t in texts):
+            raise ValueError("Input 'texts' should be a string or a list/tuple of strings.")
 
-    return np.vstack(features)
+        # Validate labels input
+        if not isinstance(labels, (list, tuple)) or not all(isinstance(l, int) for l in labels):
+            raise ValueError("Input 'labels' should be a list/tuple of integers.")
 
-# Main function
-if __name__ == "__main__":
-    # Define the base directory
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+        dataset = TextDataset(texts, labels, self.tokenizer, self.max_length)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, pin_memory=True, num_workers=4)
+        features = []
+        label_list = []
 
+        self.model.eval()
+        with torch.no_grad():
+            for batch in tqdm(dataloader, desc="Extracting BERT features"):
+                input_ids = batch['input_ids'].to(self.device, non_blocking=True)
+                attention_mask = batch['attention_mask'].to(self.device, non_blocking=True)
+                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+                # Extract the [CLS] token's hidden state
+                cls_features = outputs.last_hidden_state[:, 0, :].cpu().numpy()
+                features.append(cls_features)
+                label_list.extend(batch['labels'].cpu().numpy())
+
+        return np.vstack(features), np.array(label_list)
+    
+    
+# Main processing function
+def main():
     # Use relative paths
-    extracted_email_file = os.path.join(base_dir, 'Extracted Data', 'clean_email_info.csv')
-    clean_email_file = os.path.join(base_dir, 'Extracted Data', 'extracted_email_info.csv')
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    extracted_email_file = os.path.join(base_dir, 'Extracted Data', 'extracted_email_info.csv')
+    clean_email_file = os.path.join(base_dir, 'Extracted Data', 'clean_email_info.csv')
 
     dataset = load_dataset('talby/spamassassin', split='train', trust_remote_code=True)
     df = dataset.to_pandas()
-    texts = df['text'].tolist()
-    labels = df['label'].tolist()
 
     try:
         # Check for missing and duplicate values
@@ -424,70 +489,71 @@ if __name__ == "__main__":
         logging.info(f"Check missing values:\n{check_missing_values}\n")
         df_remove_duplicate = remove_duplicate(df)
         logging.info(f"Total number of rows remaining in the cleaned DataFrame: {df_remove_duplicate.shape[0]}")
-
+        
         # Visualize data
-        visualize_data(df_remove_duplicate)
+        #visualize_data(df_remove_duplicate)
 
         # Extract email information
-        extractor = EmailInformationExtractor(df_remove_duplicate)
-        extractor.save_to_csv(extracted_email_file)
+        #extractor = EmailInformationExtractor(df_remove_duplicate)
+        #extractor.save_to_csv(extracted_email_file)
 
         # Text processing
         processor = TextProcessor()
-        df_clean = processor.transform(df_remove_duplicate['text'])
+        df_clean = processor.transform(df_remove_duplicate['text'], df_remove_duplicate['label'])
         processor.save_to_csv_cleaned(df_clean, clean_email_file)
         logging.info("Text processing and saving completed.")
-
-        # Machine Learning: Training a classifier with class weight 'balanced'
         
-        # Features and labels
-        X = df_clean  # Cleaned text features
-        y = df_remove_duplicate['label']  # Labels (ham/spam)
-
-        # Vectorize the text data
-        vectorizer = TfidfVectorizer(max_features=5000)
-        X_transformed = vectorizer.fit_transform(X)
-
-        # Initialize BERT tokenizer and model
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        model = BertModel.from_pretrained('bert-base-uncased')
-
-        # Extract BERT features
-        max_length = 128
-        X_bert = extract_features(texts, tokenizer, model, max_length)
-
-        # Split the dataset into training and test sets
-        X_train, X_test, y_train, y_test = train_test_split(X_transformed, y, test_size=0.2, random_state=42)
-
-        # Apply SMOTE to balance the training data
-        smote = SMOTE(random_state=42)
-        X_train_resampled, y_train_resampled = smote.fit_resample(X_train, y_train)
-
-        # Initialize the classifier with class_weight='balanced'
-        rf_model = RandomForestClassifier(class_weight='balanced', random_state=42)
-
-        # Create an ensemble model
-        ensemble_model = VotingClassifier(estimators=[
-            ('rf', rf_model),
-            # Add other models here
-        ], voting='soft')
-
-        # Train the ensemble model with progress bar
-        for _ in tqdm(range(1), desc="Training ensemble model"):
-            ensemble_model.fit(X_train_resampled, y_train_resampled)
-
-        # Make predictions
-        y_pred = ensemble_model.predict(X_test)
-
-        # Evaluate the model
-        print("Accuracy:", accuracy_score(y_test, y_pred))
-        print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
-        print("Classification Report:\n", classification_report(y_test, y_pred))
-
+        # Calculate and print the percentage of spam and ham
+        spam_percentage = (df_clean['label'].value_counts(normalize=True) * 100)[0]
+        ham_percentage = (df_clean['label'].value_counts(normalize=True) * 100)[1]
+        print(f"Percentage of Spam (0): {spam_percentage:.2f}%")
+        print(f"Percentage of Ham (1): {ham_percentage:.2f}%")
+        
         # Plot word clouds (optional)
-        plot_word_cloud(df_remove_duplicate['text'], "Original Dataset")
-        plot_word_cloud(df_clean, "Cleaned Dataset")
+        #plot_word_cloud(df_remove_duplicate['text'], "Original Dataset")
+        #plot_word_cloud(df_clean, "Cleaned Dataset")
+        
+        X_train, X_test, y_train, y_test, = handle_imbalance_with_pca_smote(df_clean)
+        
+        # Convert X_train to a list of strings
+        X_train_list = [str(x) for x in X_train.tolist()]
+        y_train_list = y_train.tolist()
+        X_test_list = [str(x) for x in X_test.tolist()]
+        y_test_list = y_test.tolist()
+
+        # Print the types after conversion
+        print(f"Type of X_train_list: {type(X_train_list)}")
+        print(f"Type of y_train_list: {type(y_train_list)}")
+        
+        # Initialize the BERT feature extractor
+        feature_extractor = BERTFeatureExtractor()
+        x_train_features, y_train_features = feature_extractor.extract_features(X_train_list, y_train_list)
+        x_test_features, y_test_features = feature_extractor.extract_features(X_test_list, y_test_list)
+
+        # Train a logistic regression classifier
+        classifier = LogisticRegression(max_iter=1000)
+        classifier.fit(x_train_features, y_train_features)
+
+        # Predict on the test set
+        y_pred = classifier.predict(x_test_features)
+
+        # Calculate evaluation metrics
+        accuracy = accuracy_score(y_test_features, y_pred)
+        precision = precision_score(y_test_features, y_pred, average='weighted')
+        recall = recall_score(y_test_features, y_pred, average='weighted')
+        f1 = f1_score(y_test_features, y_pred, average='weighted')
+
+        print(f"Accuracy: {accuracy}")
+        print(f"Precision: {precision}")
+        print(f"Recall: {recall}")
+        print(f"F1 Score: {f1}")
+            
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")
+
+
+# Call the main function
+if __name__ == "__main__":
+    main()
 
