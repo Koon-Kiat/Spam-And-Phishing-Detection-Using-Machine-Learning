@@ -76,13 +76,16 @@ from torch.utils.data import DataLoader, Dataset
 from imblearn.over_sampling import SMOTE
 from typing import Union
 from tqdm import tqdm  # Import tqdm for progress bars
-import joblib
+from sklearn.model_selection import GridSearchCV
 
+import joblib
+from torch.utils.data import DataLoader
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings('ignore', category=UserWarning, module='tensorflow')
 
 # ANSI escape codes for text formatting
 BOLD = '\033[1m'
@@ -245,21 +248,16 @@ class EmailInformationExtractor:
 
 # Data cleaning
 class TextProcessor(BaseEstimator, TransformerMixin):
-    # Initialize TextProcessor
     def __init__(self, enable_spell_check=False):
-        self.stop_words = set(stopwords.words('english')) #- {'no', 'not', 'nor'}
-        self.lemmatizer = WordNetLemmatizer() # Lemmatizer
-        self.spell_checker = SpellChecker() # Spell checker
-        self.common_words = set(self.spell_checker.word_frequency.keys()) # Common words
-        self.enable_spell_check = enable_spell_check # Enable spell check
+        self.stop_words = set(stopwords.words('english'))
+        self.lemmatizer = WordNetLemmatizer()
+        self.spell_checker = SpellChecker()
+        self.common_words = set(self.spell_checker.word_frequency.keys())
+        self.enable_spell_check = enable_spell_check
 
     def expand_contractions(self, text):
         return contractions.fix(text)
-
-    def clean_html(self, text):
-        soup = BeautifulSoup(text, "html.parser")
-        return soup.get_text()
-
+        
     def to_lowercase(self, text):
         return text.lower()
 
@@ -293,17 +291,17 @@ class TextProcessor(BaseEstimator, TransformerMixin):
     def lemmatize(self, words_list):
         return [self.lemmatizer.lemmatize(w) for w in words_list]
 
-    # Cached spell check
+    def remove_url_word(self, text):
+        return re.sub(r'\burl\b', '', text)
+    
     @lru_cache(maxsize=10000)
     def cached_spell_check(self, word):
-        # Skip common words and None values
         if word is None or word in self.common_words:
             return word
         corrected_word = self.spell_checker.correction(word)
         return corrected_word if corrected_word is not None else word
 
     def correct_spelling(self, words_list):
-        # Correct spelling using multithreading
         with ThreadPoolExecutor() as executor:
             future_to_word = {executor.submit(self.cached_spell_check, word): word for word in words_list}
             corrected_words = []
@@ -314,14 +312,13 @@ class TextProcessor(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None):
         return self
 
-    # Transform text
     def transform(self, X, y=None):
         cleaned_text_list = []
 
         for body in tqdm(X, desc='Cleaning Text', unit='email'):
             try:
-                text = self.clean_html(body)
-                text = self.expand_contractions(text)
+                
+                text = self.expand_contractions(body)
                 text = self.to_lowercase(text)
                 text = self.remove_urls(text)
                 text = self.remove_emails(text)
@@ -329,6 +326,7 @@ class TextProcessor(BaseEstimator, TransformerMixin):
                 text = self.remove_punctuation(text)
                 text = self.remove_digits(text)
                 text = self.remove_non_ascii(text)
+                text = self.remove_url_word(text)
                 words_list = self.tokenize(text)
                 words_list = self.remove_stop_words(words_list)
                 words_list = self.remove_single_characters(words_list)
@@ -405,36 +403,8 @@ def handle_imbalance_with_pca_smote(df_clean):
         logging.error(f"An error occurred: {e}")
         return None, None, None, None
     
-class TextDataset(Dataset):
-    def __init__(self, texts, labels, tokenizer, max_length):
-        self.texts = texts
-        self.labels = labels
-        self.tokenizer = tokenizer
-        self.max_length = max_length
-
-    def __len__(self):
-        return len(self.texts)
-
-    def __getitem__(self, idx):
-        inputs = self.tokenizer.encode_plus(
-            self.texts[idx],
-            add_special_tokens=True,
-            max_length=self.max_length,
-            padding='max_length',
-            truncation=True,
-            return_tensors='pt'
-        )
-        input_ids = inputs['input_ids'].squeeze()
-        attention_mask = inputs['attention_mask'].squeeze()
-
-        return {
-            'input_ids': input_ids,
-            'attention_mask': attention_mask,
-            'labels': torch.tensor(self.labels[idx], dtype=torch.long)
-        }
-
 class BERTFeatureExtractor:
-    def __init__(self, model_name='bert-base-uncased', max_length=128, batch_size=512):
+    def __init__(self, model_name='bert-base-uncased', max_length=128, batch_size=32):
         self.tokenizer = BertTokenizer.from_pretrained(model_name)
         self.model = BertModel.from_pretrained(model_name)
         self.max_length = max_length
@@ -455,7 +425,7 @@ class BERTFeatureExtractor:
             raise ValueError("Input 'labels' should be a list/tuple of integers.")
 
         dataset = TextDataset(texts, labels, self.tokenizer, self.max_length)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, pin_memory=True, num_workers=4)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, pin_memory=True, num_workers=2)
         features = []
         label_list = []
 
@@ -471,8 +441,58 @@ class BERTFeatureExtractor:
                 label_list.extend(batch['labels'].cpu().numpy())
 
         return np.vstack(features), np.array(label_list)
-    
-    
+
+def train_bert_model(train_texts, train_labels, eval_texts, eval_labels):
+    # Initialize the BERT model and tokenizer
+    bert_model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+    # Tokenize the input texts
+    train_encodings = tokenizer(train_texts, truncation=True, padding=True)
+    eval_encodings = tokenizer(eval_texts, truncation=True, padding=True)
+
+    # Create a Dataset object
+    class SpamDataset(torch.utils.data.Dataset):
+        def __init__(self, encodings, labels):
+            self.encodings = encodings
+            self.labels = labels
+
+        def __getitem__(self, idx):
+            item = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+            item['labels'] = torch.tensor(self.labels[idx])
+            return item
+
+        def __len__(self):
+            return len(self.labels)
+
+    train_dataset = SpamDataset(train_encodings, train_labels)
+    eval_dataset = SpamDataset(eval_encodings, eval_labels)
+
+    # Define training arguments
+    training_args = TrainingArguments(
+        output_dir='./results',
+        num_train_epochs=3,
+        per_device_train_batch_size=8,
+        per_device_eval_batch_size=8,
+        warmup_steps=500,
+        weight_decay=0.01,
+        logging_dir='./logs',
+        logging_steps=10,
+    )
+
+    # Initialize the Trainer
+    trainer = Trainer(
+        model=bert_model,
+        args=training_args,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+    )
+
+    # Train the model
+    trainer.train()
+
+    return bert_model
+
 # Main processing function
 def main():
     # Use relative paths
@@ -489,6 +509,7 @@ def main():
         logging.info(f"Check missing values:\n{check_missing_values}\n")
         df_remove_duplicate = remove_duplicate(df)
         logging.info(f"Total number of rows remaining in the cleaned DataFrame: {df_remove_duplicate.shape[0]}")
+        logging.debug(f"DataFrame after removing duplicates:\n{df_remove_duplicate.head()}\n")
         
         # Visualize data
         #visualize_data(df_remove_duplicate)
@@ -529,25 +550,35 @@ def main():
         feature_extractor = BERTFeatureExtractor()
         x_train_features, y_train_features = feature_extractor.extract_features(X_train_list, y_train_list)
         x_test_features, y_test_features = feature_extractor.extract_features(X_test_list, y_test_list)
+        
+        # Train the BERT model
+        bert_model = train_bert_model(X_train_list, y_train_list, X_test_list, y_test_list)
 
-        # Train a logistic regression classifier
-        classifier = LogisticRegression(max_iter=1000)
-        classifier.fit(x_train_features, y_train_features)
+        # Tokenize the test data
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        test_encodings = tokenizer(X_test_list, truncation=True, padding=True)
 
         # Predict on the test set
-        y_pred = classifier.predict(x_test_features)
+        bert_model.eval()
+        y_pred_bert = []
+        for i in range(len(X_test_list)):
+            inputs = {key: torch.tensor([val[i]]) for key, val in test_encodings.items()}
+            with torch.no_grad():
+                outputs = bert_model(**inputs)
+            predictions = outputs.logits.argmax(dim=-1)
+            y_pred_bert.extend(predictions.tolist())
 
-        # Calculate evaluation metrics
-        accuracy = accuracy_score(y_test_features, y_pred)
-        precision = precision_score(y_test_features, y_pred, average='weighted')
-        recall = recall_score(y_test_features, y_pred, average='weighted')
-        f1 = f1_score(y_test_features, y_pred, average='weighted')
+        # Calculate evaluation metrics for the BERT model
+        accuracy_bert = accuracy_score(y_test_list, y_pred_bert)
+        precision_bert = precision_score(y_test_list, y_pred_bert, average='weighted')
+        recall_bert = recall_score(y_test_list, y_pred_bert, average='weighted')
+        f1_bert = f1_score(y_test_list, y_pred_bert, average='weighted')
 
-        print(f"Accuracy: {accuracy}")
-        print(f"Precision: {precision}")
-        print(f"Recall: {recall}")
-        print(f"F1 Score: {f1}")
-            
+        print(f"BERT Model Evaluation:")
+        print(f"Accuracy: {accuracy_bert}")
+        print(f"Precision: {precision_bert}")
+        print(f"Recall: {recall_bert}")
+        print(f"F1 Score: {f1_bert}")
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")
