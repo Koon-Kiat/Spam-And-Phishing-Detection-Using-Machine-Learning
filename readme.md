@@ -1,8 +1,8 @@
 # Phishing Detection Using Machine Learning
 
-![GitHub issues](https://img.shields.io/github/issues/Koon-Kiat/Phishing-Detection)
-![GitHub repo size](https://img.shields.io/github/repo-size/Koon-Kiat/Phishing-Detection)
-![Lines of code](https://img.shields.io/tokei/lines/github/Koon-Kiat/Phishing-Detection)
+![GitHub issues](https://img.shields.io/github/issues/Koon-Kiat/Phishing-Email-Detection)
+![GitHub repo size](https://img.shields.io/github/repo-size/Koon-Kiat/Phishing-Email-Detection)
+![Lines of code](https://img.shields.io/tokei/lines/github/Koon-Kiat/Phishing-Email-Detection)
 
 ## Overview
 This project aims to detect phishing emails using machine learning techniques. It involves data preprocessing, feature engineering, model training, and evaluation. The goal is to build a robust classifier that can distinguish between phishing and legitimate emails.
