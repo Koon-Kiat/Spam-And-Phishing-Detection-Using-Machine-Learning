@@ -616,9 +616,7 @@ preprocessor = ColumnTransformer(
         ('links', TfidfVectorizer(), 'links')  # Vectorize links in the email
     ])
 
-# Step 3: Combine Feature Extraction Using BERT with Metadata Features
-
-# Feature extraction using BERT for the cleaned text
+# Step 1: Feature extraction using BERT for the cleaned text
 feature_extractor = BERTFeatureExtractor()
 texts = df_clean['cleaned_text'].tolist()
 bert_features = feature_extractor.extract_features(texts)
@@ -626,24 +624,24 @@ bert_features = feature_extractor.extract_features(texts)
 # Convert BERT features to a DataFrame
 bert_features_df = pd.DataFrame(bert_features)
 
-# Step 4: Add the BERT features to the original DataFrame for additional metadata columns
-df_clean.reset_index(drop=True, inplace=True)  # Ensure no indexing issues
-bert_features_df['label'] = df_clean['label'].values  # Combine BERT features with labels
+# Step 2: Ensure that you have the correct index to combine labels
+# Add the labels to the DataFrame after ensuring alignment
+bert_features_df['label'] = df_clean['label'].reset_index(drop=True)
 
-# Step 5: Use the preprocessor for metadata columns (transform `from`, `to`, `links`)
+# Step 3: Use the preprocessor for metadata columns (transform `from`, `to`, `links`)
 X_metadata = df_clean[['from', 'to', 'links']]  # Metadata columns
 X_combined = preprocessor.fit_transform(X_metadata)  # Apply transformation
 
 # Convert sparse matrix to DataFrame
 X_combined_df = pd.DataFrame(X_combined.todense())  # Convert sparse matrix to dense format
 
-# Step 6: Merge BERT features with metadata features
+# Step 4: Merge BERT features with metadata features
 X_final = pd.concat([bert_features_df, X_combined_df], axis=1)  # Merge BERT and metadata features
 
-# Step 7: Split the data
+# Step 5: Split the data
 X_train, X_test, y_train, y_test = split_data(X_final)
 
-# Step 8: Handle data imbalance
+# Step 6: Handle data imbalance
 X_train_balanced, y_train_balanced = handle_data_imbalance(X_train, y_train)
 
 '''
