@@ -1,5 +1,4 @@
 # Description: This file is used to test the data cleaning and processing functions.
-# Import necessary libraries
 
 # Data manipulation
 import numpy as np  # Numerical operations
@@ -54,41 +53,38 @@ from spellchecker import SpellChecker  # Spell checking
 
 # Machine learning libraries
 from sklearn.base import BaseEstimator, TransformerMixin  # Scikit-learn base classes
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer  # Text feature extraction
+from sklearn.decomposition import PCA  # Principal Component Analysis
+from sklearn.model_selection import train_test_split, GridSearchCV  # Model selection
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier  # Ensemble classifiers
+from sklearn.linear_model import LogisticRegression  # Logistic Regression
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, f1_score  # Model evaluation
+from sklearn.utils import resample  # Resampling utilities
+from imblearn.over_sampling import SMOTE  # Handling imbalanced data
+
+# Transformers library
+from transformers import BertTokenizer, BertForSequenceClassification, Trainer, TrainingArguments, BertModel, AdamW  # BERT models and training utilities
+
+# PyTorch
+import torch  # PyTorch library
+from torch.utils.data import DataLoader, Dataset  # Data handling in PyTorch
+
+# TensorFlow
+import tensorflow as tf  # TensorFlow library
+
+# Sparse matrices
+from scipy.sparse import hstack, csr_matrix  # Sparse matrix operations
+
+# Profiling and job management
+import time  # Time-related functions
+import cProfile  # Profiling
+import joblib  # Job management
 
 # Warnings
 import warnings  # Warning control
 
 # Datasets
 from datasets import load_dataset  # Load datasets
-
-# Import necessary libraries for the model
-from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
-from sklearn.decomposition import PCA
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier  # Example classifier
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.utils import resample
-from imblearn.over_sampling import SMOTE
-from transformers import BertTokenizer, BertForSequenceClassification, Trainer, TrainingArguments, BertModel
-from transformers import AdamW
-import torch
-from torch.utils.data import DataLoader, Dataset
-from imblearn.over_sampling import SMOTE
-from typing import Union
-from tqdm import tqdm  # Import tqdm for progress bars
-from sklearn.model_selection import GridSearchCV
-import time
-import cProfile
-import joblib
-from torch.utils.data import DataLoader
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
-import tensorflow as tf
-from scipy.sparse import hstack
-
-warnings.filterwarnings('ignore', category=UserWarning, module='tensorflow')
 
 # ANSI escape codes for text formatting
 BOLD = '\033[1m'
@@ -101,18 +97,24 @@ nltk.download('wordnet', quiet=True)
 
 # Configure logging
 logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s [%(filename)s:%(lineno)d]',
+    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s ',
     level=logging.INFO
 )
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow logging
-# Suppress specific TensorFlow deprecation warnings
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
-# Alternatively, you can use the logging module to suppress warnings
+# Suppress TensorFlow logging
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 logging.getLogger('tensorflow').setLevel(logging.ERROR)
+
+# Suppress specific warnings from transformers
+warnings.filterwarnings("ignore", category=UserWarning, module='transformers')
+warnings.filterwarnings('ignore', category=UserWarning, module='tensorflow')
+warnings.filterwarnings("ignore", category=FutureWarning, module='transformers.tokenization_utils_base')
+
 
 # Remove duplicate data
 def remove_duplicate(df):
+    logging.info("Removing duplicate data...")
     num_duplicates_before = df.duplicated(subset=['text'], keep=False).sum()
     df_cleaned = df.drop_duplicates(subset=['text'], keep='first')
     num_duplicates_after = df_cleaned.duplicated(
@@ -128,6 +130,7 @@ def remove_duplicate(df):
 
 # Visualize data
 def visualize_data(df):
+    logging.info("Visualizing data...")
     label_map = {1: 'Ham', 0: 'Spam'}
     label_counts = df['label'].value_counts()
     ham_count = label_counts.get(1, 0)
@@ -178,6 +181,7 @@ class EmailInformationExtractor:
     def __init__(self, input_data: Union[str, pd.DataFrame], num_workers: int = 3):
         self.input_data = input_data
         self.num_workers = num_workers
+        logging.info("Initializing EmailInformationExtractor...")
 
     def extract_email_info(self) -> pd.DataFrame:
         if isinstance(self.input_data, str):
@@ -198,6 +202,7 @@ class EmailInformationExtractor:
         labels = df['label'].values.tolist()  # Extract labels
 
         num_cores = os.cpu_count()
+        logging.info(f"Extracting email information from {len(email_texts)} emails")
         logging.info(f"Number of available CPU cores: {num_cores}")
         logging.info(f"Number of threads used for extraction: {self.num_workers}")
 
@@ -254,8 +259,8 @@ class EmailInformationExtractor:
         label_counts = df['label'].value_counts(normalize=True) * 100
         spam_percentage = label_counts.get(1, 0)
         ham_percentage = label_counts.get(0, 0)
-        logging.info(f"Percentage of spam: {spam_percentage:.2f}%")
-        logging.info(f"Percentage of ham: {ham_percentage:.2f}%")
+        logging.info(f"Percentage of spam from extracted email information: {spam_percentage:.2f}%")
+        logging.info(f"Percentage of ham from extracted email information: {ham_percentage:.2f}% \n")
 
 # Data cleaning
 class TextProcessor(BaseEstimator, TransformerMixin):
@@ -265,7 +270,8 @@ class TextProcessor(BaseEstimator, TransformerMixin):
         self.spell_checker = SpellChecker()
         self.common_words = set(self.spell_checker.word_frequency.keys())
         self.enable_spell_check = enable_spell_check
-
+        logging.info("Initializing TextProcessor...")
+    
     def expand_contractions(self, text):
         return contractions.fix(text)
 
@@ -353,6 +359,7 @@ class TextProcessor(BaseEstimator, TransformerMixin):
 
 # Plot word clouds
 def plot_word_cloud(text_list, title, width=1000, height=500, background_color='white', max_words=200, stopwords=None, colormap='viridis', save_to_file=None):
+    logging.info(f"Generating word cloud for {title}...")
     unique_string = " ".join(text_list)
     wordcloud = WordCloud(width=width, height=height, background_color=background_color,
                           max_words=max_words, stopwords=stopwords, colormap=colormap).generate(unique_string)
@@ -367,44 +374,47 @@ def plot_word_cloud(text_list, title, width=1000, height=500, background_color='
         wordcloud.to_file(save_to_file)
         logging.info(f"Word cloud saved to {save_to_file}")
 
-# Handle imbalance with PCA and SMOTE
-def handle_imbalance_with_smote(df: pd.DataFrame):
+# Under Review
+def merge_and_process_data(df_extracted, df_clean, merged_file):
+    logging.info("Merging and processing data...")
     try:
-        # Ensure there are no NaN values in the 'cleaned_text' and 'label' columns
-        if df['cleaned_text'].isnull().any() or df['label'].isnull().any():
-            logging.error("Data contains NaN values. Please clean the data before processing.")
-            return None, None, None, None
+        # Concatenate the DataFrames
+        df_merged = pd.concat([df_extracted, df_clean], axis=1)
+        
+        # Check if 'clean_label' matches 'label' and print the result
+        if 'label' in df_merged.columns and 'clean_label' in df_merged.columns:
+            match = df_merged['label'] == df_merged['clean_label']
+            logging.info("Do 'label' and 'clean_label' columns match?")
+            logging.info(match.value_counts())
 
-        # Extract features and labels
-        X = df['cleaned_text'].values
-        y = df['label'].values
+        # Drop the unnecessary 'clean_label' column after concatenation
+        df_merged = df_merged.drop(columns=['clean_label'])
 
-        # Vectorize the text data
-        vectorizer = TfidfVectorizer(max_features=5000)
-        X_vectorized = vectorizer.fit_transform(X)
+        # Select only the 'label' and 'cleaned_text' columns
+        df_merged = df_merged[['label', 'cleaned_text']]
 
-        # Apply SMOTE to handle class imbalance
-        smote = SMOTE(random_state=42)
-        X_resampled, y_resampled = smote.fit_resample(X_vectorized, y)
+        # Save the combined DataFrame to a new CSV file
+        df_merged.to_csv(merged_file, index=False)
 
-        # Calculate and print the percentage of spam and ham after handling imbalance
-        spam_percentage = (pd.Series(y_resampled).value_counts(normalize=True) * 100)[0]
-        ham_percentage = (pd.Series(y_resampled).value_counts(normalize=True) * 100)[1]
-        print(f"Percentage of Spam (0) after SMOTE: {spam_percentage:.2f}%")
-        print(f"Percentage of Ham (1) after SMOTE: {ham_percentage:.2f}%")
+        total_rows = df_merged.shape[0]
+        logging.info(f"Data successfully merged and saved to {merged_file}")
+        logging.info(f"Total number of rows in the merged DataFrame: {total_rows}\n")
 
-        # Split the resampled data into training and testing sets
-        X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
+        # Calculate and print the percentage of spam and ham
+        spam_percentage = (df_merged['label'].value_counts(normalize=True) * 100)[0]
+        ham_percentage = (df_merged['label'].value_counts(normalize=True) * 100)[1]
+        logging.info(f"Percentage of Spam (0): {spam_percentage:.2f}%")
+        logging.info(f"Percentage of Ham (1): {ham_percentage:.2f}%")
 
-        # Print the shape of the resampled data
-        logging.info(f"Resampled X shape: {X_resampled.shape}")
-        logging.info(f"Resampled y shape: {y_resampled.shape}")
+        if df_merged['cleaned_text'].isnull().any():
+            logging.info(f"Data contains NaN values in the 'cleaned_text' column. Filling NaN values with empty strings.\n")
+            df_merged['cleaned_text'] = df_merged['cleaned_text'].fillna('')
 
-        return X_train, X_test, y_train, y_test
+        return df_merged
+
     except Exception as e:
-        logging.error(f"An error occurred in handle_imbalance_with_smote: {e}")
-        return None, None, None, None
-
+        logging.error(f"An error occurred in merge_and_process_data: {e}")
+        return None
 
 class TextDataset(Dataset):
     def __init__(self, texts, labels, tokenizer, max_length):
@@ -425,8 +435,8 @@ class TextDataset(Dataset):
             truncation=True,
             return_tensors='pt'
         )
-        input_ids = inputs['input_ids'].squeeze()
-        attention_mask = inputs['attention_mask'].squeeze()
+        input_ids = inputs['input_ids'].squeeze(dim=0)  # Ensure that the dimensions are correctly handled
+        attention_mask = inputs['attention_mask'].squeeze(dim=0)
 
         return {
             'input_ids': input_ids,
@@ -434,9 +444,9 @@ class TextDataset(Dataset):
             'labels': torch.tensor(self.labels[idx], dtype=torch.long)
         }
 
-
 class BERTFeatureExtractor:
     def __init__(self, max_length=128, device=None):
+        logging.info("Initializing BERT Feature Extractor...")
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.model = BertModel.from_pretrained('bert-base-uncased')
         self.max_length = max_length
@@ -448,18 +458,36 @@ class BERTFeatureExtractor:
         self.model.eval()
 
         with torch.no_grad():
-            for start in tqdm(range(0, len(texts), batch_size), desc="Extracting BERT features"):
+            for start in tqdm(range(0, len(texts), batch_size), desc="Extracting BERT features", leave=True):
                 end = min(start + batch_size, len(texts))
                 batch_texts = texts[start:end]
                 tokens = self.tokenizer(batch_texts, padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
                 input_ids = tokens['input_ids'].to(self.device)
                 attention_mask = tokens['attention_mask'].to(self.device)
                 outputs = self.model(input_ids, attention_mask=attention_mask)
-                batch_features = outputs.last_hidden_state.mean(1).cpu().numpy()  # Move back to CPU
+                batch_features = outputs.last_hidden_state.mean(dim=1).cpu().numpy()  # Move back to CPU
                 features.extend(batch_features)
         
         return features
 
+# Split the data into training and testing sets
+def split_data(features_df, test_size=0.2, random_state=42):
+    logging.info("Splitting the data into training and testing sets...\n")
+    # Assuming 'label' is the column name for labels in features_df
+    X = features_df.drop(columns=['label'])
+    y = features_df['label']
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
+    
+    return X_train, X_test, y_train, y_test
+
+# Handle data imbalance
+def handle_data_imbalance(X_train, y_train, random_state=42):
+    logging.info("Handling data imbalance...\n")
+    smote = SMOTE(random_state=random_state)
+    X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
+    
+    return X_train_balanced, y_train_balanced
 
 # Main processing function
 def main():
@@ -480,10 +508,11 @@ def main():
         # Check for missing and duplicate values
         check_missing_values = df.isnull().sum()
         logging.info(f"Check missing values:\n{check_missing_values}\n")
-
+        
+        # Check for duplicate values and remove them
         df_remove_duplicate = remove_duplicate(df)
         logging.info(f"Total number of rows remaining in the cleaned DataFrame: {
-                     df_remove_duplicate.shape[0]}")
+                     df_remove_duplicate.shape[0]}\n")
         logging.debug(f"DataFrame after removing duplicates:\n{
                       df_remove_duplicate.head()}\n")
 
@@ -494,88 +523,30 @@ def main():
         extractor = EmailInformationExtractor(df_remove_duplicate)
         extractor.save_to_csv(extracted_email_file)
 
-        # Text processing
+        # Text processing (Text only)
         processor = TextProcessor()
         df_clean = processor.transform(
         df_remove_duplicate['text'], df_remove_duplicate['label'])
         processor.save_to_csv_cleaned(df_clean, clean_email_file)
-        logging.info("Text processing and saving completed.")
+        logging.info("Text processing and saving completed.\n")
         
+        # Feature extraction using BERT
+        feature_extractor = BERTFeatureExtractor()
+        texts = df_clean['cleaned_text'].tolist()
+        features = feature_extractor.extract_features(texts)
         
-        df_extracted = pd.read_csv(extracted_email_file)
-        df_clean = pd.read_csv(clean_email_file)
+        # Convert features to a DataFrame
+        features_df = pd.DataFrame(features)
         
-        # Ensure unique column names before concatenation
-        df_clean = df_clean.rename(columns={'label': 'clean_label'})
+        # Combine features with labels
+        features_df['label'] = df_clean['label'].values
         
-        # Concatenate the DataFrames
-        df_merged = pd.concat([df_extracted, df_clean], axis=1)
+        # Split the data
+        X_train, X_test, y_train, y_test = split_data(features_df)
         
-        # Check if 'clean_label' matches 'label' and print the result
-        if 'label' in df_merged.columns and 'clean_label' in df_merged.columns:
-            match = df_merged['label'] == df_merged['clean_label']
-            print("Do 'label' and 'clean_label' columns match?")
-            print(match.value_counts())
-
-        # Drop the unnecessary 'clean_label' column after concatenation
-        df_merged = df_merged.drop(columns=['clean_label'])
-
-        # Save the combined DataFrame to a new CSV file
-        df_merged.to_csv(merged_file, index=False)
-
-        total_rows = df_merged.shape[0]
-        print(f"Data successfully merged and saved to {merged_file}")
-        print(f"Total number of rows in the merged DataFrame: {total_rows}")
-
-        
-        # Calculate and print the percentage of spam and ham
-        spam_percentage = (df_merged['label'].value_counts(normalize=True) * 100)[0]
-        ham_percentage = (df_merged['label'].value_counts(normalize=True) * 100)[1]
-        print(f"Percentage of Spam (0): {spam_percentage:.2f}%")
-        print(f"Percentage of Ham (1): {ham_percentage:.2f}%")
-        
-        # Plot word clouds (optional)
-        #plot_word_cloud(df_remove_duplicate['text'], "Original Dataset")
-        #plot_word_cloud(df_clean, "Cleaned Dataset")
-        
-        if df_merged['cleaned_text'].isnull().any():
-            logging.warning("Data contains NaN values in the 'cleaned_text' column. Filling NaN values with empty strings.")
-            df_merged['cleaned_text'] = df_merged['cleaned_text'].fillna('')
-    
-    
-        # Handle imbalance and split the data
-        X_train, X_test, y_train, y_test = handle_imbalance_with_smote(df_merged)
-
-        # Convert csr_matrix to dense arrays
-        X_train_dense = X_train.toarray()
-        X_test_dense = X_test.toarray()
-
-        # Convert dense arrays to strings for BERT feature extraction
-        X_train_str = [str(x) for x in X_train_dense]
-        X_test_str = [str(x) for x in X_test_dense]
-
-        # Ensure y_train and y_test are lists of integers
-        y_train_list = y_train.astype(int).tolist()
-        y_test_list = y_test.astype(int).tolist()
-
-        # Extract BERT features
-        extractor = BERTFeatureExtractor()
-        X_train_bert = extractor.extract_features(X_train_str)
-        X_test_bert = extractor.extract_features(X_test_str)
-
-        # Ensure BERT features are 2-D arrays
-        X_train_bert = np.array(X_train_bert)
-        X_test_bert = np.array(X_test_bert)
-
-        if X_train_bert.ndim == 1:
-            X_train_bert = X_train_bert.reshape(-1, 1)
-        if X_test_bert.ndim == 1:
-            X_test_bert = X_test_bert.reshape(-1, 1)
-
-        # Combine TF-IDF and BERT features
-        X_train_combined = hstack([X_train, X_train_bert])
-        X_test_combined = hstack([X_test, X_test_bert])
-
+        # Handle data imbalance
+        X_train_balanced, y_train_balanced = handle_data_imbalance(X_train, y_train)
+     
         # Initialize the classifier with class_weight='balanced'
         rf_model = RandomForestClassifier(class_weight='balanced', random_state=42)
         logreg_model = LogisticRegression(class_weight='balanced', random_state=42)
@@ -590,14 +561,14 @@ def main():
 
         def profile_grid_search():
             grid_search = GridSearchCV(rf_model, param_grid, cv=3, scoring='accuracy', verbose=3, n_jobs=4)
-            grid_search.fit(X_train_combined, y_train_list)
+            grid_search.fit(X_train_balanced, y_train_balanced)
             return grid_search
 
         # Timing the GridSearchCV
         start_time = time.time()
         best_rf_model = profile_grid_search().best_estimator_
         end_time = time.time()
-        print(f"GridSearchCV took {end_time - start_time:.2f} seconds")
+        logging.info(f"GridSearchCV took {end_time - start_time:.2f} seconds")
 
         # Initialize VotingClassifier (Ensemble)
         ensemble_model = VotingClassifier(estimators=[
@@ -607,34 +578,23 @@ def main():
 
         # Train the ensemble model with progress bar
         for _ in tqdm(range(1), desc="Training ensemble model"):
-            ensemble_model.fit(X_train_combined, y_train_list)
+            ensemble_model.fit(X_train_balanced, y_train_balanced)
 
         # Make predictions
-        y_train_pred = ensemble_model.predict(X_train_combined)
-        y_test_pred = ensemble_model.predict(X_test_combined)
+        y_train_pred = ensemble_model.predict(X_train_balanced)  # Predictions on the training set
+        y_test_pred = ensemble_model.predict(X_test)    # Predictions on the test set
 
         # Evaluate the model
-        train_accuracy = accuracy_score(y_train_list, y_train_pred)
-        test_accuracy = accuracy_score(y_test_list, y_test_pred)
-        print(f"Training Accuracy: {train_accuracy * 100:.2f}%")
-        print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
-        print("Confusion Matrix:\n", confusion_matrix(y_test_list, y_test_pred))
-        print("Classification Report:\n", classification_report(y_test_list, y_test_pred))
+        train_accuracy = accuracy_score(y_train_balanced, y_train_pred)
+        test_accuracy = accuracy_score(y_test, y_test_pred)
         
-
-        # Train the BERT model
-        #bert_model = train_bert_model(x_train_features, y_train_features, x_test_features, y_test_features)
-
-        # Tokenize the test data
-        #tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        #test_encodings = tokenizer(X_test_list, truncation=True, padding=True)
-
-        # Predict on the test set
-        #bert_model.eval()
-            
+        print(f"\nTraining Accuracy: {train_accuracy * 100:.2f}%")
+        print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
+        print("Confusion Matrix:\n", confusion_matrix(y_test, y_test_pred))
+        print("Classification Report:\n", classification_report(y_test, y_test_pred))
+      
     except Exception as e:
         logging.error(f"An error occurred: {e}")
-
 
 # Call the main function
 if __name__ == "__main__":
