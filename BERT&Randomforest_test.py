@@ -64,7 +64,7 @@ from sklearn.linear_model import LogisticRegression  # Logistic Regression
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, f1_score  # Model evaluation
 from sklearn.utils import resample  # Resampling utilities
 from imblearn.over_sampling import SMOTE  # Handling imbalanced data
-from sklearn.compose import ColumnTransformer
+from sklearn.compose import ColumnTransformer 
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.pipeline import Pipeline
 
@@ -379,7 +379,7 @@ class TextProcessor(BaseEstimator, TransformerMixin):
             logging.error(f"Error saving data to {filename}: {e}")
 
 # Plot word clouds
-def plot_word_cloud(text_list, title, width=1000, height=500, background_color='white', max_words=200, stopwords=None, colormap='viridis', save_to_file=None):
+def plot_word_cloud(text_list, title, width=1000, height=500, background_color='white', max_words=300, stopwords=None, colormap='viridis', save_to_file=None):
     logging.info(f"Generating word cloud for {title}...")
     unique_string = " ".join(text_list)
     wordcloud = WordCloud(width=width, height=height, background_color=background_color,
@@ -395,48 +395,45 @@ def plot_word_cloud(text_list, title, width=1000, height=500, background_color='
         wordcloud.to_file(save_to_file)
         logging.info(f"Word cloud saved to {save_to_file}")
 
-# Under Review
-def merge_and_process_data(df_extracted, df_clean, merged_file):
-    logging.info("Merging and processing data...")
-    try:
-        # Concatenate the DataFrames
-        df_merged = pd.concat([df_extracted, df_clean], axis=1)
-        
-        # Check if 'clean_label' matches 'label' and print the result
-        if 'label' in df_merged.columns and 'clean_label' in df_merged.columns:
-            match = df_merged['label'] == df_merged['clean_label']
-            logging.info("Do 'label' and 'clean_label' columns match?")
-            logging.info(match.value_counts())
+# Combine BERT features with metadata features
+def combine_features(bert_features, df_clean, headers_df, preprocessor):
+    
+    bert_features_np = np.array(bert_features)
+    
+    # Convert features to a DataFrame
+    bert_features_df = pd.DataFrame(bert_features_np)
+    
+    # Add the labels to the BERT features DataFrame for alignment
+    bert_features_df['label'] = df_clean['label'].reset_index(drop=True)
+    
+    # Logging BERT feature details
+    logging.info("BERT Features Shape: %s", bert_features_np.shape)
+    logging.info("BERT Features Type: %s", type(bert_features))
+    
+    # Convert lists of URLs to a single string in the 'Links' column
+    headers_df['Links'] = headers_df['Links'].apply(lambda x: ' '.join(x) if isinstance(x, list) else x)
 
-        # Drop the unnecessary 'clean_label' column after concatenation
-        df_merged = df_merged.drop(columns=['clean_label'])
+    # Apply the preprocessor to the metadata columns: 'From', 'To', 'Mail-To', and 'Links'
+    X_metadata = headers_df[['From', 'To', 'Mail-To', 'Links']]  # Metadata columns
+    X_combined = preprocessor.fit_transform(X_metadata)  # Apply transformation
+    
+    # Logging metadata details
+    logging.info(f"Metadata Shape: {X_metadata.shape}")
+    # Logging combined data details
+    logging.info(f"X_combined Shape: {X_combined.shape}\n")
+    
+    # Convert sparse matrix to DataFrame
+    X_combined_df = pd.DataFrame(X_combined.toarray())
 
-        # Select only the 'label' and 'cleaned_text' columns
-        df_merged = df_merged[['label', 'cleaned_text']]
+    # Ensure indices match
+    bert_features_df = bert_features_df.reset_index(drop=True)
+    X_combined_df = X_combined_df.reset_index(drop=True)
+    
+    # Merge BERT features with metadata features
+    X_final = pd.concat([bert_features_df, X_combined_df], axis=1)  # Merge BERT and metadata features
 
-        # Save the combined DataFrame to a new CSV file
-        df_merged.to_csv(merged_file, index=False)
-
-        total_rows = df_merged.shape[0]
-        logging.info(f"Data successfully merged and saved to {merged_file}")
-        logging.info(f"Total number of rows in the merged DataFrame: {total_rows}\n")
-
-        # Calculate and print the percentage of spam and ham
-        spam_percentage = (df_merged['label'].value_counts(normalize=True) * 100)[0]
-        ham_percentage = (df_merged['label'].value_counts(normalize=True) * 100)[1]
-        logging.info(f"Percentage of Spam (0): {spam_percentage:.2f}%")
-        logging.info(f"Percentage of Ham (1): {ham_percentage:.2f}%")
-
-        if df_merged['cleaned_text'].isnull().any():
-            logging.info(f"Data contains NaN values in the 'cleaned_text' column. Filling NaN values with empty strings.\n")
-            df_merged['cleaned_text'] = df_merged['cleaned_text'].fillna('')
-
-        return df_merged
-
-    except Exception as e:
-        logging.error(f"An error occurred in merge_and_process_data: {e}")
-        return None
-
+    return X_final
+    
 class TextDataset(Dataset):
     def __init__(self, texts, labels, tokenizer, max_length):
         self.texts = texts
@@ -510,6 +507,55 @@ def handle_data_imbalance(X_train, y_train, random_state=42):
     
     return X_train_balanced, y_train_balanced
 
+# Train and evaluate the ensemble model
+def train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_test):
+    # Initialize the classifiers
+    rf_model = RandomForestClassifier(class_weight='balanced', random_state=42)
+    logreg_model = LogisticRegression(class_weight='balanced', random_state=42)
+    
+    # Hyperparameter tuning for RandomForest
+    param_grid = {
+        'n_estimators': [100],  # Reduced number of estimators
+        'max_depth': [None],    # Single value for max_depth
+        'min_samples_split': [2],
+        'min_samples_leaf': [1]
+    }
+    
+    def profile_grid_search():
+        grid_search = GridSearchCV(rf_model, param_grid, cv=5, scoring='accuracy', verbose=3, n_jobs=4)
+        grid_search.fit(X_train_balanced, y_train_balanced)
+        return grid_search
+
+    # Timing the GridSearchCV
+    start_time = time.time()
+    best_rf_model = profile_grid_search().best_estimator_
+    end_time = time.time()
+    logging.info(f"GridSearchCV took {end_time - start_time:.2f} seconds\n")
+    
+    # Initialize VotingClassifier (Ensemble)
+    ensemble_model = VotingClassifier(estimators=[
+        ('rf', best_rf_model),
+        ('logreg', logreg_model)
+    ], voting='soft')
+    
+    # Train the ensemble model with progress bar
+    for _ in tqdm(range(1), desc="Training ensemble model"):
+        ensemble_model.fit(X_train_balanced, y_train_balanced)
+    
+    # Make predictions
+    y_train_pred = ensemble_model.predict(X_train_balanced)  # Predictions on the training set
+    y_test_pred = ensemble_model.predict(X_test)    # Predictions on the test set
+    
+    # Evaluate the model
+    train_accuracy = accuracy_score(y_train_balanced, y_train_pred)
+    test_accuracy = accuracy_score(y_test, y_test_pred)
+    
+    print(f"\nTraining Accuracy: {train_accuracy * 100:.2f}%")
+    print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
+    print("Confusion Matrix:\n", confusion_matrix(y_test, y_test_pred))
+    print("Classification Report:\n", classification_report(y_test, y_test_pred))
+
+
 # Main processing function
 def main():
     # Use relative paths
@@ -538,13 +584,13 @@ def main():
                       df_remove_duplicate.head()}\n")
 
         # Visualize data
-        # visualize_data(df_remove_duplicate)
+        #visualize_data(df_remove_duplicate)
         
         # Extract email header information
         header_extractor = EmailHeaderExtractor(df_remove_duplicate)
         headers_df = header_extractor.extract_headers()
         header_extractor.save_to_csv(extracted_email_file)
-        logging.info("Email header extraction complete.\n")
+        logging.info("Email header extraction and saving completed.\n")
 
         # Text processing (Text only)
         processor = TextProcessor()
@@ -553,158 +599,36 @@ def main():
         processor.save_to_csv_cleaned(df_clean, clean_email_file)
         logging.info("Text processing and saving completed.\n")
         
+        # Plot word clouds 
+        #plot_word_cloud(df_remove_duplicate['text'], "Original Dataset")
+        #plot_word_cloud(df_clean['cleaned_text'], "Cleaned Dataset")
+        
         # Feature extraction using BERT
         feature_extractor = BERTFeatureExtractor()
         texts = df_clean['cleaned_text'].tolist()
         bert_features = feature_extractor.extract_features(texts)
         
-        # Convert list of BERT features to a NumPy array
-        bert_features_np = np.array(bert_features)
-
-        # Convert features to a DataFrame
-        bert_features_df = pd.DataFrame(bert_features_np)
-        
-        # Add the labels to the BERT features DataFrame for alignment
-        bert_features_df['label'] = df_clean['label'].reset_index(drop=True)
-        
-        # Logging BERT feature details
-        logging.info("BERT Features Shape: %s", bert_features_np.shape)
-        logging.info("BERT Features Type: \n%s", type(bert_features))
-        
-        # Convert lists of URLs to a single string in the 'Links' column
-        headers_df['Links'] = headers_df['Links'].apply(lambda x: ' '.join(x) if isinstance(x, list) else x)
-
-        # Define the ColumnTransformer for preprocessing
         preprocessor = ColumnTransformer(
-            transformers=[
-                ('email_fields', OneHotEncoder(handle_unknown='ignore'), ['From', 'To', 'Mail-To']),  # One-hot encode 'from', 'to', and 'mail_to'
-                ('links', TfidfVectorizer(), 'Links')  # Vectorize links in the email
-            ])
+        transformers=[
+            ('email_fields', OneHotEncoder(handle_unknown='ignore'), ['From', 'To', 'Mail-To']),  # One-hot encode 'from', 'to', and 'mail_to'
+            ('links', TfidfVectorizer(), 'Links')  # Vectorize links in the email
+        ])
         
-        logging.info("Combining datasets...")
-        # Apply the preprocessor to the metadata columns: 'From', 'To', 'Mail-To', and 'Links'
-        X_metadata = headers_df[['From', 'To', 'Mail-To', 'Links']] # Metadata columns
-        X_combined = preprocessor.fit_transform(X_metadata)  # Apply transformation
-        
-
-        # Logging metadata details
-        logging.info(f"Metadata Shape:{X_metadata.shape}")
-        # Logging combined data details
-        logging.info(f"X_combined Shape:{X_combined.shape}")
-        logging.info(f"X_combined Type:{type(X_combined)}\n")
-        
-        # Convert sparse matrix to DataFrame
-        X_combined_df = pd.DataFrame(X_combined.toarray())
-
-        # Ensure indices match
-        bert_features_df = bert_features_df.reset_index(drop=True)
-        X_combined_df = X_combined_df.reset_index(drop=True)
-
-
-        # Merge BERT features with metadata features
-        X_final = pd.concat([bert_features_df, X_combined_df], axis=1)  # Merge BERT and metadata features
+        # Combine features from BERT and metadata
+        X_final = combine_features(bert_features, df_clean, headers_df, preprocessor)
         
         # Split the data
         X_train, X_test, y_train, y_test = split_data(X_final)
         
         # Handle data imbalance
         X_train_balanced, y_train_balanced = handle_data_imbalance(X_train, y_train)
-     
-        # Initialize the classifier with class_weight='balanced'
-        rf_model = RandomForestClassifier(class_weight='balanced', random_state=42)
-        logreg_model = LogisticRegression(class_weight='balanced', random_state=42)
-
-        # Hyperparameter tuning for RandomForest
-        param_grid = {
-            'n_estimators': [100],  # Reduced number of estimators
-            'max_depth': [None],    # Single value for max_depth
-            'min_samples_split': [2],
-            'min_samples_leaf': [1]
-        }
-
-        def profile_grid_search():
-            grid_search = GridSearchCV(rf_model, param_grid, cv=5, scoring='accuracy', verbose=3, n_jobs=4)
-            grid_search.fit(X_train_balanced, y_train_balanced)
-            return grid_search
-
-        # Timing the GridSearchCV
-        start_time = time.time()
-        best_rf_model = profile_grid_search().best_estimator_
-        end_time = time.time()
-        logging.info(f"GridSearchCV took {end_time - start_time:.2f} seconds\n")
-
-        # Initialize VotingClassifier (Ensemble)
-        ensemble_model = VotingClassifier(estimators=[
-            ('rf', best_rf_model),
-            ('logreg', logreg_model)
-        ], voting='soft')
-
-        # Train the ensemble model with progress bar
-        for _ in tqdm(range(1), desc="Training ensemble model"):
-            ensemble_model.fit(X_train_balanced, y_train_balanced)
-
-        # Make predictions
-        y_train_pred = ensemble_model.predict(X_train_balanced)  # Predictions on the training set
-        y_test_pred = ensemble_model.predict(X_test)    # Predictions on the test set
-
-        # Evaluate the model
-        train_accuracy = accuracy_score(y_train_balanced, y_train_pred)
-        test_accuracy = accuracy_score(y_test, y_test_pred)
         
-        print(f"\nTraining Accuracy: {train_accuracy * 100:.2f}%")
-        print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
-        print("Confusion Matrix:\n", confusion_matrix(y_test, y_test_pred))
-        print("Classification Report:\n", classification_report(y_test, y_test_pred))
-      
+        # Train and evaluate the ensemble model
+        train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_test)
+
     except Exception as e:
         logging.error(f"An error occurred: {e}")
 
 # Call the main function
 if __name__ == "__main__":
     main()
-
-
-
-'''
-import pandas as pd
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.compose import ColumnTransformer
-
-# Assuming 'from', 'to', and 'links' columns exist in df_clean
-preprocessor = ColumnTransformer(
-    transformers=[
-        ('clean_text', TfidfVectorizer(), 'cleaned_text'),  # Apply TF-IDF to the cleaned text
-        ('from_to', OneHotEncoder(handle_unknown='ignore'), ['from', 'to']),  # One-hot encode 'from' and 'to' email fields
-        ('links', TfidfVectorizer(), 'links')  # Vectorize links in the email
-    ])
-
-# Step 1: Feature extraction using BERT for the cleaned text
-feature_extractor = BERTFeatureExtractor()
-texts = df_clean['cleaned_text'].tolist()
-bert_features = feature_extractor.extract_features(texts)
-
-# Convert BERT features to a DataFrame
-bert_features_df = pd.DataFrame(bert_features)
-
-# Step 2: Ensure that you have the correct index to combine labels
-# Add the labels to the DataFrame after ensuring alignment
-bert_features_df['label'] = df_clean['label'].reset_index(drop=True)
-
-# Step 3: Use the preprocessor for metadata columns (transform `from`, `to`, `links`)
-X_metadata = df_clean[['from', 'to', 'links']]  # Metadata columns
-X_combined = preprocessor.fit_transform(X_metadata)  # Apply transformation
-
-# Convert sparse matrix to DataFrame
-X_combined_df = pd.DataFrame(X_combined.todense())  # Convert sparse matrix to dense format
-
-# Step 4: Merge BERT features with metadata features
-X_final = pd.concat([bert_features_df, X_combined_df], axis=1)  # Merge BERT and metadata features
-
-# Step 5: Split the data
-X_train, X_test, y_train, y_test = split_data(X_final)
-
-# Step 6: Handle data imbalance
-X_train_balanced, y_train_balanced = handle_data_imbalance(X_train, y_train)
-
-'''
