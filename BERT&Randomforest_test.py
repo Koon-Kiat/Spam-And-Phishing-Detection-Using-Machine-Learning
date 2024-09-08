@@ -24,7 +24,7 @@ import string  # String operations
 import re  # Regular expressions
 
 # HTML and XML parsing
-from bs4 import BeautifulSoup  # HTML and XML parsing
+from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning  # HTML and XML parsing
 
 # Progress bar
 from tqdm import tqdm  # Progress bar for loops
@@ -116,6 +116,7 @@ logging.getLogger('tensorflow').setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=UserWarning, module='transformers')
 warnings.filterwarnings('ignore', category=UserWarning, module='tensorflow')
 warnings.filterwarnings("ignore", category=FutureWarning, module='transformers.tokenization_utils_base')
+warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
 
 # Remove duplicate data
@@ -303,32 +304,117 @@ class TextProcessor(BaseEstimator, TransformerMixin):
         return word_tokenize(text)
 
     def remove_stop_words(self, words_list):
-        return [w for w in words_list if w not in self.stop_words]
+        return [w for w in words_list if w.lower() not in self.stop_words]
 
     def lemmatize(self, words_list):
         return [self.lemmatizer.lemmatize(w) for w in words_list]
 
     def remove_urls(self, text):
-        return re.sub(r'https?://\S+|www\.\S+', '', text)
+        # Updated to remove non-standard URL formats (e.g., 'http ww newsisfree com')
+        return re.sub(r'(http[s]?|ftp):\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', '', text)
 
-    def remove_emails(self, text):
-        return re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '', text)
-
-    def remove_email_headers(self, text):
-        headers = ['From:', 'To:', 'Subject:', 'Cc:', 'Bcc:', 'Date:']
-        for header in headers:
-            text = re.sub(rf'^{header}.*$', '', text, flags=re.MULTILINE)
-        return text
-
-    def remove_word_url(self, text):
-        return re.sub(r'\burl\b', '', text, flags=re.IGNORECASE)
+    def remove_custom_urls(self, text):
+        # Catch patterns like 'http ww' or 'www.' that are incomplete
+        return re.sub(r'\b(?:http|www)[^\s]*\b', '', text)
 
     def remove_numbers(self, text):
         return re.sub(r'\d+', '', text)
-    
+
     def remove_repeating_characters(self, text):
         return re.sub(r'(.)\1+', r'\1\1', text)
 
+    def remove_all_html_elements(self, text):
+        soup = BeautifulSoup(text, 'html.parser')
+        for script_or_style in soup(["script", "style"]):
+            script_or_style.decompose()  
+        for tag in soup.find_all(True):
+            tag.attrs = {}
+        return soup.get_text(separator=" ", strip=True)
+    
+    def remove_emails(self, text):
+        # Remove email addresses
+        return re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '', text)
+    
+    def remove_email_headers(self, text):
+        # Remove common email headers
+        headers = ['From:', 'To:', 'Subject:', 'Cc:', 'Bcc:', 'Date:', 'Reply-To:', 'Content-Type:', 'Return-Path:', 'Message-ID:', 'Received:', 'MIME-Version:', 'Delivered-To:', 'Authentication-Results:', 'DKIM-Signature:', 'X-', 'Mail-To:']
+        for header in headers:
+            text = re.sub(rf'^{header}.*$', '', text, flags=re.MULTILINE)
+        return text
+    
+    def remove_emails(self, text):
+        # Regex to match emails with or without spaces around "@"
+        email_pattern = r'\b[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        return re.sub(email_pattern, '', text)
+    
+    def remove_time(self, text):
+        # Regex to match various time patterns
+        time_pattern = r'\b(?:[01]?[0-9]|2[0-3]):[0-5][0-9](?: ?[APMapm]{2})?(?: [A-Z]{1,5})?\b'
+        return re.sub(time_pattern, '', text)
+
+    def remove_months(self, text):
+        # List of full and shortened month names
+        months = [
+            'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 
+            'november', 'december', 'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+        ]
+        # Regex to match months
+        months_regex = r'\b(?:' + '|'.join(months) + r')\b'
+        return re.sub(months_regex, '', text, flags=re.IGNORECASE)
+
+    def remove_dates(self, text):
+        # Regex to match various date formats
+        date_pattern = (
+            r'\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s*,?\s*\d{1,2}\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{4}\b|'  # Example: Mon, 2 Sep 2002
+            r'\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|[A-Za-z]+\s\d{1,2},\s\d{4})\b|'  # Example: 20-09-2002, Sep 13 2002
+            r'\b(?:\d{1,2}\s[A-Za-z]+\s\d{4})\b|'  # Example: 01 September 2002
+            r'\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{4})\b'  # Example: 24/08/2002
+        )
+        return re.sub(date_pattern, '', text, flags=re.IGNORECASE)
+
+    def remove_timezones(self, text):
+        # Regex to match time zones (e.g., PST, EST, GMT, UTC)
+        timezone_pattern = r'\b(?:[A-Z]{2,4}[+-]\d{2,4}|UTC|GMT|PST|EST|CST|MST)\b'
+        return re.sub(timezone_pattern, '', text)
+    
+    def remove_multiple_newlines(self, text):
+        # Replace multiple newlines with a single newline
+        return re.sub(r'\n{2,}', '\n', text)
+    
+    def remove_word_url(self, text):
+        return re.sub(r'\burl\b', '', text, flags=re.IGNORECASE)
+    
+    def remove_word_original_message(self, text):
+        return re.sub(r'\boriginal message\b', '', text, flags=re.IGNORECASE)
+    
+    def remove_single_characters(self, text):
+        # Remove single characters that are not part of a word
+        return re.sub(r'\b\w\b', '', text)
+    
+    def remove_nt_variations(self, text):
+        return re.sub(r'\bnt+ts?\b', '', text)
+    
+    def remove_repetitive_patterns(self, text):
+        # Remove repetitive 'n' and 'nt' patterns
+        return re.sub(r'\b(n|nt)+\b', '', text)
+    
+    def remove_repetitive_patterns(self, text):
+        # Remove repetitive 't', 'n', and 'nt' patterns
+        return re.sub(r'\b(t+|n+|nt+)\b', '', text)
+    
+    def lowercase_text(self, text):
+        return text.lower()
+    
+    def remove_bullet_points_and_symbols(self, text):
+        # List of bullet points and similar symbols
+        symbols = ['•', '◦', '◉', '▪', '▫', '●', '□', '■', '✦', '✧', '✪', '✫', '✬', '✭', '✮', '✯', '✰']
+        
+        # Remove all occurrences of these symbols
+        for symbol in symbols:
+            text = text.replace(symbol, '')
+        
+        return text
+    
     def fit(self, X, y=None):
         return self
 
@@ -337,38 +423,40 @@ class TextProcessor(BaseEstimator, TransformerMixin):
 
         for body in tqdm(X, desc='Cleaning Text', unit='email'):
             try:
-                text = self.expand_contractions(body)
+                text = self.remove_all_html_elements(body)
+                text = self.expand_contractions(text)
                 text = self.remove_email_headers(text)
-                text = self.remove_urls(text)
                 text = self.remove_emails(text)
-                text = self.remove_word_url(text)
-                text = self.remove_punctuation(text)
+                text = self.remove_time(text)
+                text = self.remove_months(text)
+                text = self.remove_dates(text)
+                text = self.remove_timezones(text)
                 text = self.remove_numbers(text)
+                text = self.remove_multiple_newlines(text)
+                text = self.remove_custom_urls(text)
+                text = self.remove_urls(text)
+                text = self.remove_punctuation(text)
+                text = self.remove_word_url(text)
+                text = self.remove_word_original_message(text)
+                text = self.remove_single_characters(text)
+                text = self.remove_nt_variations(text)
+                text = self.remove_repetitive_patterns(text)
+                text = self.lowercase_text(text)
+                text = self.remove_bullet_points_and_symbols(text)
                 text = self.remove_repeating_characters(text)
                 words_list = self.tokenize(text)
                 words_list = self.remove_stop_words(words_list)
                 lemmatized_list = self.lemmatize(words_list)
-
-                corrected_sentences = []
-                for word in lemmatized_list:
-                    corrected_word = re.sub(
-                        r"(?<=t)[^a-zA-Z0-9']+|[^a-zA-Z0-9']+|(?<=\w)\-|(?<=\w)\—", ' ', word)
-                    corrected_word = [
-                        token for token in word_tokenize(corrected_word)]
-                    corrected_sentences.extend(corrected_word)
-
-                cleaned_text_list.append(' '.join(corrected_sentences))
+                cleaned_text_list.append(' '.join(lemmatized_list))
             except Exception as e:
                 logging.error(f"Error processing text: {e}")
                 cleaned_text_list.append('')
 
         if y is not None:
-            logging.info(f"Total amount of text processed: {
-                         len(cleaned_text_list)}")
+            logging.info(f"Total amount of text processed: {len(cleaned_text_list)}")
             return pd.DataFrame({'cleaned_text': cleaned_text_list, 'label': y})
         else:
-            logging.info(f"Total amount of text processed: {
-                         len(cleaned_text_list)}")
+            logging.info(f"Total amount of text processed: {len(cleaned_text_list)}")
             return pd.DataFrame({'cleaned_text': cleaned_text_list})
 
     def save_to_csv_cleaned(self, df, filename):
@@ -379,7 +467,7 @@ class TextProcessor(BaseEstimator, TransformerMixin):
             logging.error(f"Error saving data to {filename}: {e}")
 
 # Plot word clouds
-def plot_word_cloud(text_list, title, width=1000, height=500, background_color='white', max_words=300, stopwords=None, colormap='viridis', save_to_file=None):
+def plot_word_cloud(text_list, title, width=1500, height=1000, background_color='white', max_words=300, stopwords=None, colormap='viridis', save_to_file=None):
     logging.info(f"Generating word cloud for {title}...")
     unique_string = " ".join(text_list)
     wordcloud = WordCloud(width=width, height=height, background_color=background_color,
@@ -546,14 +634,19 @@ def train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_te
     y_train_pred = ensemble_model.predict(X_train_balanced)  # Predictions on the training set
     y_test_pred = ensemble_model.predict(X_test)    # Predictions on the test set
     
-    # Evaluate the model
     train_accuracy = accuracy_score(y_train_balanced, y_train_pred)
     test_accuracy = accuracy_score(y_test, y_test_pred)
+    target_names = ['Phishing', 'Safe']
     
     print(f"\nTraining Accuracy: {train_accuracy * 100:.2f}%")
     print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
     print("Confusion Matrix:\n", confusion_matrix(y_test, y_test_pred))
-    print("Classification Report:\n", classification_report(y_test, y_test_pred))
+    #print("Classification Report:\n", classification_report(y_test, y_test_pred))
+    print("Classification Report for Training Data:")
+    print(classification_report(y_train_balanced, y_train_pred, target_names=target_names))
+    # Print classification report for test data
+    print("\nClassification Report for Test Data:")
+    print(classification_report(y_test, y_test_pred, target_names=target_names))
 
 
 # Main processing function
@@ -601,7 +694,7 @@ def main():
         
         # Plot word clouds 
         #plot_word_cloud(df_remove_duplicate['text'], "Original Dataset")
-        #plot_word_cloud(df_clean['cleaned_text'], "Cleaned Dataset")
+        plot_word_cloud(df_clean['cleaned_text'], "Cleaned Dataset")
         
         # Feature extraction using BERT
         feature_extractor = BERTFeatureExtractor()
