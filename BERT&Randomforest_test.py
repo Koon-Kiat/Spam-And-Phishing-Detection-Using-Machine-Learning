@@ -15,6 +15,9 @@ import os  # Interact with the operating system
 # Email parsing
 import email  # Email handling
 import email.policy  # Email policies
+from email import policy
+from email.parser import BytesParser
+from email.message import EmailMessage
 
 # String and regular expression operations
 import string  # String operations
@@ -61,6 +64,9 @@ from sklearn.linear_model import LogisticRegression  # Logistic Regression
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, f1_score  # Model evaluation
 from sklearn.utils import resample  # Resampling utilities
 from imblearn.over_sampling import SMOTE  # Handling imbalanced data
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.pipeline import Pipeline
 
 # Transformers library
 from transformers import BertTokenizer, BertForSequenceClassification, Trainer, TrainingArguments, BertModel, AdamW  # BERT models and training utilities
@@ -176,91 +182,106 @@ def visualize_data(df):
 
     plt.show()
 
-# Extract email information
-class EmailInformationExtractor:
-    def __init__(self, input_data: Union[str, pd.DataFrame], num_workers: int = 3):
-        self.input_data = input_data
-        self.num_workers = num_workers
-        logging.info("Initializing EmailInformationExtractor...")
+# Extract email header
+class EmailHeaderExtractor:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df
+        self.headers_df = pd.DataFrame()
+        logging.info("Initializing EmailHeaderExtractor...")
 
-    def extract_email_info(self) -> pd.DataFrame:
-        if isinstance(self.input_data, str):
-            df = pd.read_csv(self.input_data)
-        elif isinstance(self.input_data, pd.DataFrame):
-            df = self.input_data
+    def clean_links(self, links: List[str]) -> List[str]:
+        cleaned_links = []
+        for link in links:
+            # Remove single quotes and brackets, then clean new lines and extra spaces
+            link = re.sub(r'[\'\[\]\s]+', '', link)  # Remove single quotes, brackets, and whitespace
+            link = re.sub(r'\\n+', ' ', link)  # Replace \n and repeating new lines with a single space
+            link = link.strip()  # Trim leading and trailing spaces
+            if link:  # Avoid appending empty links
+                cleaned_links.append(link)
+        return cleaned_links
+
+    def extract_inline_headers(self, email_text: str) -> Dict[str, Union[str, None]]:
+        # Regex to capture full email addresses in the format Name <email@domain.com>
+        from_match = re.search(r'From:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
+        to_match = re.search(r'To:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
+        mail_to_match = re.search(r'mailto:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
+
+        from_header = from_match.group(1) if from_match else None
+        to_header = to_match.group(1) if to_match else None
+        mail_to_header = mail_to_match.group(1) if mail_to_match else None
+
+        return {'From': from_header, 'To': to_header, 'Mail-To': mail_to_header}
+
+    def extract_body_content(self, email_message: EmailMessage) -> str:
+        # Extract body content from different parts of the email
+        body_content = ""
+        if email_message.is_multipart():
+            for part in email_message.iter_parts():
+                if part.get_content_type() == 'text/plain':
+                    body_content += part.get_payload(decode=True).decode(errors='ignore')
+                elif part.get_content_type() == 'text/html':
+                    body_content += part.get_payload(decode=True).decode(errors='ignore')
         else:
-            raise ValueError("input_data should be either a file path or a DataFrame.")
+            body_content = email_message.get_payload(decode=True).decode(errors='ignore')
+        return body_content
 
-        # Initialize DataFrame to store extracted information
-        extracted_df = pd.DataFrame(columns=[
-            'From', 'To', 'Delivered-To', 'Subject', 'Reply-To', 'Content-Type',
-            'Return-Path', 'Received', 'Message-ID', 'MIME', 'DKIM-Signature',
-            'Authentication-Results', 'Links'
-        ])
+    def extract_headers(self) -> pd.DataFrame:
+        headers_list: List[Dict[str, Union[str, List[str]]]] = []
 
-        email_texts = df['text'].values.tolist()  # Extract email texts
-        labels = df['label'].values.tolist()  # Extract labels
+        # Add a progress bar for email processing
+        for email_text in tqdm(self.df['text'], desc="Extracting headers"):
+            try:
+                # Parse the email
+                email_message = BytesParser(policy=policy.default).parsebytes(email_text.encode('utf-8'))
 
-        num_cores = os.cpu_count()
-        logging.info(f"Extracting email information from {len(email_texts)} emails")
-        logging.info(f"Number of available CPU cores: {num_cores}")
-        logging.info(f"Number of threads used for extraction: {self.num_workers}")
+                # Extract 'From', 'To', and 'Mail-To' headers
+                from_header = email_message['From'] if 'From' in email_message else None
+                to_header = email_message['To'] if 'To' in email_message else None
+                mail_to_header = email_message.get('Mail-To') if email_message.get('Mail-To') else None
 
-        # Extract email information using multithreading
-        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-            results = list(tqdm(executor.map(self._extract_info_from_text, email_texts), total=len(email_texts), desc="Extracting email info"))
+                # Fallback to inline header extraction if headers are not present
+                if not from_header or not to_header:
+                    inline_headers = self.extract_inline_headers(email_text)
+                    from_header = inline_headers['From'] or from_header
+                    to_header = inline_headers['To'] or to_header
+                    mail_to_header = inline_headers['Mail-To'] or mail_to_header
 
-        # Add labels to extracted information
-        for i, result in enumerate(results):
-            result['label'] = labels[i]
+                # Clean 'From', 'To', and 'Mail-To' headers
+                from_header = from_header if from_header else None
+                to_header = to_header if to_header else None
+                mail_to_header = mail_to_header if mail_to_header else None
 
-        extracted_df = pd.concat([extracted_df, pd.DataFrame(results)], ignore_index=True)
+                # Extract body content
+                body_content = self.extract_body_content(email_message)
+                logging.debug(f"Email body content: {body_content}")
 
-        return extracted_df
+                # Extract links from the body content
+                url_pattern = r'https?:\/\/[^\s\'"()<>]+'
+                links = re.findall(url_pattern, body_content)
+                links = self.clean_links(links)
 
-    def _extract_info_from_text(self, text: str) -> Dict[str, str]:
-        info = {
-            'From': self._extract_header(text, 'From:'),
-            'To': self._extract_header(text, 'To:'),
-            'Delivered-To': self._extract_header(text, 'Delivered-To:'),
-            'Subject': self._extract_header(text, 'Subject:'),
-            'Reply-To': self._extract_header(text, 'Reply-To:'),
-            'Content-Type': self._extract_header(text, 'Content-Type:'),
-            'Return-Path': self._extract_header(text, 'Return-Path:'),
-            'Received': self._extract_header(text, 'Received:'),
-            'Message-ID': self._extract_header(text, 'Message-ID:'),
-            'MIME': self._extract_header(text, 'MIME-Version:'),
-            'DKIM-Signature': self._extract_header(text, 'DKIM-Signature:'),
-            'Authentication-Results': self._extract_header(text, 'Authentication-Results:'),
-            'Links': self._extract_links(text)
-        }
-        return info
+                headers_list.append({
+                    'From': from_header,
+                    'To': to_header,
+                    'Mail-To': mail_to_header,
+                    'Links': links
+                })
+            except Exception as e:
+                logging.error(f"Error parsing email: {e}")
+                headers_list.append({'From': None, 'To': None, 'Mail-To': None, 'Links': []})
+                
+        self.headers_df = pd.DataFrame(headers_list)
+        # Clean 'Links' column after extraction
+        self.headers_df['Links'] = self.headers_df['Links'].apply(self.clean_links)
+        return self.headers_df
 
-    def _extract_header(self, text: str, header: str) -> str:
-        pattern = re.compile(rf'{header}\s*(.*)', re.MULTILINE)
-        match = pattern.search(text)
-        return match.group(1).strip() if match else ''
-
-    def _extract_links(self, text: str) -> str:
-        links = re.findall(r'http[s]?://\S+', text)
-        return ', '.join(links)
-
-    def save_to_csv(self, output_file: str):
-        try:
-            df = self.extract_email_info()
-            df.to_csv(output_file, index=False)
-            logging.info(f"Data successfully saved to {output_file}")
-            self.print_label_percentages(df)
-        except Exception as e:
-            logging.error(f"Error saving data to CSV: {e}")
-
-    # Print label percentages
-    def print_label_percentages(self, df: pd.DataFrame):
-        label_counts = df['label'].value_counts(normalize=True) * 100
-        spam_percentage = label_counts.get(1, 0)
-        ham_percentage = label_counts.get(0, 0)
-        logging.info(f"Percentage of spam from extracted email information: {spam_percentage:.2f}%")
-        logging.info(f"Percentage of ham from extracted email information: {ham_percentage:.2f}% \n")
+    def save_to_csv(self, file_path: str):
+        if not self.headers_df.empty:
+            # Apply the cleaning function to your DataFrame
+            self.headers_df.to_csv(file_path, index=False)
+            logging.info(f"Data successfully saved to: {file_path}")
+        else:
+            raise ValueError("No header information extracted. Please run extract_headers() first.")
 
 # Data cleaning
 class TextProcessor(BaseEstimator, TransformerMixin):
@@ -518,10 +539,12 @@ def main():
 
         # Visualize data
         # visualize_data(df_remove_duplicate)
-
-        # Extract email information
-        extractor = EmailInformationExtractor(df_remove_duplicate)
-        extractor.save_to_csv(extracted_email_file)
+        
+        # Extract email header information
+        header_extractor = EmailHeaderExtractor(df_remove_duplicate)
+        headers_df = header_extractor.extract_headers()
+        header_extractor.save_to_csv(extracted_email_file)
+        logging.info("Email header extraction complete.\n")
 
         # Text processing (Text only)
         processor = TextProcessor()
@@ -533,16 +556,56 @@ def main():
         # Feature extraction using BERT
         feature_extractor = BERTFeatureExtractor()
         texts = df_clean['cleaned_text'].tolist()
-        features = feature_extractor.extract_features(texts)
+        bert_features = feature_extractor.extract_features(texts)
         
+        # Convert list of BERT features to a NumPy array
+        bert_features_np = np.array(bert_features)
+
         # Convert features to a DataFrame
-        features_df = pd.DataFrame(features)
+        bert_features_df = pd.DataFrame(bert_features_np)
         
-        # Combine features with labels
-        features_df['label'] = df_clean['label'].values
+        # Add the labels to the BERT features DataFrame for alignment
+        bert_features_df['label'] = df_clean['label'].reset_index(drop=True)
+        
+        # Logging BERT feature details
+        logging.info("BERT Features Shape: %s", bert_features_np.shape)
+        logging.info("BERT Features Type: \n%s", type(bert_features))
+        
+        # Convert lists of URLs to a single string in the 'Links' column
+        headers_df['Links'] = headers_df['Links'].apply(lambda x: ' '.join(x) if isinstance(x, list) else x)
+
+        # Define the ColumnTransformer for preprocessing
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ('email_fields', OneHotEncoder(handle_unknown='ignore'), ['From', 'To', 'Mail-To']),  # One-hot encode 'from', 'to', and 'mail_to'
+                ('links', TfidfVectorizer(), 'Links')  # Vectorize links in the email
+            ])
+        
+        logging.info("Combining datasets...")
+        # Apply the preprocessor to the metadata columns: 'From', 'To', 'Mail-To', and 'Links'
+        X_metadata = headers_df[['From', 'To', 'Mail-To', 'Links']] # Metadata columns
+        X_combined = preprocessor.fit_transform(X_metadata)  # Apply transformation
+        
+
+        # Logging metadata details
+        logging.info(f"Metadata Shape:{X_metadata.shape}")
+        # Logging combined data details
+        logging.info(f"X_combined Shape:{X_combined.shape}")
+        logging.info(f"X_combined Type:{type(X_combined)}\n")
+        
+        # Convert sparse matrix to DataFrame
+        X_combined_df = pd.DataFrame(X_combined.toarray())
+
+        # Ensure indices match
+        bert_features_df = bert_features_df.reset_index(drop=True)
+        X_combined_df = X_combined_df.reset_index(drop=True)
+
+
+        # Merge BERT features with metadata features
+        X_final = pd.concat([bert_features_df, X_combined_df], axis=1)  # Merge BERT and metadata features
         
         # Split the data
-        X_train, X_test, y_train, y_test = split_data(features_df)
+        X_train, X_test, y_train, y_test = split_data(X_final)
         
         # Handle data imbalance
         X_train_balanced, y_train_balanced = handle_data_imbalance(X_train, y_train)
@@ -560,7 +623,7 @@ def main():
         }
 
         def profile_grid_search():
-            grid_search = GridSearchCV(rf_model, param_grid, cv=3, scoring='accuracy', verbose=3, n_jobs=4)
+            grid_search = GridSearchCV(rf_model, param_grid, cv=5, scoring='accuracy', verbose=3, n_jobs=4)
             grid_search.fit(X_train_balanced, y_train_balanced)
             return grid_search
 
@@ -568,7 +631,7 @@ def main():
         start_time = time.time()
         best_rf_model = profile_grid_search().best_estimator_
         end_time = time.time()
-        logging.info(f"GridSearchCV took {end_time - start_time:.2f} seconds")
+        logging.info(f"GridSearchCV took {end_time - start_time:.2f} seconds\n")
 
         # Initialize VotingClassifier (Ensemble)
         ensemble_model = VotingClassifier(estimators=[
