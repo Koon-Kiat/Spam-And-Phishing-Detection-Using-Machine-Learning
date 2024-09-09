@@ -128,60 +128,100 @@ def remove_duplicate(df):
         subset=['text'], keep=False).sum()
     duplicates_removed = num_duplicates_before - num_duplicates_after
 
-    logging.info(f"Total number of rows identified as duplicates based on 'text': {
-                 num_duplicates_before}")
-    logging.info(f"Number of rows removed due to duplication: {
-                 duplicates_removed}")
+    logging.info(f"Total number of rows identified as duplicates based on 'text': {num_duplicates_before}")
+    logging.info(f"Number of rows removed due to duplication: {duplicates_removed}")
 
     return df_cleaned
 
 # Visualize data
-def visualize_data(df):
-    logging.info("Visualizing data...")
-    label_map = {1: 'Ham', 0: 'Spam'}
-    label_counts = df['label'].value_counts()
-    ham_count = label_counts.get(1, 0)
-    spam_count = label_counts.get(0, 0)
-    total_count = ham_count + spam_count
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
 
-    if total_count == 0:
+def visualize_data_comparison(df_before, df_after):
+    logging.info("Visualizing data before and after cleaning...")
+
+    # Mapping and counting labels for before and after cleaning
+    label_map = {1: 'Safe', 0: 'Phishing'}
+    label_counts_before = df_before['label'].value_counts()
+    label_counts_after = df_after['label'].value_counts()
+
+    ham_count_before = label_counts_before.get(1, 0)
+    spam_count_before = label_counts_before.get(0, 0)
+    total_before = ham_count_before + spam_count_before
+
+    ham_count_after = label_counts_after.get(1, 0)
+    spam_count_after = label_counts_after.get(0, 0)
+    total_after = ham_count_after + spam_count_after
+
+    if total_before == 0 or total_after == 0:
         logging.warning("No data to visualize.")
         return
 
-    # Plot distribution of ham and spam emails
-    data = [ham_count / total_count, spam_count / total_count]
-    labels = ['Ham', 'Spam']
-    colors = ['blue', 'red']
+    # Plot distribution before and after cleaning
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-    #
-    plt.figure(figsize=(12, 5))
-    wedges, texts, autotexts = plt.pie(
-        data, labels=labels, autopct='%.0f%%', colors=colors, startangle=140)
-    plt.title('Distribution of Ham and Spam Emails')
+    # Pie chart for data before cleaning
+    data_before = [ham_count_before / total_before, spam_count_before / total_before]
+    wedges, texts, autotexts = axes[0].pie(
+        data_before, labels=['Safe', 'Phishing'], autopct='%.0f%%', colors=['blue', 'red'], startangle=140)
+    axes[0].set_title('Before Cleaning')
 
     for i, wedge in enumerate(wedges):
         angle = (wedge.theta2 - wedge.theta1) / 2. + wedge.theta1
         x = wedge.r * 0.7 * np.cos(np.radians(angle))
         y = wedge.r * 0.7 * np.sin(np.radians(angle))
-        plt.text(x, y, f'{labels[i]}: {label_counts.get(
-            i, 0)}', ha='center', va='center', fontsize=12, color='black')
+        axes[0].text(x, y, f'{["Safe", "Phishing"][i]}: {label_counts_before.get(i, 0)}', ha='center', va='center', fontsize=10)
 
+    # Pie chart for data after cleaning
+    data_after = [ham_count_after / total_after, spam_count_after / total_after]
+    wedges, texts, autotexts = axes[1].pie(
+        data_after, labels=['Safe', 'Phishing'], autopct='%.0f%%', colors=['blue', 'red'], startangle=140)
+    axes[1].set_title('After Cleaning')
+
+    for i, wedge in enumerate(wedges):
+        angle = (wedge.theta2 - wedge.theta1) / 2. + wedge.theta1
+        x = wedge.r * 0.7 * np.cos(np.radians(angle))
+        y = wedge.r * 0.7 * np.sin(np.radians(angle))
+        axes[1].text(x, y, f'{["Safe", "Phishing"][i]}: {label_counts_after.get(i, 0)}', ha='center', va='center', fontsize=10)
+
+    plt.tight_layout()
     plt.show()
 
-    # Plot count of ham and spam emails
-    plt.figure(figsize=(8, 5))
-    ax = sns.countplot(x='label', data=df, palette=colors, order=[1, 0])
-    plt.title('Ham vs Spam Email Count')
-    plt.xlabel('Label')
-    plt.ylabel('Count')
-    plt.xticks(ticks=[0, 1], labels=['Ham', 'Spam'])
+    # Bar plot for email counts before and after cleaning
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-    for p in ax.patches:
+    # Bar plot before cleaning
+    sns.countplot(x='label', data=df_before, palette=['blue', 'red'], ax=axes[0], order=[1, 0])
+    axes[0].set_title('Safe vs Phishing Email Count (Before Cleaning)')
+    axes[0].set_xticklabels(['Safe', 'Phishing'])
+    axes[0].set_xlabel('Label')
+    axes[0].set_ylabel('Count')
+
+    # Annotate percentages on the bars
+    for p in axes[0].patches:
         height = p.get_height()
-        ax.annotate(f'{height / total_count:.1%}', (p.get_x() + p.get_width() / 2., height),
-                    ha='center', va='center', xytext=(0, 5), textcoords='offset points')
+        axes[0].annotate(f'{height / total_before:.1%}', (p.get_x() + p.get_width() / 2., height),
+                         ha='center', va='center', xytext=(0, 5), textcoords='offset points')
 
+    # Bar plot after cleaning
+    sns.countplot(x='label', data=df_after, palette=['blue', 'red'], ax=axes[1], order=[1, 0])
+    axes[1].set_title('Safe vs Phishing Email Count (After Cleaning)')
+    axes[1].set_xticklabels(['Safe', 'Phishing'])
+    axes[1].set_xlabel('Label')
+    axes[1].set_ylabel('Count')
+
+    # Annotate percentages on the bars
+    for p in axes[1].patches:
+        height = p.get_height()
+        axes[1].annotate(f'{height / total_after:.1%}', (p.get_x() + p.get_width() / 2., height),
+                         ha='center', va='center', xytext=(0, 5), textcoords='offset points')
+
+    plt.tight_layout()
     plt.show()
+
+
+
 
 # Extract email header
 class EmailHeaderExtractor:
@@ -671,14 +711,12 @@ def main():
         
         # Check for duplicate values and remove them
         df_remove_duplicate = remove_duplicate(df)
-        logging.info(f"Total number of rows remaining in the cleaned DataFrame: {
-                     df_remove_duplicate.shape[0]}\n")
-        logging.debug(f"DataFrame after removing duplicates:\n{
-                      df_remove_duplicate.head()}\n")
+        logging.info(f"Total number of rows remaining in the cleaned DataFrame: {df_remove_duplicate.shape[0]}\n")
+        logging.debug(f"DataFrame after removing duplicates:\n{df_remove_duplicate.head()}\n")
 
-        # Visualize data
-        #visualize_data(df_remove_duplicate)
-        
+        # Visualize data before and after cleaning
+        #visualize_data_comparison(df, df_remove_duplicate)
+
         # Extract email header information
         header_extractor = EmailHeaderExtractor(df_remove_duplicate)
         headers_df = header_extractor.extract_headers()
@@ -687,8 +725,7 @@ def main():
 
         # Text processing (Text only)
         processor = TextProcessor()
-        df_clean = processor.transform(
-        df_remove_duplicate['text'], df_remove_duplicate['label'])
+        df_clean = processor.transform(df_remove_duplicate['text'], df_remove_duplicate['label'])
         processor.save_to_csv_cleaned(df_clean, clean_email_file)
         logging.info("Text processing and saving completed.\n")
         
