@@ -343,7 +343,14 @@ class TextProcessor(BaseEstimator, TransformerMixin):
         return contractions.fix(text)
 
     def remove_punctuation(self, text):
-        return text.translate(str.maketrans('', '', string.punctuation))
+        # Define additional punctuation or symbols to remove
+        extra_punctuation = '“”‘’—–•·’'
+        
+        # Combine standard punctuation and extra punctuation
+        all_punctuation = string.punctuation + extra_punctuation
+        
+        # Remove all punctuation from the text
+        return text.translate(str.maketrans('', '', all_punctuation))
 
     def tokenize(self, text):
         return word_tokenize(text)
@@ -365,9 +372,6 @@ class TextProcessor(BaseEstimator, TransformerMixin):
     def remove_numbers(self, text):
         return re.sub(r'\d+', '', text)
 
-    def remove_repeating_characters(self, text):
-        return re.sub(r'(.)\1+', r'\1\1', text)
-
     def remove_all_html_elements(self, text):
         soup = BeautifulSoup(text, 'html.parser')
         for script_or_style in soup(["script", "style"]):
@@ -375,10 +379,6 @@ class TextProcessor(BaseEstimator, TransformerMixin):
         for tag in soup.find_all(True):
             tag.attrs = {}
         return soup.get_text(separator=" ", strip=True)
-    
-    def remove_emails(self, text):
-        # Remove email addresses
-        return re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '', text)
     
     def remove_email_headers(self, text):
         # Remove common email headers
@@ -388,9 +388,16 @@ class TextProcessor(BaseEstimator, TransformerMixin):
         return text
     
     def remove_emails(self, text):
-        # Regex to match emails with or without spaces around "@"
-        email_pattern = r'\b[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        return re.sub(email_pattern, '', text)
+        # Regex pattern to match emails with or without spaces around "@"
+        email_pattern_with_spaces = r'\b[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        # Regex pattern to match emails without spaces
+        email_pattern_no_spaces = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        
+        # Combine both patterns using the OR operator
+        combined_pattern = f"({email_pattern_with_spaces}|{email_pattern_no_spaces})"
+        
+        # Perform the substitution
+        return re.sub(combined_pattern, '', text)
     
     def remove_time(self, text):
         # Regex to match various time patterns
@@ -426,26 +433,17 @@ class TextProcessor(BaseEstimator, TransformerMixin):
         # Replace multiple newlines with a single newline
         return re.sub(r'\n{2,}', '\n', text)
     
-    def remove_word_url(self, text):
-        return re.sub(r'\burl\b', '', text, flags=re.IGNORECASE)
-    
-    def remove_word_original_message(self, text):
-        return re.sub(r'\boriginal message\b', '', text, flags=re.IGNORECASE)
-    
+    def remove_words(self, text):
+        # Combine both words using the | (OR) operator in regex
+        return re.sub(r'\b(url|original message)\b', '', text, flags=re.IGNORECASE)
+
     def remove_single_characters(self, text):
         # Remove single characters that are not part of a word
         return re.sub(r'\b\w\b', '', text)
     
-    def remove_nt_variations(self, text):
-        return re.sub(r'\bnt+ts?\b', '', text)
-    
     def remove_repetitive_patterns(self, text):
-        # Remove repetitive 'n' and 'nt' patterns
-        return re.sub(r'\b(n|nt)+\b', '', text)
-    
-    def remove_repetitive_patterns(self, text):
-        # Remove repetitive 't', 'n', and 'nt' patterns
-        return re.sub(r'\b(t+|n+|nt+)\b', '', text)
+    # Combine patterns for 'nt+ts?', repetitive 'n' or 'nt', and 't+', 'n+', 'nt+'
+        return re.sub(r'\b(nt+ts?|n+|t+|nt+)\b', '', text)
     
     def lowercase_text(self, text):
         return text.lower()
@@ -481,14 +479,11 @@ class TextProcessor(BaseEstimator, TransformerMixin):
                 text = self.remove_custom_urls(text)
                 text = self.remove_urls(text)
                 text = self.remove_punctuation(text)
-                text = self.remove_word_url(text)
-                text = self.remove_word_original_message(text)
+                text = self.remove_words(text)
                 text = self.remove_single_characters(text)
-                text = self.remove_nt_variations(text)
                 text = self.remove_repetitive_patterns(text)
                 text = self.lowercase_text(text)
                 text = self.remove_bullet_points_and_symbols(text)
-                text = self.remove_repeating_characters(text)
                 words_list = self.tokenize(text)
                 words_list = self.remove_stop_words(words_list)
                 lemmatized_list = self.lemmatize(words_list)
