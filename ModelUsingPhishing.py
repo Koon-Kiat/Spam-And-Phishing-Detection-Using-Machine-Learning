@@ -629,7 +629,7 @@ def train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_te
     }
     
     def profile_grid_search():
-        grid_search = GridSearchCV(rf_model, param_grid, cv=5, scoring='accuracy', verbose=3, n_jobs=4)
+        grid_search = GridSearchCV(rf_model, param_grid, cv=5, scoring='accuracy', verbose=3, n_jobs=1)
         grid_search.fit(X_train_balanced, y_train_balanced)
         return grid_search
 
