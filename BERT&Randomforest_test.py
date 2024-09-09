@@ -134,10 +134,6 @@ def remove_duplicate(df):
     return df_cleaned
 
 # Visualize data
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
-
 def visualize_data_comparison(df_before, df_after):
     logging.info("Visualizing data before and after cleaning...")
 
@@ -146,12 +142,12 @@ def visualize_data_comparison(df_before, df_after):
     label_counts_before = df_before['label'].value_counts()
     label_counts_after = df_after['label'].value_counts()
 
-    ham_count_before = label_counts_before.get(1, 0)
-    spam_count_before = label_counts_before.get(0, 0)
+    ham_count_before = label_counts_before.get(1, 0)  # Safe (ham) emails count before cleaning
+    spam_count_before = label_counts_before.get(0, 0)  # Phishing (spam) emails count before cleaning
     total_before = ham_count_before + spam_count_before
 
-    ham_count_after = label_counts_after.get(1, 0)
-    spam_count_after = label_counts_after.get(0, 0)
+    ham_count_after = label_counts_after.get(1, 0)  # Safe (ham) emails count after cleaning
+    spam_count_after = label_counts_after.get(0, 0)  # Phishing (spam) emails count after cleaning
     total_after = ham_count_after + spam_count_after
 
     if total_before == 0 or total_after == 0:
@@ -162,28 +158,32 @@ def visualize_data_comparison(df_before, df_after):
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
     # Pie chart for data before cleaning
-    data_before = [ham_count_before / total_before, spam_count_before / total_before]
+    data_before = [ham_count_before / total_before, spam_count_before / total_before]  # Ensure correct order: Safe, Phishing
     wedges, texts, autotexts = axes[0].pie(
         data_before, labels=['Safe', 'Phishing'], autopct='%.0f%%', colors=['blue', 'red'], startangle=140)
     axes[0].set_title('Before Cleaning')
 
+    # Adding text labels for counts next to wedges
     for i, wedge in enumerate(wedges):
         angle = (wedge.theta2 - wedge.theta1) / 2. + wedge.theta1
         x = wedge.r * 0.7 * np.cos(np.radians(angle))
         y = wedge.r * 0.7 * np.sin(np.radians(angle))
-        axes[0].text(x, y, f'{["Safe", "Phishing"][i]}: {label_counts_before.get(i, 0)}', ha='center', va='center', fontsize=10)
+        count = ham_count_before if i == 0 else spam_count_before  # Match count with wedge
+        axes[0].text(x, y, f'{["Safe", "Phishing"][i]}: {count}', ha='center', va='center', fontsize=10)
 
     # Pie chart for data after cleaning
-    data_after = [ham_count_after / total_after, spam_count_after / total_after]
+    data_after = [ham_count_after / total_after, spam_count_after / total_after]  # Ensure correct order: Safe, Phishing
     wedges, texts, autotexts = axes[1].pie(
         data_after, labels=['Safe', 'Phishing'], autopct='%.0f%%', colors=['blue', 'red'], startangle=140)
     axes[1].set_title('After Cleaning')
 
+    # Adding text labels for counts next to wedges
     for i, wedge in enumerate(wedges):
         angle = (wedge.theta2 - wedge.theta1) / 2. + wedge.theta1
         x = wedge.r * 0.7 * np.cos(np.radians(angle))
         y = wedge.r * 0.7 * np.sin(np.radians(angle))
-        axes[1].text(x, y, f'{["Safe", "Phishing"][i]}: {label_counts_after.get(i, 0)}', ha='center', va='center', fontsize=10)
+        count = ham_count_after if i == 0 else spam_count_after  # Match count with wedge
+        axes[1].text(x, y, f'{["Safe", "Phishing"][i]}: {count}', ha='center', va='center', fontsize=10)
 
     plt.tight_layout()
     plt.show()
@@ -192,8 +192,10 @@ def visualize_data_comparison(df_before, df_after):
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
     # Bar plot before cleaning
-    sns.countplot(x='label', data=df_before, palette=['blue', 'red'], ax=axes[0], order=[1, 0])
+    sns.countplot(x='label', data=df_before, hue='label', palette=['blue', 'red'], ax=axes[0], order=[1, 0])
+    axes[0].legend_.remove()  # Remove legend since we are displaying labels directly
     axes[0].set_title('Safe vs Phishing Email Count (Before Cleaning)')
+    axes[0].set_xticks([0, 1])  # Set correct tick positions
     axes[0].set_xticklabels(['Safe', 'Phishing'])
     axes[0].set_xlabel('Label')
     axes[0].set_ylabel('Count')
@@ -201,12 +203,16 @@ def visualize_data_comparison(df_before, df_after):
     # Annotate percentages on the bars
     for p in axes[0].patches:
         height = p.get_height()
-        axes[0].annotate(f'{height / total_before:.1%}', (p.get_x() + p.get_width() / 2., height),
-                         ha='center', va='center', xytext=(0, 5), textcoords='offset points')
+        if height > 0:  # Only annotate if there is a non-zero count
+            axes[0].annotate(f'{height / total_before:.1%}', 
+                            (p.get_x() + p.get_width() / 2., height),
+                            ha='center', va='center', xytext=(0, 5), textcoords='offset points')
 
     # Bar plot after cleaning
-    sns.countplot(x='label', data=df_after, palette=['blue', 'red'], ax=axes[1], order=[1, 0])
+    sns.countplot(x='label', data=df_after, hue='label', palette=['blue', 'red'], ax=axes[1], order=[1, 0])
+    axes[1].legend_.remove()  # Remove legend since we are displaying labels directly
     axes[1].set_title('Safe vs Phishing Email Count (After Cleaning)')
+    axes[1].set_xticks([0, 1])  # Set correct tick positions
     axes[1].set_xticklabels(['Safe', 'Phishing'])
     axes[1].set_xlabel('Label')
     axes[1].set_ylabel('Count')
@@ -214,14 +220,13 @@ def visualize_data_comparison(df_before, df_after):
     # Annotate percentages on the bars
     for p in axes[1].patches:
         height = p.get_height()
-        axes[1].annotate(f'{height / total_after:.1%}', (p.get_x() + p.get_width() / 2., height),
-                         ha='center', va='center', xytext=(0, 5), textcoords='offset points')
+        if height > 0:  # Only annotate if there is a non-zero count
+            axes[1].annotate(f'{height / total_after:.1%}', 
+                            (p.get_x() + p.get_width() / 2., height),
+                            ha='center', va='center', xytext=(0, 5), textcoords='offset points')
 
     plt.tight_layout()
     plt.show()
-
-
-
 
 # Extract email header
 class EmailHeaderExtractor:
@@ -714,8 +719,8 @@ def main():
         logging.info(f"Total number of rows remaining in the cleaned DataFrame: {df_remove_duplicate.shape[0]}\n")
         logging.debug(f"DataFrame after removing duplicates:\n{df_remove_duplicate.head()}\n")
 
-        # Visualize data before and after cleaning
-        #visualize_data_comparison(df, df_remove_duplicate)
+        # Visualize data before and after removing duplicate
+        visualize_data_comparison(df, df_remove_duplicate)
 
         # Extract email header information
         header_extractor = EmailHeaderExtractor(df_remove_duplicate)
