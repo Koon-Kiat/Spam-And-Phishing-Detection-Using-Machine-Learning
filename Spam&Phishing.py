@@ -564,50 +564,97 @@ def plot_word_cloud(text_list, title, width=1500, height=1000, background_color=
         logging.error(f"An error occurred: {e}")
 
 # Combine BERT features with metadata features
-def combine_features(bert_features, df_clean, headers_df, preprocessor):
-    bert_features_np = np.array(bert_features)
+def combine_features(ceas_bert_features, spamassassin_bert_features, df_processed_ceas, spamassassin_headers_df, preprocessor):
+    # Convert BERT features to DataFrames
+    ceas_bert_features_df = pd.DataFrame(ceas_bert_features)
+    spamassassin_bert_features_df = pd.DataFrame(spamassassin_bert_features)
     
-    # Convert features to a DataFrame
-    bert_features_df = pd.DataFrame(bert_features_np)
-    
-    # Add the labels to the BERT features DataFrame for alignment
-    bert_features_df['label'] = df_clean['label'].reset_index(drop=True)
-    
-    # Logging BERT feature details
-    logging.info("BERT Features Shape: %s", bert_features_np.shape)
-    logging.info("BERT Features Type: %s", type(bert_features))
+    # Prepare CEAS headers DataFrame
+    ceas_headers_df = df_processed_ceas.copy()
     
     # Convert 'urls' to numeric if not already
-    headers_df['urls'] = pd.to_numeric(headers_df['urls'], errors='coerce')
+    ceas_headers_df['urls'] = pd.to_numeric(ceas_headers_df['urls'], errors='coerce')
     
     # Convert 'date' to datetime and extract features
-    headers_df['date'] = pd.to_datetime(headers_df['date'], errors='coerce')
-    headers_df['day_of_week'] = headers_df['date'].dt.dayofweek
-    headers_df['month'] = headers_df['date'].dt.month
-    headers_df['year'] = headers_df['date'].dt.year
-    headers_df['hour'] = headers_df['date'].dt.hour
+    ceas_headers_df['date'] = pd.to_datetime(ceas_headers_df['date'], errors='coerce', utc=True)
+    valid_dates = ceas_headers_df['date'].notna()
+    ceas_headers_df.loc[valid_dates, 'day_of_week'] = ceas_headers_df.loc[valid_dates, 'date'].dt.dayofweek
+    ceas_headers_df.loc[valid_dates, 'month'] = ceas_headers_df.loc[valid_dates, 'date'].dt.month
+    ceas_headers_df.loc[valid_dates, 'year'] = ceas_headers_df.loc[valid_dates, 'date'].dt.year
+    ceas_headers_df.loc[valid_dates, 'hour'] = ceas_headers_df.loc[valid_dates, 'date'].dt.hour
+    ceas_headers_df.loc[~valid_dates, ['day_of_week', 'month', 'year', 'hour']] = np.nan
     
-    # Apply the preprocessor to the metadata columns
-    X_metadata = headers_df[['sender', 'receiver', 'subject', 'urls', 'day_of_week', 'month', 'year', 'hour']]  # Metadata columns
-    X_combined = preprocessor.fit_transform(X_metadata)  # Apply transformation
+    # Rename columns to avoid conflicts
+    ceas_headers_df.rename(columns={'sender': 'ceas_sender', 'receiver': 'ceas_receiver', 'subject': 'ceas_subject'}, inplace=True)
     
-    # Logging metadata details
-    logging.info(f"Metadata Shape: {X_metadata.shape}")
-    # Logging combined data details
-    logging.info(f"X_combined Shape: {X_combined.shape}\n")
+    # Prepare SpamAssassin headers DataFrame
+    spamassassin_headers_df = spamassassin_headers_df.copy()
     
-    # Convert sparse matrix to DataFrame
-    X_combined_df = pd.DataFrame(X_combined.toarray())
-
-    # Ensure indices match
-    bert_features_df = bert_features_df.reset_index(drop=True)
-    X_combined_df = X_combined_df.reset_index(drop=True)
+    # Rename columns to avoid conflicts
+    spamassassin_headers_df.rename(columns={'sender': 'spamassassin_sender', 'receiver': 'spamassassin_receiver'}, inplace=True)
     
-    # Merge BERT features with metadata features
-    X_final = pd.concat([bert_features_df, X_combined_df], axis=1)  # Merge BERT and metadata features
-
+    # Check and log the columns in metadata DataFrames
+    logging.info("Columns in CEAS metadata: %s", ceas_headers_df.columns.tolist())
+    logging.info("Columns in SpamAssassin metadata: %s", spamassassin_headers_df.columns.tolist())
+    
+    # Combine metadata
+    ceas_metadata = ceas_headers_df[['ceas_sender', 'ceas_receiver', 'ceas_subject', 'urls', 'day_of_week', 'month', 'year', 'hour']]
+    spamassassin_metadata = spamassassin_headers_df[['spamassassin_sender', 'spamassassin_receiver', 'mailto', 'texturls']]
+    
+    # Ensure 'label' column is included in the final DataFrames
+    ceas_labels = df_processed_ceas['label'].reset_index(drop=True)
+    spamassassin_labels = spamassassin_headers_df[['sender', 'receiver']].copy()
+    spamassassin_labels = spamassassin_labels.assign(label=df_processed_ceas['label'].reset_index(drop=True))
+    
+    # Remove 'label' column from metadata for preprocessor
+    ceas_metadata = ceas_metadata.drop(columns=['label'], errors='ignore')
+    
+    # Check columns before applying the preprocessor
+    missing_columns_ceas = [col for col in ['ceas_sender', 'ceas_receiver', 'ceas_subject', 'urls', 'day_of_week', 'month', 'year', 'hour'] if col not in ceas_metadata.columns]
+    if missing_columns_ceas:
+        raise ValueError(f"Missing columns in CEAS metadata: {', '.join(missing_columns_ceas)}")
+    
+    missing_columns_spamassassin = [col for col in ['spamassassin_sender', 'spamassassin_receiver', 'mailto', 'texturls'] if col not in spamassassin_metadata.columns]
+    if missing_columns_spamassassin:
+        raise ValueError(f"Missing columns in SpamAssassin metadata: {', '.join(missing_columns_spamassassin)}")
+    
+    # Fit the preprocessor on the CEAS metadata
+    preprocessor.fit(ceas_metadata)
+    
+    # Transform both datasets
+    X_ceas = preprocessor.transform(ceas_metadata)
+    X_spamassassin = preprocessor.transform(spamassassin_metadata)
+    
+    # Convert sparse matrices to DataFrames
+    X_ceas_df = pd.DataFrame(X_ceas.toarray(), columns=preprocessor.get_feature_names_out())
+    X_spamassassin_df = pd.DataFrame(X_spamassassin.toarray(), columns=preprocessor.get_feature_names_out())
+    
+    # Ensure indices match and concatenate BERT features with metadata features
+    ceas_bert_features_df = ceas_bert_features_df.reset_index(drop=True)
+    spamassassin_bert_features_df = spamassassin_bert_features_df.reset_index(drop=True)
+    X_ceas_df = X_ceas_df.reset_index(drop=True)
+    X_spamassassin_df = X_spamassassin_df.reset_index(drop=True)
+    
+    # Merge BERT features with metadata features for each dataset
+    ceas_final = pd.concat([ceas_bert_features_df, X_ceas_df, ceas_labels], axis=1)
+    spamassassin_final = pd.concat([spamassassin_bert_features_df, X_spamassassin_df, spamassassin_labels], axis=1)
+    
+    # Concatenate both final DataFrames
+    X_final = pd.concat([ceas_final, spamassassin_final], axis=0, ignore_index=True)
+    
+    logging.info("Final Product Columns: %s", X_final.columns.tolist())
+    
     return X_final
 
+def create_preprocessor():
+    return ColumnTransformer(
+        transformers=[
+            ('email_fields', OneHotEncoder(handle_unknown='ignore'), ['ceas_sender', 'ceas_receiver', 'ceas_subject', 'spamassassin_sender', 'spamassassin_receiver', 'mailto']),  # One-hot encode email fields
+            ('urls', StandardScaler(), ['urls']),  # Scale the 'urls' column
+            ('date_features', StandardScaler(), ['day_of_week', 'month', 'year', 'hour']),  # Scale the extracted date features
+            ('texturls', StandardScaler(), ['texturls'])  # Scale the 'texturls' column
+        ]
+    )
 def extract_bert_features(dataset_name, df_clean):
     logging.info(f"BERT feature extraction from {dataset_name} dataset...")
     feature_extractor = BERTFeatureExtractor()
@@ -774,7 +821,6 @@ def main():
         # Change labels to match the labeling scheme
         df_spamassassin['label'] = df_spamassassin['label'].astype(int)
         df_spamassassin['label'] = df_spamassassin['label'].replace({0: 2, 1: 0}).astype(np.int64)
-        print(df_spamassassin['label'].dtype)
         
         # Calculate the value counts
         label_counts = df_spamassassin['label'].value_counts()
@@ -815,8 +861,9 @@ def main():
         # Plot word clouds 
         logging.info("Plotting word clouds for the cleaned datasets...")
         #plot_word_cloud(df_remove_duplicate['text'], "Original Dataset")
-        plot_word_cloud(df_clean_ceas['cleaned_text'], "Cleaned CEAS_08 Dataset")
-        plot_word_cloud(df_clean_spamassassin['cleaned_text'], "Cleaned Spam Assassin Dataset")
+        #plot_word_cloud(df_clean_ceas['cleaned_text'], "Cleaned CEAS_08 Dataset")
+        #plot_word_cloud(df_clean_spamassassin['cleaned_text'], "Cleaned Spam Assassin Dataset")
+        logging.info("Word clouds plotted successfully.\n")
         
         # Feature extraction using BERT for CEAS_08 dataset
         ceas_bert_features = extract_bert_features("CEAS_08", df_clean_ceas)
@@ -824,12 +871,7 @@ def main():
         # Feature extraction using BERT for Spam Assassin dataset
         spamassassin_bert_features = extract_bert_features("Spam Assassin", df_clean_spamassassin)
         
-        ceas_headers_df['date'] = pd.to_datetime(ceas_headers_df['date'], format='%a, %d %b %Y %H:%M:%S %z', errors='coerce', utc=True)
-        ceas_headers_df['day_of_week'] = ceas_headers_df['date'].dt.dayofweek
-        ceas_headers_df['month'] = ceas_headers_df['date'].dt.month
-        ceas_headers_df['year'] = ceas_headers_df['date'].dt.year
-        ceas_headers_df['hour'] = ceas_headers_df['date'].dt.hour
-        
+        '''
         preprocessor = ColumnTransformer(
             transformers=[
                 ('email_fields', OneHotEncoder(handle_unknown='ignore'), ['sender', 'receiver', 'subject']),  # One-hot encode 'sender', 'receiver', 'subject'
@@ -837,12 +879,23 @@ def main():
                 ('date_features', StandardScaler(), ['day_of_week', 'month', 'year', 'hour'])  # Scale the extracted date features
             ]
         )
+        '''
         
-        # Combine features from BERT and metadata
-        X_final = combine_features(bert_features, df_clean, headers_df, preprocessor)
+        # Create the preprocessor
+        preprocessor = create_preprocessor()
+       
+       
+        logging.info(f"Columns in df_clean_spamassassin: {df_clean_spamassassin.columns.tolist()}")
+        logging.info(f"Columns in df_clean_ceas: {df_clean_ceas.columns.tolist()}")
+        logging.info(f"Columns in spamassassin_headers_df: {spamassassin_headers_df.columns.tolist()}")
+        logging.info(f"Columns in ceas_headers_df: {ceas_headers_df.columns.tolist()}\n")
         
+        combined_df = combine_features(ceas_bert_features, spamassassin_bert_features, df_processed_ceas, spamassassin_headers_df, preprocessor)
+
+        logging.info(f"Finished combining features. Final DataFrame shape: {combined_df.shape}\n")
+        logging.info(f"Checking for missing and duplicate values in the final DataFrame...\n")
         # Check for missing and duplicate values
-        check_missing_values = X_final.isnull().sum()
+        check_missing_values = combined_df.isnull().sum()
         missing_values = check_missing_values[check_missing_values > 0]
 
         if not missing_values.empty:
@@ -852,11 +905,11 @@ def main():
 
         # Remove missing values
         logging.info("Removing missing values...")
-        X_final = X_final.dropna()
-        logging.info(f"Total number of rows after removing missing values: {X_final.shape[0]}\n")
+        combined_df = combined_df.dropna()
+        logging.info(f"Total number of rows after removing missing values: {combined_df.shape[0]}\n")
         
         # Split the data
-        X_train, X_test, y_train, y_test = split_data(X_final)
+        X_train, X_test, y_train, y_test = split_data(combined_df)
         logging.info(f" Data split into training and testing sets.\n")
         
         # Handle data imbalance
