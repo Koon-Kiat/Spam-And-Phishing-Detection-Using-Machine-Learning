@@ -8,6 +8,7 @@ import pandas as pd  # Data manipulation and analysis
 import matplotlib.pyplot as plt  # Plotting library
 import seaborn as sns  # Statistical data visualization
 from wordcloud import WordCloud  # Generate word clouds
+from unittest.mock import patch
 
 # Operating system interfaces
 import os  # Interact with the operating system
@@ -133,99 +134,71 @@ def remove_duplicate(df):
 
     return df_cleaned
 
-# Visualize data
-def visualize_data_comparison(df_before, df_after):
-    logging.info("Visualizing data before and after cleaning...")
+def visualize_data(df, df_remove_duplicate):
+    logging.info("Visualizing data...")
+    label_map = {1: 'Ham', 0: 'Spam'}
+    
+    # Original DataFrame counts
+    original_label_counts = df['label'].value_counts()
+    original_ham_count = original_label_counts.get(1, 0)
+    original_spam_count = original_label_counts.get(0, 0)
+    original_total_count = original_ham_count + original_spam_count
 
-    # Mapping and counting labels for before and after cleaning
-    label_map = {1: 'Safe', 0: 'Phishing'}
-    label_counts_before = df_before['label'].value_counts()
-    label_counts_after = df_after['label'].value_counts()
+    # Cleaned DataFrame counts
+    cleaned_label_counts = df_remove_duplicate['label'].value_counts()
+    cleaned_ham_count = cleaned_label_counts.get(1, 0)
+    cleaned_spam_count = cleaned_label_counts.get(0, 0)
+    cleaned_total_count = cleaned_ham_count + cleaned_spam_count
 
-    ham_count_before = label_counts_before.get(1, 0)  # Safe (ham) emails count before cleaning
-    spam_count_before = label_counts_before.get(0, 0)  # Phishing (spam) emails count before cleaning
-    total_before = ham_count_before + spam_count_before
-
-    ham_count_after = label_counts_after.get(1, 0)  # Safe (ham) emails count after cleaning
-    spam_count_after = label_counts_after.get(0, 0)  # Phishing (spam) emails count after cleaning
-    total_after = ham_count_after + spam_count_after
-
-    if total_before == 0 or total_after == 0:
+    if original_total_count == 0 or cleaned_total_count == 0:
         logging.warning("No data to visualize.")
         return
 
-    # Plot distribution before and after cleaning
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    # Plot distribution of ham and spam emails in the original and cleaned DataFrames
+    fig, axs = plt.subplots(1, 2, figsize=(24, 10))
 
-    # Pie chart for data before cleaning
-    data_before = [ham_count_before / total_before, spam_count_before / total_before]  # Ensure correct order: Safe, Phishing
-    wedges, texts, autotexts = axes[0].pie(
-        data_before, labels=['Safe', 'Phishing'], autopct='%.0f%%', colors=['blue', 'red'], startangle=140)
-    axes[0].set_title('Before Cleaning')
+    # Original DataFrame pie chart
+    original_data = [original_ham_count / original_total_count, original_spam_count / original_total_count]
+    wedges, texts, autotexts = axs[0].pie(original_data, labels=['Safe Emails', 'Phishing Emails'], autopct='%.0f%%', colors=['blue', 'red'], startangle=140, textprops={'fontsize': 14, 'color': 'black'})
+    axs[0].set_title('Distribution of Safe and Phishing Emails (Original)', color='black')
 
-    # Adding text labels for counts next to wedges
-    for i, wedge in enumerate(wedges):
-        angle = (wedge.theta2 - wedge.theta1) / 2. + wedge.theta1
-        x = wedge.r * 0.7 * np.cos(np.radians(angle))
-        y = wedge.r * 0.7 * np.sin(np.radians(angle))
-        count = ham_count_before if i == 0 else spam_count_before  # Match count with wedge
-        axes[0].text(x, y, f'{["Safe", "Phishing"][i]}: {count}', ha='center', va='center', fontsize=10)
+    for i, autotext in enumerate(autotexts):
+        label = 'Ham' if i == 0 else 'Spam'
+        count = original_ham_count if i == 0 else original_spam_count
+        autotext.set_text(f'{autotext.get_text()}\n({count})')
 
-    # Pie chart for data after cleaning
-    data_after = [ham_count_after / total_after, spam_count_after / total_after]  # Ensure correct order: Safe, Phishing
-    wedges, texts, autotexts = axes[1].pie(
-        data_after, labels=['Safe', 'Phishing'], autopct='%.0f%%', colors=['blue', 'red'], startangle=140)
-    axes[1].set_title('After Cleaning')
+    # Cleaned DataFrame pie chart
+    cleaned_data = [cleaned_ham_count / cleaned_total_count, cleaned_spam_count / cleaned_total_count]
+    wedges, texts, autotexts = axs[1].pie(cleaned_data, labels=['Safe Emails', 'Phishing Emails'], autopct='%.0f%%', colors=['blue', 'red'], startangle=140, textprops={'fontsize': 14, 'color': 'black'})
+    axs[1].set_title('Distribution of Safe and Phishing Emails (After Removing Duplicates)', color='black')
 
-    # Adding text labels for counts next to wedges
-    for i, wedge in enumerate(wedges):
-        angle = (wedge.theta2 - wedge.theta1) / 2. + wedge.theta1
-        x = wedge.r * 0.7 * np.cos(np.radians(angle))
-        y = wedge.r * 0.7 * np.sin(np.radians(angle))
-        count = ham_count_after if i == 0 else spam_count_after  # Match count with wedge
-        axes[1].text(x, y, f'{["Safe", "Phishing"][i]}: {count}', ha='center', va='center', fontsize=10)
+    for i, autotext in enumerate(autotexts):
+        label = 'Ham' if i == 0 else 'Spam'
+        count = cleaned_ham_count if i == 0 else cleaned_spam_count
+        autotext.set_text(f'{autotext.get_text()}\n({count})')
 
-    plt.tight_layout()
     plt.show()
 
-    # Bar plot for email counts before and after cleaning
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    # Plot count of ham and spam emails in the original and cleaned DataFrames side by side
+    fig, ax = plt.subplots(figsize=(10, 6))
+    bar_width = 0.35
+    index = np.arange(2)
 
-    # Bar plot before cleaning
-    sns.countplot(x='label', data=df_before, hue='label', palette=['blue', 'red'], ax=axes[0], order=[1, 0])
-    axes[0].legend_.remove()  # Remove legend since we are displaying labels directly
-    axes[0].set_title('Safe vs Phishing Email Count (Before Cleaning)')
-    axes[0].set_xticks([0, 1])  # Set correct tick positions
-    axes[0].set_xticklabels(['Safe', 'Phishing'])
-    axes[0].set_xlabel('Label')
-    axes[0].set_ylabel('Count')
+    bar1 = ax.bar(index, [original_ham_count, original_spam_count], bar_width, label='Original', color='blue')
+    bar2 = ax.bar(index + bar_width, [cleaned_ham_count, cleaned_spam_count], bar_width, label='Removed Duplicate', color='red')
 
-    # Annotate percentages on the bars
-    for p in axes[0].patches:
+    ax.set_xlabel('Label Type', color='black')
+    ax.set_ylabel('Count', color='black')
+    ax.set_title('Safe vs Phishing Email Count (Original vs Remove Duplicates)', color='black')
+    ax.set_xticks(index + bar_width / 2)
+    ax.set_xticklabels(['Safe', 'Phishing'], color='black')
+    ax.legend()
+
+    for p in bar1 + bar2:
         height = p.get_height()
-        if height > 0:  # Only annotate if there is a non-zero count
-            axes[0].annotate(f'{height / total_before:.1%}', 
-                            (p.get_x() + p.get_width() / 2., height),
-                            ha='center', va='center', xytext=(0, 5), textcoords='offset points')
+        ax.annotate(f'{height}', (p.get_x() + p.get_width() / 2., height),
+                    ha='center', va='center', xytext=(0, 5), textcoords='offset points', color='black')
 
-    # Bar plot after cleaning
-    sns.countplot(x='label', data=df_after, hue='label', palette=['blue', 'red'], ax=axes[1], order=[1, 0])
-    axes[1].legend_.remove()  # Remove legend since we are displaying labels directly
-    axes[1].set_title('Safe vs Phishing Email Count (After Cleaning)')
-    axes[1].set_xticks([0, 1])  # Set correct tick positions
-    axes[1].set_xticklabels(['Safe', 'Phishing'])
-    axes[1].set_xlabel('Label')
-    axes[1].set_ylabel('Count')
-
-    # Annotate percentages on the bars
-    for p in axes[1].patches:
-        height = p.get_height()
-        if height > 0:  # Only annotate if there is a non-zero count
-            axes[1].annotate(f'{height / total_after:.1%}', 
-                            (p.get_x() + p.get_width() / 2., height),
-                            ha='center', va='center', xytext=(0, 5), textcoords='offset points')
-
-    plt.tight_layout()
     plt.show()
 
 # Extract email header
@@ -650,7 +623,7 @@ def train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_te
     }
     
     def profile_grid_search():
-        grid_search = GridSearchCV(rf_model, param_grid, cv=5, scoring='accuracy', verbose=3, n_jobs=4)
+        grid_search = GridSearchCV(rf_model, param_grid, cv=5, scoring='accuracy', verbose=3, n_jobs=6)
         grid_search.fit(X_train_balanced, y_train_balanced)
         return grid_search
 
@@ -715,7 +688,7 @@ def main():
         logging.debug(f"DataFrame after removing duplicates:\n{df_remove_duplicate.head()}\n")
 
         # Visualize data before and after removing duplicate
-        visualize_data_comparison(df, df_remove_duplicate)
+        visualize_data(df, df_remove_duplicate)
 
         # Extract email header information
         header_extractor = EmailHeaderExtractor(df_remove_duplicate)
