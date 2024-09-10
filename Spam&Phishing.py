@@ -57,20 +57,24 @@ from spellchecker import SpellChecker  # Spell checking
 
 # Machine learning libraries
 from sklearn.base import BaseEstimator, TransformerMixin  # Scikit-learn base classes
-from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer  # Text feature extraction
+# Text feature extraction
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 from sklearn.decomposition import PCA  # Principal Component Analysis
 from sklearn.model_selection import train_test_split, GridSearchCV  # Model selection
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier  # Ensemble classifiers
+# Ensemble classifiers
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.linear_model import LogisticRegression  # Logistic Regression
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, f1_score  # Model evaluation
 from sklearn.utils import resample  # Resampling utilities
 from imblearn.over_sampling import SMOTE  # Handling imbalanced data
-from sklearn.compose import ColumnTransformer 
+from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
 
 # Transformers library
-from transformers import BertTokenizer, BertForSequenceClassification, Trainer, TrainingArguments, BertModel, AdamW  # BERT models and training utilities
+# BERT models and training utilities
+from transformers import BertTokenizer, BertForSequenceClassification, Trainer, TrainingArguments, BertModel, AdamW
 
 # PyTorch
 import torch  # PyTorch library
@@ -93,6 +97,13 @@ import warnings  # Warning control
 # Datasets
 from datasets import load_dataset  # Load datasets
 
+# Define the mapping of label values to descriptions
+label_descriptions = {
+    0: "Safe",
+    1: "Phishing",
+    2: "Spam"
+}
+
 # ANSI escape codes for text formatting
 BOLD = '\033[1m'
 RESET = '\033[0m'
@@ -107,19 +118,14 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s ',
     level=logging.INFO
 )
-
 # Suppress TensorFlow logging
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 logging.getLogger('tensorflow').setLevel(logging.ERROR)
-
-# Suppress specific warnings from transformers
 warnings.filterwarnings("ignore", category=UserWarning, module='transformers')
 warnings.filterwarnings('ignore', category=UserWarning, module='tensorflow')
 warnings.filterwarnings("ignore", category=FutureWarning, module='transformers.tokenization_utils_base')
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
-
-
 
 def drop_unnamed_column(df, dataset_name):
     if 'Unnamed: 0' in df.columns:
@@ -127,62 +133,76 @@ def drop_unnamed_column(df, dataset_name):
         logging.info(f"Dropped 'Unnamed: 0' column from {dataset_name}.")
     return df
 
+
 def check_and_remove_missing_values(df, dataset_name):
     check_missing_values = df.isnull().sum()
     total_missing_values = check_missing_values.sum()
-    logging.info(f"Total missing values: {total_missing_values}")    
-    
+    logging.info(f"Total missing values: {total_missing_values}")
+
     logging.info(f"Removing missing values from {dataset_name}...")
     df = df.dropna()
-    logging.info(f"Total number of rows after removing missing values from {dataset_name}: {df.shape[0]}")
-    
+    logging.info(f"Total number of rows after removing missing values from {
+                 dataset_name}: {df.shape[0]}")
+
     return df
 
+
 def remove_duplicates(df, column_name):
-    logging.info(f"Removing duplicate data....")    
-    num_duplicates_before = df.duplicated(subset=[column_name], keep=False).sum()
+    logging.info(f"Removing duplicate data....")
+    num_duplicates_before = df.duplicated(
+        subset=[column_name], keep=False).sum()
     df_cleaned = df.drop_duplicates(subset=[column_name], keep='first')
-    num_duplicates_after = df_cleaned.duplicated(subset=[column_name], keep=False).sum()
+    num_duplicates_after = df_cleaned.duplicated(
+        subset=[column_name], keep=False).sum()
     duplicates_removed = num_duplicates_before - num_duplicates_after
 
-    logging.info(f"Total number of rows identified as duplicates based on '{column_name}': {num_duplicates_before}")
-    logging.info(f"Number of rows removed due to duplication: {duplicates_removed}")
+    logging.info(f"Total number of rows identified as duplicates based on '{
+                 column_name}': {num_duplicates_before}")
+    logging.info(f"Number of rows removed due to duplication: {
+                 duplicates_removed}")
 
     return df_cleaned
+
 
 def process_dataset(df, column_name, dataset_name):
-    logging.info(f"Total number of rows in {dataset_name} DataFrame: {df.shape[0]}")
-    
+    logging.info(f"Total number of rows in {
+                 dataset_name} DataFrame: {df.shape[0]}")
+
     # Drop the 'Unnamed: 0' column
     df = drop_unnamed_column(df, dataset_name)
-    
+
     # Check for missing and duplicate values
     df = check_and_remove_missing_values(df, dataset_name)
-    
+
     # Check for duplicate values and remove them
     df_cleaned = remove_duplicates(df, column_name)
-    logging.info(f"Total number of rows remaining in the {dataset_name}: {df_cleaned.shape[0]}\n")
-    logging.debug(f"{dataset_name} after removing duplicates:\n{df_cleaned.head()}\n")
-    
+    logging.info(f"Total number of rows remaining in the {
+                 dataset_name}: {df_cleaned.shape[0]}\n")
+    logging.debug(f"{dataset_name} after removing duplicates:\n{
+                  df_cleaned.head()}\n")
+
     return df_cleaned
+
 
 def visualize_data(df, df_remove_duplicate):
     logging.info("Visualizing data...")
     label_map = {0: 'Safe', 1: 'Phishing', 2: 'Spam'}
-    
+
     # Original DataFrame counts
     original_label_counts = df['label'].value_counts()
     original_safe_count = original_label_counts.get(0, 0)
     original_phishing_count = original_label_counts.get(1, 0)
     original_spam_count = original_label_counts.get(2, 0)
-    original_total_count = original_safe_count + original_phishing_count + original_spam_count
+    original_total_count = original_safe_count + \
+        original_phishing_count + original_spam_count
 
     # Cleaned DataFrame counts
     cleaned_label_counts = df_remove_duplicate['label'].value_counts()
     cleaned_safe_count = cleaned_label_counts.get(0, 0)
     cleaned_phishing_count = cleaned_label_counts.get(1, 0)
     cleaned_spam_count = cleaned_label_counts.get(2, 0)
-    cleaned_total_count = cleaned_safe_count + cleaned_phishing_count + cleaned_spam_count
+    cleaned_total_count = cleaned_safe_count + \
+        cleaned_phishing_count + cleaned_spam_count
 
     if original_total_count == 0 or cleaned_total_count == 0:
         logging.warning("No data to visualize.")
@@ -190,13 +210,15 @@ def visualize_data(df, df_remove_duplicate):
 
     # Filter out labels with 0% for original data
     original_data = [(original_safe_count / original_total_count, 'Safe Emails', original_safe_count),
-                     (original_phishing_count / original_total_count, 'Phishing Emails', original_phishing_count),
+                     (original_phishing_count / original_total_count,
+                      'Phishing Emails', original_phishing_count),
                      (original_spam_count / original_total_count, 'Spam Emails', original_spam_count)]
     original_data = [item for item in original_data if item[0] > 0]
 
     # Filter out labels with 0% for cleaned data
     cleaned_data = [(cleaned_safe_count / cleaned_total_count, 'Safe Emails', cleaned_safe_count),
-                    (cleaned_phishing_count / cleaned_total_count, 'Phishing Emails', cleaned_phishing_count),
+                    (cleaned_phishing_count / cleaned_total_count,
+                     'Phishing Emails', cleaned_phishing_count),
                     (cleaned_spam_count / cleaned_total_count, 'Spam Emails', cleaned_spam_count)]
     cleaned_data = [item for item in cleaned_data if item[0] > 0]
 
@@ -206,8 +228,10 @@ def visualize_data(df, df_remove_duplicate):
     # Original DataFrame pie chart
     if original_data:
         original_sizes, original_labels, original_counts = zip(*original_data)
-        wedges, texts, autotexts = axs[0].pie(original_sizes, labels=original_labels, autopct='%.0f%%', colors=['blue', 'red', 'green'], startangle=140, textprops={'fontsize': 14, 'color': 'black'})
-        axs[0].set_title('Distribution of Safe, Phishing, and Spam Emails (Original)', color='black')
+        wedges, texts, autotexts = axs[0].pie(original_sizes, labels=original_labels, autopct='%.0f%%', colors=[
+                                              'blue', 'red', 'green'], startangle=140, textprops={'fontsize': 14, 'color': 'black'})
+        axs[0].set_title(
+            'Distribution of Safe, Phishing, and Spam Emails (Original)', color='black')
 
         for i, autotext in enumerate(autotexts):
             autotext.set_text(f'{autotext.get_text()}\n({original_counts[i]})')
@@ -215,8 +239,10 @@ def visualize_data(df, df_remove_duplicate):
     # Cleaned DataFrame pie chart
     if cleaned_data:
         cleaned_sizes, cleaned_labels, cleaned_counts = zip(*cleaned_data)
-        wedges, texts, autotexts = axs[1].pie(cleaned_sizes, labels=cleaned_labels, autopct='%.0f%%', colors=['blue', 'red', 'green'], startangle=140, textprops={'fontsize': 14, 'color': 'black'})
-        axs[1].set_title('Distribution of Safe, Phishing, and Spam Emails (After Removing Duplicates)', color='black')
+        wedges, texts, autotexts = axs[1].pie(cleaned_sizes, labels=cleaned_labels, autopct='%.0f%%', colors=[
+                                              'blue', 'red', 'green'], startangle=140, textprops={'fontsize': 14, 'color': 'black'})
+        axs[1].set_title(
+            'Distribution of Safe, Phishing, and Spam Emails (After Removing Duplicates)', color='black')
 
         for i, autotext in enumerate(autotexts):
             autotext.set_text(f'{autotext.get_text()}\n({cleaned_counts[i]})')
@@ -228,12 +254,15 @@ def visualize_data(df, df_remove_duplicate):
     bar_width = 0.25
     index = np.arange(3)
 
-    bar1 = ax.bar(index, [original_safe_count, original_phishing_count, original_spam_count], bar_width, label='Original', color='blue')
-    bar2 = ax.bar(index + bar_width, [cleaned_safe_count, cleaned_phishing_count, cleaned_spam_count], bar_width, label='Removed Duplicate', color='red')
+    bar1 = ax.bar(index, [original_safe_count, original_phishing_count,
+                  original_spam_count], bar_width, label='Original', color='blue')
+    bar2 = ax.bar(index + bar_width, [cleaned_safe_count, cleaned_phishing_count,
+                  cleaned_spam_count], bar_width, label='Removed Duplicate', color='red')
 
     ax.set_xlabel('Label Type', color='black')
     ax.set_ylabel('Count', color='black')
-    ax.set_title('Safe vs Phishing vs Spam Email Count (Original vs Remove Duplicates)', color='black')
+    ax.set_title(
+        'Safe vs Phishing vs Spam Email Count (Original vs Remove Duplicates)', color='black')
     ax.set_xticks(index + bar_width / 2)
     ax.set_xticklabels(['Safe', 'Phishing', 'Spam'], color='black')
     ax.legend()
@@ -246,7 +275,8 @@ def visualize_data(df, df_remove_duplicate):
 
     plt.show()
 
-# Extract email header
+
+
 class EmailHeaderExtractor:
     def __init__(self, df: pd.DataFrame):
         self.df = df
@@ -257,8 +287,10 @@ class EmailHeaderExtractor:
         cleaned_links = []
         for link in links:
             # Remove single quotes and brackets, then clean new lines and extra spaces
-            link = re.sub(r'[\'\[\]\s]+', '', link)  # Remove single quotes, brackets, and whitespace
-            link = re.sub(r'\\n+', ' ', link)  # Replace \n and repeating new lines with a single space
+            # Remove single quotes, brackets, and whitespace
+            link = re.sub(r'[\'\[\]\s]+', '', link)
+            # Replace \n and repeating new lines with a single space
+            link = re.sub(r'\\n+', ' ', link)
             link = link.strip()  # Trim leading and trailing spaces
             if link:  # Avoid appending empty links
                 cleaned_links.append(link)
@@ -266,9 +298,12 @@ class EmailHeaderExtractor:
 
     def extract_inline_headers(self, email_text: str) -> Dict[str, Union[str, None]]:
         # Regex to capture full email addresses in the format Name <email@domain.com>
-        from_match = re.search(r'From:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
-        to_match = re.search(r'To:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
-        mail_to_match = re.search(r'mailto:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
+        from_match = re.search(
+            r'From:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
+        to_match = re.search(
+            r'To:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
+        mail_to_match = re.search(
+            r'mailto:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
 
         from_header = from_match.group(1) if from_match else None
         to_header = to_match.group(1) if to_match else None
@@ -282,11 +317,14 @@ class EmailHeaderExtractor:
         if email_message.is_multipart():
             for part in email_message.iter_parts():
                 if part.get_content_type() == 'text/plain':
-                    body_content += part.get_payload(decode=True).decode(errors='ignore')
+                    body_content += part.get_payload(
+                        decode=True).decode(errors='ignore')
                 elif part.get_content_type() == 'text/html':
-                    body_content += part.get_payload(decode=True).decode(errors='ignore')
+                    body_content += part.get_payload(
+                        decode=True).decode(errors='ignore')
         else:
-            body_content = email_message.get_payload(decode=True).decode(errors='ignore')
+            body_content = email_message.get_payload(
+                decode=True).decode(errors='ignore')
         return body_content
 
     def extract_headers(self) -> pd.DataFrame:
@@ -296,12 +334,14 @@ class EmailHeaderExtractor:
         for email_text in tqdm(self.df['text'], desc="Extracting headers"):
             try:
                 # Parse the email
-                email_message = BytesParser(policy=policy.default).parsebytes(email_text.encode('utf-8'))
+                email_message = BytesParser(policy=policy.default).parsebytes(
+                    email_text.encode('utf-8'))
 
                 # Extract 'From', 'To', and 'Mail-To' headers
                 from_header = email_message['From'] if 'From' in email_message else None
                 to_header = email_message['To'] if 'To' in email_message else None
-                mail_to_header = email_message.get('Mail-To') if email_message.get('Mail-To') else None
+                mail_to_header = email_message.get(
+                    'Mail-To') if email_message.get('Mail-To') else None
 
                 # Fallback to inline header extraction if headers are not present
                 if not from_header or not to_header:
@@ -332,11 +372,13 @@ class EmailHeaderExtractor:
                 })
             except Exception as e:
                 logging.error(f"Error parsing email: {e}")
-                headers_list.append({'sender': None, 'receiver': None, 'mailto': None, 'texturls': []})
-                
+                headers_list.append(
+                    {'sender': None, 'receiver': None, 'mailto': None, 'texturls': []})
+
         self.headers_df = pd.DataFrame(headers_list)
         # Clean 'Text URLs' column after extraction
-        self.headers_df['texturls'] = self.headers_df['texturls'].apply(self.clean_links)
+        self.headers_df['texturls'] = self.headers_df['texturls'].apply(
+            self.clean_links)
         return self.headers_df
 
     def save_to_csv(self, file_path: str):
@@ -345,18 +387,24 @@ class EmailHeaderExtractor:
             self.headers_df.to_csv(file_path, index=False)
             logging.info(f"Data successfully saved to: {file_path}")
         else:
-            raise ValueError("No header information extracted. Please run extract_headers() first.")
+            raise ValueError(
+                "No header information extracted. Please run extract_headers() first.")
+
 
 def data_cleaning_and_save_text(dataset_name, df_processed, text_column, clean_file):
     logging.info(f"Text processing {dataset_name} dataset...")
     processor = TextProcessor()
-    df_clean = processor.transform(df_processed[text_column], df_processed['label'])
+    df_clean = processor.transform(
+        df_processed[text_column], df_processed['label'])
     processor.save_to_csv_cleaned(df_clean, clean_file)
     logging.info("Text processing and saving completed.")
-    logging.info(f"DataFrame columns after data cleaning: {df_clean.columns}\n")
+    logging.info(f"DataFrame columns after data cleaning: {
+                 df_clean.columns}\n")
     return df_clean
-  
+
 # Data cleaning
+
+
 class TextProcessor(BaseEstimator, TransformerMixin):
     def __init__(self, enable_spell_check=False):
         self.stop_words = set(stopwords.words('english'))
@@ -365,17 +413,17 @@ class TextProcessor(BaseEstimator, TransformerMixin):
         self.common_words = set(self.spell_checker.word_frequency.keys())
         self.enable_spell_check = enable_spell_check
         logging.info("Initializing TextProcessor...")
-    
+
     def expand_contractions(self, text):
         return contractions.fix(text)
 
     def remove_punctuation(self, text):
         # Define additional punctuation or symbols to remove
         extra_punctuation = '“”‘’—–•·’'
-        
+
         # Combine standard punctuation and extra punctuation
         all_punctuation = string.punctuation + extra_punctuation
-        
+
         # Remove all punctuation from the text
         return text.translate(str.maketrans('', '', all_punctuation))
 
@@ -402,30 +450,32 @@ class TextProcessor(BaseEstimator, TransformerMixin):
     def remove_all_html_elements(self, text):
         soup = BeautifulSoup(text, 'html.parser')
         for script_or_style in soup(["script", "style"]):
-            script_or_style.decompose()  
+            script_or_style.decompose()
         for tag in soup.find_all(True):
             tag.attrs = {}
         return soup.get_text(separator=" ", strip=True)
-    
+
     def remove_email_headers(self, text):
         # Remove common email headers
-        headers = ['From:', 'To:', 'Subject:', 'Cc:', 'Bcc:', 'Date:', 'Reply-To:', 'Content-Type:', 'Return-Path:', 'Message-ID:', 'Received:', 'MIME-Version:', 'Delivered-To:', 'Authentication-Results:', 'DKIM-Signature:', 'X-', 'Mail-To:']
+        headers = ['From:', 'To:', 'Subject:', 'Cc:', 'Bcc:', 'Date:', 'Reply-To:', 'Content-Type:', 'Return-Path:', 'Message-ID:',
+                   'Received:', 'MIME-Version:', 'Delivered-To:', 'Authentication-Results:', 'DKIM-Signature:', 'X-', 'Mail-To:']
         for header in headers:
             text = re.sub(rf'^{header}.*$', '', text, flags=re.MULTILINE)
         return text
-    
+
     def remove_emails(self, text):
         # Regex pattern to match emails with or without spaces around "@"
         email_pattern_with_spaces = r'\b[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         # Regex pattern to match emails without spaces
         email_pattern_no_spaces = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        
+
         # Combine both patterns using the OR operator
-        combined_pattern = f"({email_pattern_with_spaces}|{email_pattern_no_spaces})"
-        
+        combined_pattern = f"({email_pattern_with_spaces}|{
+            email_pattern_no_spaces})"
+
         # Perform the substitution
         return re.sub(combined_pattern, '', text)
-    
+
     def remove_time(self, text):
         # Regex to match various time patterns
         time_pattern = r'\b(?:[01]?[0-9]|2[0-3]):[0-5][0-9](?: ?[APMapm]{2})?(?: [A-Z]{1,5})?\b'
@@ -434,7 +484,7 @@ class TextProcessor(BaseEstimator, TransformerMixin):
     def remove_months(self, text):
         # List of full and shortened month names
         months = [
-            'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 
+            'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october',
             'november', 'december', 'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
         ]
         # Regex to match months
@@ -444,8 +494,10 @@ class TextProcessor(BaseEstimator, TransformerMixin):
     def remove_dates(self, text):
         # Regex to match various date formats
         date_pattern = (
-            r'\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s*,?\s*\d{1,2}\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{4}\b|'  # Example: Mon, 2 Sep 2002
-            r'\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|[A-Za-z]+\s\d{1,2},\s\d{4})\b|'  # Example: 20-09-2002, Sep 13 2002
+            # Example: Mon, 2 Sep 2002
+            r'\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s*,?\s*\d{1,2}\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{4}\b|'
+            # Example: 20-09-2002, Sep 13 2002
+            r'\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|[A-Za-z]+\s\d{1,2},\s\d{4})\b|'
             r'\b(?:\d{1,2}\s[A-Za-z]+\s\d{4})\b|'  # Example: 01 September 2002
             r'\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{4})\b'  # Example: 24/08/2002
         )
@@ -455,11 +507,11 @@ class TextProcessor(BaseEstimator, TransformerMixin):
         # Regex to match time zones (e.g., PST, EST, GMT, UTC)
         timezone_pattern = r'\b(?:[A-Z]{2,4}[+-]\d{2,4}|UTC|GMT|PST|EST|CST|MST)\b'
         return re.sub(timezone_pattern, '', text)
-    
+
     def remove_multiple_newlines(self, text):
         # Replace multiple newlines with a single newline
         return re.sub(r'\n{2,}', '\n', text)
-    
+
     def remove_words(self, text):
         # Combine both words using the | (OR) operator in regex
         return re.sub(r'\b(url|original message)\b', '', text, flags=re.IGNORECASE)
@@ -467,24 +519,25 @@ class TextProcessor(BaseEstimator, TransformerMixin):
     def remove_single_characters(self, text):
         # Remove single characters that are not part of a word
         return re.sub(r'\b\w\b', '', text)
-    
+
     def remove_repetitive_patterns(self, text):
-    # Combine patterns for 'nt+ts?', repetitive 'n' or 'nt', and 't+', 'n+', 'nt+'
+        # Combine patterns for 'nt+ts?', repetitive 'n' or 'nt', and 't+', 'n+', 'nt+'
         return re.sub(r'\b(nt+ts?|n+|t+|nt+)\b', '', text)
-    
+
     def lowercase_text(self, text):
         return text.lower()
-    
+
     def remove_bullet_points_and_symbols(self, text):
         # List of bullet points and similar symbols
-        symbols = ['•', '◦', '◉', '▪', '▫', '●', '□', '■', '✦', '✧', '✪', '✫', '✬', '✭', '✮', '✯', '✰']
-        
+        symbols = ['•', '◦', '◉', '▪', '▫', '●', '□', '■',
+                   '✦', '✧', '✪', '✫', '✬', '✭', '✮', '✯', '✰']
+
         # Remove all occurrences of these symbols
         for symbol in symbols:
             text = text.replace(symbol, '')
-        
+
         return text
-    
+
     def fit(self, X, y=None):
         return self
 
@@ -520,10 +573,12 @@ class TextProcessor(BaseEstimator, TransformerMixin):
                 cleaned_text_list.append('')
 
         if y is not None:
-            logging.info(f"Total amount of text processed: {len(cleaned_text_list)}")
+            logging.info(f"Total amount of text processed: {
+                         len(cleaned_text_list)}")
             return pd.DataFrame({'cleaned_text': cleaned_text_list, 'label': y})
         else:
-            logging.info(f"Total amount of text processed: {len(cleaned_text_list)}")
+            logging.info(f"Total amount of text processed: {
+                         len(cleaned_text_list)}")
             return pd.DataFrame({'cleaned_text': cleaned_text_list})
 
     def save_to_csv_cleaned(self, df, filename):
@@ -534,6 +589,8 @@ class TextProcessor(BaseEstimator, TransformerMixin):
             logging.error(f"Error saving data to {filename}: {e}")
 
 # Plot word clouds
+
+
 def plot_word_cloud(text_list, title, width=1500, height=1000, background_color='white', max_words=300, stopwords=None, colormap='viridis', save_to_file=None):
     try:
         logging.info(f"Generating word cloud for {title}...")
@@ -563,98 +620,7 @@ def plot_word_cloud(text_list, title, width=1500, height=1000, background_color=
     except Exception as e:
         logging.error(f"An error occurred: {e}")
 
-# Combine BERT features with metadata features
-def combine_features(ceas_bert_features, spamassassin_bert_features, df_processed_ceas, spamassassin_headers_df, preprocessor):
-    # Convert BERT features to DataFrames
-    ceas_bert_features_df = pd.DataFrame(ceas_bert_features)
-    spamassassin_bert_features_df = pd.DataFrame(spamassassin_bert_features)
-    
-    # Prepare CEAS headers DataFrame
-    ceas_headers_df = df_processed_ceas.copy()
-    
-    # Convert 'urls' to numeric if not already
-    ceas_headers_df['urls'] = pd.to_numeric(ceas_headers_df['urls'], errors='coerce')
-    
-    # Convert 'date' to datetime and extract features
-    ceas_headers_df['date'] = pd.to_datetime(ceas_headers_df['date'], errors='coerce', utc=True)
-    valid_dates = ceas_headers_df['date'].notna()
-    ceas_headers_df.loc[valid_dates, 'day_of_week'] = ceas_headers_df.loc[valid_dates, 'date'].dt.dayofweek
-    ceas_headers_df.loc[valid_dates, 'month'] = ceas_headers_df.loc[valid_dates, 'date'].dt.month
-    ceas_headers_df.loc[valid_dates, 'year'] = ceas_headers_df.loc[valid_dates, 'date'].dt.year
-    ceas_headers_df.loc[valid_dates, 'hour'] = ceas_headers_df.loc[valid_dates, 'date'].dt.hour
-    ceas_headers_df.loc[~valid_dates, ['day_of_week', 'month', 'year', 'hour']] = np.nan
-    
-    # Rename columns to avoid conflicts
-    ceas_headers_df.rename(columns={'sender': 'ceas_sender', 'receiver': 'ceas_receiver', 'subject': 'ceas_subject'}, inplace=True)
-    
-    # Prepare SpamAssassin headers DataFrame
-    spamassassin_headers_df = spamassassin_headers_df.copy()
-    
-    # Rename columns to avoid conflicts
-    spamassassin_headers_df.rename(columns={'sender': 'spamassassin_sender', 'receiver': 'spamassassin_receiver'}, inplace=True)
-    
-    # Check and log the columns in metadata DataFrames
-    logging.info("Columns in CEAS metadata: %s", ceas_headers_df.columns.tolist())
-    logging.info("Columns in SpamAssassin metadata: %s", spamassassin_headers_df.columns.tolist())
-    
-    # Combine metadata
-    ceas_metadata = ceas_headers_df[['ceas_sender', 'ceas_receiver', 'ceas_subject', 'urls', 'day_of_week', 'month', 'year', 'hour']]
-    spamassassin_metadata = spamassassin_headers_df[['spamassassin_sender', 'spamassassin_receiver', 'mailto', 'texturls']]
-    
-    # Ensure 'label' column is included in the final DataFrames
-    ceas_labels = df_processed_ceas['label'].reset_index(drop=True)
-    spamassassin_labels = spamassassin_headers_df[['sender', 'receiver']].copy()
-    spamassassin_labels = spamassassin_labels.assign(label=df_processed_ceas['label'].reset_index(drop=True))
-    
-    # Remove 'label' column from metadata for preprocessor
-    ceas_metadata = ceas_metadata.drop(columns=['label'], errors='ignore')
-    
-    # Check columns before applying the preprocessor
-    missing_columns_ceas = [col for col in ['ceas_sender', 'ceas_receiver', 'ceas_subject', 'urls', 'day_of_week', 'month', 'year', 'hour'] if col not in ceas_metadata.columns]
-    if missing_columns_ceas:
-        raise ValueError(f"Missing columns in CEAS metadata: {', '.join(missing_columns_ceas)}")
-    
-    missing_columns_spamassassin = [col for col in ['spamassassin_sender', 'spamassassin_receiver', 'mailto', 'texturls'] if col not in spamassassin_metadata.columns]
-    if missing_columns_spamassassin:
-        raise ValueError(f"Missing columns in SpamAssassin metadata: {', '.join(missing_columns_spamassassin)}")
-    
-    # Fit the preprocessor on the CEAS metadata
-    preprocessor.fit(ceas_metadata)
-    
-    # Transform both datasets
-    X_ceas = preprocessor.transform(ceas_metadata)
-    X_spamassassin = preprocessor.transform(spamassassin_metadata)
-    
-    # Convert sparse matrices to DataFrames
-    X_ceas_df = pd.DataFrame(X_ceas.toarray(), columns=preprocessor.get_feature_names_out())
-    X_spamassassin_df = pd.DataFrame(X_spamassassin.toarray(), columns=preprocessor.get_feature_names_out())
-    
-    # Ensure indices match and concatenate BERT features with metadata features
-    ceas_bert_features_df = ceas_bert_features_df.reset_index(drop=True)
-    spamassassin_bert_features_df = spamassassin_bert_features_df.reset_index(drop=True)
-    X_ceas_df = X_ceas_df.reset_index(drop=True)
-    X_spamassassin_df = X_spamassassin_df.reset_index(drop=True)
-    
-    # Merge BERT features with metadata features for each dataset
-    ceas_final = pd.concat([ceas_bert_features_df, X_ceas_df, ceas_labels], axis=1)
-    spamassassin_final = pd.concat([spamassassin_bert_features_df, X_spamassassin_df, spamassassin_labels], axis=1)
-    
-    # Concatenate both final DataFrames
-    X_final = pd.concat([ceas_final, spamassassin_final], axis=0, ignore_index=True)
-    
-    logging.info("Final Product Columns: %s", X_final.columns.tolist())
-    
-    return X_final
 
-def create_preprocessor():
-    return ColumnTransformer(
-        transformers=[
-            ('email_fields', OneHotEncoder(handle_unknown='ignore'), ['ceas_sender', 'ceas_receiver', 'ceas_subject', 'spamassassin_sender', 'spamassassin_receiver', 'mailto']),  # One-hot encode email fields
-            ('urls', StandardScaler(), ['urls']),  # Scale the 'urls' column
-            ('date_features', StandardScaler(), ['day_of_week', 'month', 'year', 'hour']),  # Scale the extracted date features
-            ('texturls', StandardScaler(), ['texturls'])  # Scale the 'texturls' column
-        ]
-    )
 def extract_bert_features(dataset_name, df_clean):
     logging.info(f"BERT feature extraction from {dataset_name} dataset...")
     feature_extractor = BERTFeatureExtractor()
@@ -662,6 +628,7 @@ def extract_bert_features(dataset_name, df_clean):
     bert_features = feature_extractor.extract_features(texts)
     logging.info(f"BERT feature extraction from {dataset_name} completed.\n")
     return bert_features
+
 
 class TextDataset(Dataset):
     def __init__(self, texts, labels, tokenizer, max_length):
@@ -682,7 +649,8 @@ class TextDataset(Dataset):
             truncation=True,
             return_tensors='pt'
         )
-        input_ids = inputs['input_ids'].squeeze(dim=0)  # Ensure that the dimensions are correctly handled
+        # Ensure that the dimensions are correctly handled
+        input_ids = inputs['input_ids'].squeeze(dim=0)
         attention_mask = inputs['attention_mask'].squeeze(dim=0)
 
         return {
@@ -691,13 +659,15 @@ class TextDataset(Dataset):
             'labels': torch.tensor(self.labels[idx], dtype=torch.long)
         }
 
+
 class BERTFeatureExtractor:
     def __init__(self, max_length=128, device=None):
         logging.info("Initializing BERT Feature Extractor...")
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.model = BertModel.from_pretrained('bert-base-uncased')
         self.max_length = max_length
-        self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = device if device else torch.device(
+            'cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)  # Ensure model is on the right device
 
     def extract_features(self, texts, batch_size=16):
@@ -708,40 +678,50 @@ class BERTFeatureExtractor:
             for start in tqdm(range(0, len(texts), batch_size), desc="Extracting BERT features", leave=True):
                 end = min(start + batch_size, len(texts))
                 batch_texts = texts[start:end]
-                tokens = self.tokenizer(batch_texts, padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
+                tokens = self.tokenizer(
+                    batch_texts, padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
                 input_ids = tokens['input_ids'].to(self.device)
                 attention_mask = tokens['attention_mask'].to(self.device)
                 outputs = self.model(input_ids, attention_mask=attention_mask)
-                batch_features = outputs.last_hidden_state.mean(dim=1).cpu().numpy()  # Move back to CPU
+                batch_features = outputs.last_hidden_state.mean(
+                    dim=1).cpu().numpy()  # Move back to CPU
                 features.extend(batch_features)
-        
+
+        # Convert features to DataFrame
         return features
 
 # Split the data into training and testing sets
+
+
 def split_data(features_df, test_size=0.2, random_state=42):
     logging.info("Splitting the data into training and testing sets...\n")
     # Assuming 'label' is the column name for labels in features_df
     X = features_df.drop(columns=['label'])
     y = features_df['label']
-    
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
-    
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size, random_state=random_state)
+
     return X_train, X_test, y_train, y_test
 
 # Handle data imbalance
+
+
 def handle_data_imbalance(X_train, y_train, random_state=42):
     logging.info("Handling data imbalance...\n")
     smote = SMOTE(random_state=random_state)
     X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
-    
+
     return X_train_balanced, y_train_balanced
 
 # Train and evaluate the ensemble model
+
+
 def train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_test):
     # Initialize the classifiers
     rf_model = RandomForestClassifier(class_weight='balanced', random_state=42)
     logreg_model = LogisticRegression(class_weight='balanced', random_state=42)
-    
+
     # Hyperparameter tuning for RandomForest
     param_grid = {
         'n_estimators': [100],  # Reduced number of estimators
@@ -749,9 +729,10 @@ def train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_te
         'min_samples_split': [2],
         'min_samples_leaf': [1]
     }
-    
+
     def profile_grid_search():
-        grid_search = GridSearchCV(rf_model, param_grid, cv=5, scoring='accuracy', verbose=3, n_jobs=1)
+        grid_search = GridSearchCV(
+            rf_model, param_grid, cv=5, scoring='accuracy', verbose=3, n_jobs=1)
         grid_search.fit(X_train_balanced, y_train_balanced)
         return grid_search
 
@@ -760,68 +741,95 @@ def train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_te
     best_rf_model = profile_grid_search().best_estimator_
     end_time = time.time()
     logging.info(f"GridSearchCV took {end_time - start_time:.2f} seconds\n")
-    
+
     # Initialize VotingClassifier (Ensemble)
     ensemble_model = VotingClassifier(estimators=[
         ('rf', best_rf_model),
         ('logreg', logreg_model)
     ], voting='soft')
-    
+
     # Train the ensemble model with progress bar
     for _ in tqdm(range(1), desc="Training ensemble model"):
         ensemble_model.fit(X_train_balanced, y_train_balanced)
-    
+
     # Make predictions
     y_train_pred = ensemble_model.predict(X_train_balanced)  # Predictions on the training set
     y_test_pred = ensemble_model.predict(X_test)    # Predictions on the test set
-    
+
     train_accuracy = accuracy_score(y_train_balanced, y_train_pred)
     test_accuracy = accuracy_score(y_test, y_test_pred)
-    target_names = ['Phishing', 'Safe']
-    
+    target_names = ['Safe', 'Phishing', 'Spam']
+
     print(f"\nTraining Accuracy: {train_accuracy * 100:.2f}%")
     print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
     print("Confusion Matrix:\n", confusion_matrix(y_test, y_test_pred))
-    #print("Classification Report:\n", classification_report(y_test, y_test_pred))
+    
+    # Print classification report for training data
     print("Classification Report for Training Data:")
     print(classification_report(y_train_balanced, y_train_pred, target_names=target_names))
+
     # Print classification report for test data
     print("\nClassification Report for Test Data:")
     print(classification_report(y_test, y_test_pred, target_names=target_names))
 
 
+
+def log_label_percentages(df, dataset_name):
+    total_count = len(df)
+    label_counts = df['label'].value_counts(normalize=True) * 100
+    logging.info(f"Dataset: {dataset_name}")
+    logging.info(f"Total count: {total_count}")
+    
+    # Sort label counts by label value
+    sorted_label_counts = label_counts.sort_index()
+    
+    # Get the number of unique labels
+    num_labels = len(sorted_label_counts)
+    
+    for i, (label, percentage) in enumerate(sorted_label_counts.items()):
+        description = label_descriptions.get(label, "Unknown")
+        if i == num_labels - 1:
+            logging.info(f"{description} percentage: {percentage:.2f}%\n")
+        else:
+            logging.info(f"{description} percentage: {percentage:.2f}%")
+
+
+def count_urls(urls_list):
+    if isinstance(urls_list, list):
+        return len(urls_list)
+    else:
+        return 0
+
+
+
+
+
 # Main processing function
 def main():
-    
-    '''
-    For labeling:
-    0 = Safe
-    1 = Phishing
-    2 = Spam
-    '''
-    
+
+
     # Use relative paths
-    
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    dataset = os.path.join(base_dir, 'CEAS_08.csv')    
+    dataset = os.path.join(base_dir, 'CEAS_08.csv')
     extracted_email_file = os.path.join(
         base_dir, 'Extracted Data', 'SpamAssassinExtractedEmailHeader.csv')
     clean_ceas_file = os.path.join(
         base_dir, 'Extracted Data', 'CleanedCEAS_08Text.csv')
     clean_spamassassin_file = os.path.join(
         base_dir, 'Extracted Data', 'CleanedSpamAssassinText.csv')
-
+    MergedHeaderDataset = os.path.join(
+        base_dir, 'Extracted Data', 'MergedHeaderDataset.csv')
 
     df_ceas = pd.read_csv(dataset)
-    dataset = load_dataset('talby/spamassassin', split='train', trust_remote_code=True)
+    dataset = load_dataset('talby/spamassassin',
+                           split='train', trust_remote_code=True)
     df_spamassassin = dataset.to_pandas()
 
-    
     try:
+        '''Changing the labels to match the labeling scheme'''
         # Change labels to match the labeling scheme
-        df_spamassassin['label'] = df_spamassassin['label'].astype(int)
-        df_spamassassin['label'] = df_spamassassin['label'].replace({0: 2, 1: 0}).astype(np.int64)
-        
+        df_spamassassin['label'] = df_spamassassin['label'].map({1: 0, 0: 2})
+
         # Calculate the value counts
         label_counts = df_spamassassin['label'].value_counts()
 
@@ -833,94 +841,163 @@ def main():
         # Print the percentages
         logging.info(f"Percentage of Spam emails: {spam_percentage:.2f}%")
         logging.info(f"Percentage of Safe emails: {safe_percentage:.2f}%\n")
-        
-        # Process CEAS_08 dataset (Remove duplicates)
-        df_processed_ceas = process_dataset(df_ceas, 'body', 'CEAS_08')
-        
-        # Process SpamAssassin dataset (Remove duplicates)
-        df_processed_spamassassin = process_dataset(df_spamassassin, 'text', 'SpamAssassin')
-        
-        #Visualize data before and after removing duplicate
-        #visualize_data(df_spamassassin, df_processed_spamassassin)
 
+        '''Removing duplicates and missing values from the datasets''' 
+        df_processed_ceas = process_dataset(df_ceas, 'body', 'CEAS_08')
+        df_processed_spamassassin = process_dataset(df_spamassassin, 'text', 'SpamAssassin')
+        log_label_percentages(df_processed_ceas, 'CEAS_08')
+        log_label_percentages(df_processed_spamassassin, 'SpamAssassin')
+        combined__percentage_df = pd.concat([df_processed_ceas, df_processed_spamassassin])
+        log_label_percentages(combined__percentage_df, 'Combined CEAS_08 and SpamAssassin')
+
+        '''Visualizing data before and after removing duplicates (SpamAssassin)'''
+        # visualize_data(df_spamassassin, df_processed_spamassassin)
+
+        '''Extracting email headers from the SpamAssassin dataset after removing duplicates'''
         # Extract email header information from the cleaned spamassassin dataset
         header_extractor = EmailHeaderExtractor(df_processed_spamassassin)
         spamassassin_headers_df = header_extractor.extract_headers()
         header_extractor.save_to_csv(extracted_email_file)
-        logging.info("Email header extraction and saving from Spam Assassin completed.\n")
-        
-        
-        ceas_headers_df = df_processed_ceas[['sender', 'receiver', 'date', 'subject', 'urls']].copy()
-        
-        # Text processing CEAS_08 dataset
-        df_clean_ceas = data_cleaning_and_save_text("CEAS_08", df_processed_ceas, 'body', clean_ceas_file)
+        logging.info(
+            "Email header extraction and saving from Spam Assassin completed.\n")
 
-        # Text processing Spam Assassin dataset
-        df_clean_spamassassin = data_cleaning_and_save_text("Spam Assassin", df_processed_spamassassin, 'text', clean_spamassassin_file)
-        
-        # Plot word clouds 
-        logging.info("Plotting word clouds for the cleaned datasets...")
-        #plot_word_cloud(df_remove_duplicate['text'], "Original Dataset")
-        #plot_word_cloud(df_clean_ceas['cleaned_text'], "Cleaned CEAS_08 Dataset")
-        #plot_word_cloud(df_clean_spamassassin['cleaned_text'], "Cleaned Spam Assassin Dataset")
-        logging.info("Word clouds plotted successfully.\n")
-        
-        # Feature extraction using BERT for CEAS_08 dataset
+        '''Data cleaning and saving the cleaned text data'''
+        df_clean_ceas = data_cleaning_and_save_text(
+            "CEAS_08", df_processed_ceas, 'body', clean_ceas_file)
+        df_clean_spamassassin = data_cleaning_and_save_text(
+            "Spam Assassin", df_processed_spamassassin, 'text', clean_spamassassin_file)
+
+
+        '''Visualizing data after cleaning the text data'''
+        #logging.info("Plotting word clouds for the cleaned datasets...")
+        # plot_word_cloud(df_remove_duplicate['text'], "Original Dataset")
+        # plot_word_cloud(df_clean_ceas['cleaned_text'], "Cleaned CEAS_08 Dataset")
+        # plot_word_cloud(df_clean_spamassassin['cleaned_text'], "Cleaned Spam Assassin Dataset")
+        #logging.info("Word clouds plotted successfully.\n")
+
+
+        '''Feature extraction using BERT'''
         ceas_bert_features = extract_bert_features("CEAS_08", df_clean_ceas)
-
-        # Feature extraction using BERT for Spam Assassin dataset
         spamassassin_bert_features = extract_bert_features("Spam Assassin", df_clean_spamassassin)
+
+
+        '''Combining the datasets'''
+        if len(df_processed_spamassassin) != len(spamassassin_headers_df):
+            raise ValueError("The lengths of df_processed_spamassassin and spamassassin_headers_df do not match.")
+
+        # Merge df_processed_spamassassin with spamassassin_headers_df
+        merged_spamassassin = pd.concat([spamassassin_headers_df.reset_index(drop=True), df_processed_spamassassin[['label']].reset_index(drop=True)], axis=1)
+
+        # Ensure the total amount of data remains the same
+        assert len(merged_spamassassin) == len(df_processed_spamassassin), "Data loss detected in merging spamassassin data."
+
+        # Align the columns of df_processed_ceas to match the final desired structure
+        df_processed_ceas['mailto'] = None  # Add mailto column with None values
+        df_processed_ceas['texturls'] = None  # Add texturls column with None values
+
+        # Ensure the label column in df_processed_ceas is correctly populated
+        # Assuming df_processed_ceas already has a 'label' column with correct values
+        if 'label' not in df_processed_ceas.columns:
+            df_processed_ceas['label'] = None  # Add label column with None values if it doesn't exist
+
+        # Concatenate the DataFrames
+        final_df = pd.concat([merged_spamassassin, df_processed_ceas], ignore_index=True)
+
+        # Ensure the total amount of data remains the same
+        assert len(final_df) == len(df_processed_spamassassin) + len(df_processed_ceas), "Data loss detected in final merging."
+
+        # Reorder columns to match the desired structure
+        final_df = final_df[['sender', 'receiver', 'mailto', 'subject', 'date', 'urls', 'texturls', 'label']]
+
+        # Calculate and log the percentage of each label
+        log_label_percentages(final_df, "Final Merged Dataset")
+        pd.set_option('display.max_columns', None)  # Show all columns
+        pd.set_option('display.width', 1000)        # Adjust width to fit content
+        pd.set_option('display.max_colwidth', 100)  # Limit column width
         
-        '''
+        final_df.to_csv(MergedHeaderDataset, index=False)
+
+        # Preprocessing the final merged dataset
+        # Fill missing values for specific columns where necessary
+        final_df['sender'] = final_df['sender'].fillna('unknown')
+        final_df['receiver'] = final_df['receiver'].fillna('unknown')
+        final_df['mailto'] = final_df['mailto'].fillna('unknown')
+        final_df['subject'] = final_df['subject'].fillna('unknown')
+
+        # Drop the 'date' column
+        final_df = final_df.drop(columns=['date'], errors='ignore')
+
+        # Process the 'texturls' column
+        final_df['texturls'] = final_df['texturls'].apply(lambda x: ' '.join(x) if isinstance(x, list) else (x if x is not None else ''))
+        final_df['urls'] = final_df.apply(lambda row: count_urls(row['texturls']) if pd.isna(row['urls']) or row['urls'] == 0 else row['urls'], axis=1)
+
+        # Check for missing values in all columns
+        missing_values = final_df.isnull().sum()
+        logging.info(f"Missing values in each column:\n{missing_values}")
+
+        # Define the columns for preprocessing
+        categorical_columns = ['sender', 'receiver', 'mailto', 'subject']
+        numerical_columns = ['urls']
+        text_columns = ['texturls']
+
+        # Define the preprocessing pipeline
         preprocessor = ColumnTransformer(
-            transformers=[
-                ('email_fields', OneHotEncoder(handle_unknown='ignore'), ['sender', 'receiver', 'subject']),  # One-hot encode 'sender', 'receiver', 'subject'
-                ('urls', StandardScaler(), ['urls']),  # Scale the 'urls' column
-                ('date_features', StandardScaler(), ['day_of_week', 'month', 'year', 'hour'])  # Scale the extracted date features
-            ]
+        transformers=[
+            # Categorical columns: Use OneHotEncoder
+            ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_columns),
+            
+            # Numerical columns: Use StandardScaler
+            ('num', StandardScaler(), numerical_columns),
+            
+            # Text columns: Use TF-IDF Vectorizer for the text content (URLs)
+            ('text', TfidfVectorizer(), 'texturls')
+        ]
         )
-        '''
-        
-        # Create the preprocessor
-        preprocessor = create_preprocessor()
-       
-       
-        logging.info(f"Columns in df_clean_spamassassin: {df_clean_spamassassin.columns.tolist()}")
-        logging.info(f"Columns in df_clean_ceas: {df_clean_ceas.columns.tolist()}")
-        logging.info(f"Columns in spamassassin_headers_df: {spamassassin_headers_df.columns.tolist()}")
-        logging.info(f"Columns in ceas_headers_df: {ceas_headers_df.columns.tolist()}\n")
-        
-        combined_df = combine_features(ceas_bert_features, spamassassin_bert_features, df_processed_ceas, spamassassin_headers_df, preprocessor)
 
-        logging.info(f"Finished combining features. Final DataFrame shape: {combined_df.shape}\n")
-        logging.info(f"Checking for missing and duplicate values in the final DataFrame...\n")
-        # Check for missing and duplicate values
-        check_missing_values = combined_df.isnull().sum()
-        missing_values = check_missing_values[check_missing_values > 0]
+        # Apply the preprocessing pipeline
+        preprocessed_data = preprocessor.fit_transform(final_df)
 
-        if not missing_values.empty:
-            logging.info(f"Columns with missing values:\n{missing_values}\n")
-        else:
-            logging.info("No missing values found.\n")
+        # Convert preprocessed data to a DataFrame and ensure column names are strings
+        preprocessed_df = pd.DataFrame(preprocessed_data.toarray(), columns=preprocessor.get_feature_names_out())
+        preprocessed_df.columns = preprocessed_df.columns.astype(str)  # Ensure all column names are strings
 
-        # Remove missing values
-        logging.info("Removing missing values...")
-        combined_df = combined_df.dropna()
-        logging.info(f"Total number of rows after removing missing values: {combined_df.shape[0]}\n")
-        
-        # Split the data
-        X_train, X_test, y_train, y_test = split_data(combined_df)
-        logging.info(f" Data split into training and testing sets.\n")
-        
+        # Add the label column back to the preprocessed DataFrame
+        preprocessed_df['label'] = final_df['label'].values
+
+        # Convert BERT features to DataFrames if needed
+        ceas_bert_features_df = pd.DataFrame(ceas_bert_features)
+        spamassassin_bert_features_df = pd.DataFrame(spamassassin_bert_features)
+
+        # Merge the preprocessed data with the BERT features
+        final_features = pd.concat([preprocessed_df, ceas_bert_features_df, spamassassin_bert_features_df], axis=1)
+
+        # Ensure no misalignment between preprocessed_df and BERT feature dataframes
+        if final_features.shape[0] != final_df.shape[0]:
+            logging.info("Error: Row count mismatch between preprocessed data and BERT features.")
+
+        # Handle missing values
+        if final_features.isnull().sum().sum() > 0:
+            logging.info("Missing values found. Applying imputation.")
+
+        # Impute missing values
+        imputer = SimpleImputer(strategy='mean')  # Use 'mean' for numerical data
+        final_features = pd.DataFrame(imputer.fit_transform(final_features), columns=final_features.columns)
+
+        # Split the data into training and testing sets
+        X_train, X_test, y_train, y_test = split_data(final_features)
+        logging.info(f"Data split into training and testing sets.\n")
+
         # Handle data imbalance
         X_train_balanced, y_train_balanced = handle_data_imbalance(X_train, y_train)
         logging.info(f"Data imbalance handled.\n")
-        
+
         # Train and evaluate the ensemble model
         train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_test)
-
+    
+    
     except Exception as e:
         logging.error(f"An error occurred: {e}")
+
 
 # Call the main function
 if __name__ == "__main__":
