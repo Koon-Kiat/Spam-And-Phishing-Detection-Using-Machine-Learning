@@ -93,6 +93,13 @@ import warnings  # Warning control
 # Datasets
 from datasets import load_dataset  # Load datasets
 
+'''
+import cuml
+from cuml.ensemble import RandomForestClassifier as cuMLRandomForest
+from cuml.linear_model import LogisticRegression as cuMLLogisticRegression
+from cuml.ensemble import VotingClassifier as cuMLVotingClassifier
+'''
+
 # ANSI escape codes for text formatting
 BOLD = '\033[1m'
 RESET = '\033[0m'
@@ -569,6 +576,10 @@ class TextDataset(Dataset):
             'labels': torch.tensor(self.labels[idx], dtype=torch.long)
         }
 
+# Define paths for saving models
+BERT_MODEL_PATH = 'bert_model.pth'
+ENSEMBLE_MODEL_PATH = 'ensemble_model.pkl'
+
 class BERTFeatureExtractor:
     def __init__(self, max_length=128, device=None):
         logging.info("Initializing BERT Feature Extractor...")
@@ -577,6 +588,18 @@ class BERTFeatureExtractor:
         self.max_length = max_length
         self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)  # Ensure model is on the right device
+    
+    def save_model(self):
+        torch.save(self.model.state_dict(), BERT_MODEL_PATH)
+        logging.info("Saved BERT model.")
+
+    def load_model(self):
+        if os.path.exists(BERT_MODEL_PATH):
+            self.model.load_state_dict(torch.load(BERT_MODEL_PATH))
+            self.model.to(self.device)
+            logging.info("Loaded BERT model.")
+        else:
+            logging.info("BERT model not found. Training a new one.")
 
     def extract_features(self, texts, batch_size=16):
         features = []
@@ -614,8 +637,7 @@ def handle_data_imbalance(X_train, y_train, random_state=42):
     
     return X_train_balanced, y_train_balanced
 
-# Train and evaluate the ensemble model
-def train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_test):
+def train_and_save_ensemble(X_train_balanced, y_train_balanced):
     # Initialize the classifiers
     rf_model = RandomForestClassifier(class_weight='balanced', random_state=42)
     logreg_model = LogisticRegression(class_weight='balanced', random_state=42)
@@ -645,14 +667,34 @@ def train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_te
         ('logreg', logreg_model)
     ], voting='soft')
     
-    # Train the ensemble model with progress bar
-    for _ in tqdm(range(1), desc="Training ensemble model"):
-        ensemble_model.fit(X_train_balanced, y_train_balanced)
+    # Train the ensemble model
+    ensemble_model.fit(X_train_balanced, y_train_balanced)
+    
+    # Save the trained ensemble model
+    joblib.dump(ensemble_model, ENSEMBLE_MODEL_PATH)
+    logging.info("Saved the ensemble model.")
+
+def load_ensemble_model():
+    if os.path.exists(ENSEMBLE_MODEL_PATH):
+        ensemble_model = joblib.load(ENSEMBLE_MODEL_PATH)
+        logging.info("Loaded existing ensemble model.")
+        return ensemble_model
+    return None
+
+def train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_test):
+    # Load existing model if available
+    ensemble_model = load_ensemble_model()
+    
+    if ensemble_model is None:
+        logging.info("Training a new ensemble model...")
+        train_and_save_ensemble(X_train_balanced, y_train_balanced)
+        ensemble_model = load_ensemble_model()
     
     # Make predictions
     y_train_pred = ensemble_model.predict(X_train_balanced)  # Predictions on the training set
     y_test_pred = ensemble_model.predict(X_test)    # Predictions on the test set
     
+    # Evaluate the model
     train_accuracy = accuracy_score(y_train_balanced, y_train_pred)
     test_accuracy = accuracy_score(y_test, y_test_pred)
     target_names = ['Phishing', 'Safe']
@@ -668,7 +710,6 @@ def train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_te
     print(classification_report(y_test, y_test_pred, target_names=target_names))
 
 
-# Main processing function
 def main():
     # Use relative paths
     
@@ -684,7 +725,6 @@ def main():
     df = pd.read_csv(dataset)
     
     try:
-        
         logging.info(f"Total number of rows in the original DataFrame: {df.shape[0]}")
         logging.info(f"DataFrame columns: {df.columns}\n")
         
@@ -708,10 +748,11 @@ def main():
         logging.info(f"Total number of rows remaining in the cleaned DataFrame: {df_remove_duplicate.shape[0]}\n")
         logging.debug(f"DataFrame after removing duplicates:\n{df_remove_duplicate.head()}\n")
 
+        # Visualize data before and after removing duplicate
+        #visualize_data(df, df_remove_duplicate)
        
         # Visualize data before and after removing duplicate
         #visualize_data(df, df_remove_duplicate)
-
         
         # Extract email header information
         #header_extractor = EmailHeaderExtractor(df_remove_duplicate)
@@ -721,7 +762,7 @@ def main():
         
         headers_df = df[['sender', 'receiver', 'date', 'subject', 'urls']].copy()
         
-        #Text processing (Text only)
+        # Text processing (Text only)
         processor = TextProcessor()
         df_clean = processor.transform(df_remove_duplicate['body'], df_remove_duplicate['label'])
         processor.save_to_csv_cleaned(df_clean, clean_email_file)
@@ -732,11 +773,16 @@ def main():
         #plot_word_cloud(df_remove_duplicate['text'], "Original Dataset")
         #plot_word_cloud(df_clean['cleaned_text'], "Cleaned Dataset")
         
+        print(torch.cuda.is_available())  # Should return True if CUDA is available
+        print(torch.cuda.device_count())  # Should return the number of GPUs available
+        print(torch.cuda.current_device())  # Should return the index of the current GPU
         
         # Feature extraction using BERT
         feature_extractor = BERTFeatureExtractor()
+        feature_extractor.load_model()  # Load pre-trained BERT model
         texts = df_clean['cleaned_text'].tolist()
         bert_features = feature_extractor.extract_features(texts)
+        feature_extractor.save_model()  # Save BERT model after extraction
         logging.info("BERT feature extraction completed.\n")
         
         headers_df['date'] = pd.to_datetime(headers_df['date'], format='%a, %d %b %Y %H:%M:%S %z', errors='coerce', utc=True)
