@@ -1,98 +1,114 @@
 # Description: This file is used to test the data cleaning and processing functions.
 
 # Data manipulation
-import numpy as np  # Numerical operations
-import pandas as pd  # Data manipulation and analysis
-
-# Data visualization
-import matplotlib.pyplot as plt  # Plotting library
-import seaborn as sns  # Statistical data visualization
-from wordcloud import WordCloud  # Generate word clouds
-from unittest.mock import patch
-
-# Operating system interfaces
-import os  # Interact with the operating system
+import codecs  # Codec registry and base classes
+import cProfile  # Profiling
 
 # Email parsing
 import email  # Email handling
 import email.policy  # Email policies
-from email import policy
-from email.parser import BytesParser
-from email.message import EmailMessage
-
-# String and regular expression operations
-import string  # String operations
-import re  # Regular expressions
-
-# HTML and XML parsing
-from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning  # HTML and XML parsing
-
-# Progress bar
-from tqdm import tqdm  # Progress bar for loops
+import json  # JSON parsing and manipulation
 
 # Logging
 import logging  # Logging library
 
-# Text processing
-import contractions  # Expand contractions in text
-import codecs  # Codec registry and base classes
-import json  # JSON parsing and manipulation
+# Operating system interfaces
+import os  # Interact with the operating system
+import re  # Regular expressions
+
+# String and regular expression operations
+import string  # String operations
+
+# Profiling and job management
+import time  # Time-related functions
 import urllib.parse  # URL parsing
 
-# Natural Language Toolkit (NLTK)
-import nltk  # Natural language processing
-from nltk.stem import WordNetLemmatizer  # Lemmatization
-from nltk.corpus import stopwords  # Stop words
-from nltk.tokenize import word_tokenize  # Tokenization
-
-# Typing support
-from typing import List, Dict, Union  # Type hints
+# Warnings
+import warnings  # Warning control
 
 # Concurrent execution
 from concurrent.futures import ThreadPoolExecutor, as_completed  # Multithreading
+from email import policy
+from email.message import EmailMessage
+from email.parser import BytesParser
 from functools import lru_cache  # Least Recently Used (LRU) cache
 
-# Spell checking
-from spellchecker import SpellChecker  # Spell checking
+# Typing support
+from typing import Dict, List, Union  # Type hints
+from unittest.mock import patch
 
-# Machine learning libraries
-from sklearn.base import BaseEstimator, TransformerMixin  # Scikit-learn base classes
-# Text feature extraction
-from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
-from sklearn.decomposition import PCA  # Principal Component Analysis
-from sklearn.model_selection import train_test_split, GridSearchCV  # Model selection
-# Ensemble classifiers
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier
-from sklearn.linear_model import LogisticRegression  # Logistic Regression
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, f1_score  # Model evaluation
-from sklearn.utils import resample  # Resampling utilities
-from imblearn.over_sampling import SMOTE  # Handling imbalanced data
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
+# Text processing
+import contractions  # Expand contractions in text
+import joblib  # Job management
 
-# Transformers library
-# BERT models and training utilities
-from transformers import BertTokenizer, BertForSequenceClassification, Trainer, TrainingArguments, BertModel, AdamW
+# Data visualization
+import matplotlib.pyplot as plt  # Plotting library
 
-# PyTorch
-import torch  # PyTorch library
-from torch.utils.data import DataLoader, Dataset  # Data handling in PyTorch
+# Natural Language Toolkit (NLTK)
+import nltk  # Natural language processing
+import numpy as np  # Numerical operations
+import pandas as pd  # Data manipulation and analysis
+import seaborn as sns  # Statistical data visualization
 
 # TensorFlow
 import tensorflow as tf  # TensorFlow library
 
+# PyTorch
+import torch  # PyTorch library
+
+# HTML and XML parsing
+from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning  # HTML and XML parsing
+from imblearn.over_sampling import SMOTE  # Handling imbalanced data
+from nltk.corpus import stopwords  # Stop words
+from nltk.stem import WordNetLemmatizer  # Lemmatization
+from nltk.tokenize import word_tokenize  # Tokenization
+
 # Sparse matrices
-from scipy.sparse import hstack, csr_matrix  # Sparse matrix operations
+from scipy.sparse import csr_matrix, hstack  # Sparse matrix operations
 
-# Profiling and job management
-import time  # Time-related functions
-import cProfile  # Profiling
-import joblib  # Job management
+# Machine learning libraries
+from sklearn.base import BaseEstimator, TransformerMixin  # Scikit-learn base classes
+from sklearn.compose import ColumnTransformer
+from sklearn.decomposition import PCA  # Principal Component Analysis
 
-# Warnings
-import warnings  # Warning control
+# Ensemble classifiers
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+
+# Text feature extraction
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression  # Logistic Regression
+from sklearn.metrics import (  # Model evaluation
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+)
+from sklearn.model_selection import GridSearchCV, train_test_split  # Model selection
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.utils import resample  # Resampling utilities
+
+# Spell checking
+from spellchecker import SpellChecker  # Spell checking
+from torch.utils.data import DataLoader, Dataset  # Data handling in PyTorch
+
+# Progress bar
+from tqdm import tqdm  # Progress bar for loops
+
+# Transformers library
+# BERT models and training utilities
+from transformers import (
+    AdamW,
+    BertForSequenceClassification,
+    BertModel,
+    BertTokenizer,
+    Trainer,
+    TrainingArguments,
+)
+from wordcloud import WordCloud  # Generate word clouds
 
 # Datasets
 from datasets import load_dataset  # Load datasets
@@ -124,8 +140,10 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 logging.getLogger('tensorflow').setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=UserWarning, module='transformers')
 warnings.filterwarnings('ignore', category=UserWarning, module='tensorflow')
-warnings.filterwarnings("ignore", category=FutureWarning, module='transformers.tokenization_utils_base')
+warnings.filterwarnings("ignore", category=FutureWarning,
+                        module='transformers.tokenization_utils_base')
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
+
 
 def drop_unnamed_column(df, dataset_name):
     if 'Unnamed: 0' in df.columns:
@@ -274,7 +292,6 @@ def visualize_data(df, df_remove_duplicate):
                         ha='center', va='center', xytext=(0, 5), textcoords='offset points', color='black')
 
     plt.show()
-
 
 
 class EmailHeaderExtractor:
@@ -694,7 +711,7 @@ class BERTFeatureExtractor:
 
 
 def split_data(features_df, test_size=0.2, random_state=42):
-    logging.info("Splitting the data into training and testing sets...\n")
+    logging.info("Splitting the data into training and testing sets...")
     # Assuming 'label' is the column name for labels in features_df
     X = features_df.drop(columns=['label'])
     y = features_df['label']
@@ -708,7 +725,7 @@ def split_data(features_df, test_size=0.2, random_state=42):
 
 
 def handle_data_imbalance(X_train, y_train, random_state=42):
-    logging.info("Handling data imbalance...\n")
+    logging.info("Handling data imbalance...")
     smote = SMOTE(random_state=random_state)
     X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
 
@@ -753,8 +770,10 @@ def train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_te
         ensemble_model.fit(X_train_balanced, y_train_balanced)
 
     # Make predictions
-    y_train_pred = ensemble_model.predict(X_train_balanced)  # Predictions on the training set
-    y_test_pred = ensemble_model.predict(X_test)    # Predictions on the test set
+    y_train_pred = ensemble_model.predict(
+        X_train_balanced)  # Predictions on the training set
+    y_test_pred = ensemble_model.predict(
+        X_test)    # Predictions on the test set
 
     train_accuracy = accuracy_score(y_train_balanced, y_train_pred)
     test_accuracy = accuracy_score(y_test, y_test_pred)
@@ -763,15 +782,15 @@ def train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_te
     print(f"\nTraining Accuracy: {train_accuracy * 100:.2f}%")
     print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
     print("Confusion Matrix:\n", confusion_matrix(y_test, y_test_pred))
-    
+
     # Print classification report for training data
     print("Classification Report for Training Data:")
-    print(classification_report(y_train_balanced, y_train_pred, target_names=target_names))
+    print(classification_report(y_train_balanced,
+          y_train_pred, target_names=target_names))
 
     # Print classification report for test data
     print("\nClassification Report for Test Data:")
     print(classification_report(y_test, y_test_pred, target_names=target_names))
-
 
 
 def log_label_percentages(df, dataset_name):
@@ -779,13 +798,13 @@ def log_label_percentages(df, dataset_name):
     label_counts = df['label'].value_counts(normalize=True) * 100
     logging.info(f"Dataset: {dataset_name}")
     logging.info(f"Total count: {total_count}")
-    
+
     # Sort label counts by label value
     sorted_label_counts = label_counts.sort_index()
-    
+
     # Get the number of unique labels
     num_labels = len(sorted_label_counts)
-    
+
     for i, (label, percentage) in enumerate(sorted_label_counts.items()):
         description = label_descriptions.get(label, "Unknown")
         if i == num_labels - 1:
@@ -801,13 +820,8 @@ def count_urls(urls_list):
         return 0
 
 
-
-
-
 # Main processing function
 def main():
-
-
     # Use relative paths
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dataset = os.path.join(base_dir, 'CEAS_08.csv')
@@ -842,13 +856,16 @@ def main():
         logging.info(f"Percentage of Spam emails: {spam_percentage:.2f}%")
         logging.info(f"Percentage of Safe emails: {safe_percentage:.2f}%\n")
 
-        '''Removing duplicates and missing values from the datasets''' 
+        '''Removing duplicates and missing values from the datasets'''
         df_processed_ceas = process_dataset(df_ceas, 'body', 'CEAS_08')
-        df_processed_spamassassin = process_dataset(df_spamassassin, 'text', 'SpamAssassin')
+        df_processed_spamassassin = process_dataset(
+            df_spamassassin, 'text', 'SpamAssassin')
         log_label_percentages(df_processed_ceas, 'CEAS_08')
         log_label_percentages(df_processed_spamassassin, 'SpamAssassin')
-        combined__percentage_df = pd.concat([df_processed_ceas, df_processed_spamassassin])
-        log_label_percentages(combined__percentage_df, 'Combined CEAS_08 and SpamAssassin')
+        combined__percentage_df = pd.concat(
+            [df_processed_ceas, df_processed_spamassassin])
+        log_label_percentages(combined__percentage_df,
+                              'Combined CEAS_08 and SpamAssassin')
 
         '''Visualizing data before and after removing duplicates (SpamAssassin)'''
         # visualize_data(df_spamassassin, df_processed_spamassassin)
@@ -867,69 +884,118 @@ def main():
         df_clean_spamassassin = data_cleaning_and_save_text(
             "Spam Assassin", df_processed_spamassassin, 'text', clean_spamassassin_file)
 
-
         '''Visualizing data after cleaning the text data'''
-        #logging.info("Plotting word clouds for the cleaned datasets...")
+        # logging.info("Plotting word clouds for the cleaned datasets...")
         # plot_word_cloud(df_remove_duplicate['text'], "Original Dataset")
         # plot_word_cloud(df_clean_ceas['cleaned_text'], "Cleaned CEAS_08 Dataset")
         # plot_word_cloud(df_clean_spamassassin['cleaned_text'], "Cleaned Spam Assassin Dataset")
-        #logging.info("Word clouds plotted successfully.\n")
-
+        # logging.info("Word clouds plotted successfully.\n")
 
         '''Feature extraction using BERT'''
         ceas_bert_features = extract_bert_features("CEAS_08", df_clean_ceas)
-        spamassassin_bert_features = extract_bert_features("Spam Assassin", df_clean_spamassassin)
+        spamassassin_bert_features = extract_bert_features(
+            "Spam Assassin", df_clean_spamassassin)
 
+        '''Merging the datasets'''
+        # Apply the function to create the 'urls' column
+        spamassassin_headers_df['urls'] = spamassassin_headers_df['texturls'].apply(
+            count_urls)
 
-        '''Combining the datasets'''
+        # Check for length match between df_processed_spamassassin and spamassassin_headers_df
         if len(df_processed_spamassassin) != len(spamassassin_headers_df):
-            raise ValueError("The lengths of df_processed_spamassassin and spamassassin_headers_df do not match.")
+            raise ValueError(
+                "The lengths of df_processed_spamassassin and spamassassin_headers_df do not match.")
 
         # Merge df_processed_spamassassin with spamassassin_headers_df
-        merged_spamassassin = pd.concat([spamassassin_headers_df.reset_index(drop=True), df_processed_spamassassin[['label']].reset_index(drop=True)], axis=1)
+        merged_spamassassin = pd.concat([spamassassin_headers_df.reset_index(
+            drop=True), df_processed_spamassassin[['label']].reset_index(drop=True)], axis=1)
 
         # Ensure the total amount of data remains the same
-        assert len(merged_spamassassin) == len(df_processed_spamassassin), "Data loss detected in merging spamassassin data."
+        assert len(merged_spamassassin) == len(
+            df_processed_spamassassin), "Data loss detected in merging spamassassin data."
 
         # Align the columns of df_processed_ceas to match the final desired structure
-        df_processed_ceas['mailto'] = None  # Add mailto column with None values
-        df_processed_ceas['texturls'] = None  # Add texturls column with None values
+        # Add mailto column with None values
+        df_processed_ceas['mailto'] = None
+        # Add texturls column with None values
+        df_processed_ceas['texturls'] = None
 
         # Ensure the label column in df_processed_ceas is correctly populated
         # Assuming df_processed_ceas already has a 'label' column with correct values
         if 'label' not in df_processed_ceas.columns:
-            df_processed_ceas['label'] = None  # Add label column with None values if it doesn't exist
+            # Add label column with None values if it doesn't exist
+            df_processed_ceas['label'] = None
 
         # Concatenate the DataFrames
-        final_df = pd.concat([merged_spamassassin, df_processed_ceas], ignore_index=True)
+        final_df = pd.concat(
+            [merged_spamassassin, df_processed_ceas], ignore_index=True)
 
         # Ensure the total amount of data remains the same
-        assert len(final_df) == len(df_processed_spamassassin) + len(df_processed_ceas), "Data loss detected in final merging."
+        assert len(final_df) == len(df_processed_spamassassin) + \
+            len(df_processed_ceas), "Data loss detected in final merging."
 
-        # Reorder columns to match the desired structure
-        final_df = final_df[['sender', 'receiver', 'mailto', 'subject', 'date', 'urls', 'texturls', 'label']]
+        # Drop the 'date' column if it exists
+        if 'date' in final_df.columns:
+            final_df = final_df.drop(columns=['date'])
+
+        # Drop the 'texturls' column since we now have 'urls'
+        if 'texturls' in final_df.columns:
+            final_df = final_df.drop(columns=['texturls'])
+
+        # Reorder columns to match the desired structure, excluding 'date' and 'texturls'
+        final_df = final_df[['sender', 'receiver',
+                             'mailto', 'subject', 'urls', 'label']]
 
         # Calculate and log the percentage of each label
         log_label_percentages(final_df, "Final Merged Dataset")
+
+        # Set pandas display options
         pd.set_option('display.max_columns', None)  # Show all columns
-        pd.set_option('display.width', 1000)        # Adjust width to fit content
+        # Adjust width to fit content
+        pd.set_option('display.width', 1000)
         pd.set_option('display.max_colwidth', 100)  # Limit column width
-        
+
+        # Save the final DataFrame to a CSV file
         final_df.to_csv(MergedHeaderDataset, index=False)
 
-        # Preprocessing the final merged dataset
+        '''Verify the label columns have merge'''
+        combined_labels = combined__percentage_df['label'].reset_index(
+            drop=True)
+        final_labels = final_df['label'].reset_index(drop=True)
+
+        labels_match = combined_labels.equals(final_labels)
+
+        if labels_match:
+            print(
+                "The label columns match between the combined percentage DataFrame and final DataFrame.")
+            # Log label percentages for combined data
+            log_label_percentages(combined__percentage_df,
+                                  "Combined Percentage DataFrame")
+            # Log label percentages for final data
+            log_label_percentages(final_df, "Final DataFrame")
+        else:
+            print(
+                "The label columns do not match between the combined percentage DataFrame and final DataFrame.")
+            # Optionally, you can also inspect mismatches
+            mismatched_labels = combined_labels[combined_labels != final_labels]
+            print(f"Mismatched labels:\n{mismatched_labels}")
+
+            # Log label percentages for both DataFrames to inspect discrepancies
+            log_label_percentages(combined__percentage_df,
+                                  "Combined Percentage DataFrame")
+            log_label_percentages(final_df, "Final DataFrame")
+
+        logging.info("Verification complete.\n")
+
+        '''Preprocessing the final merged dataset'''
         # Fill missing values for specific columns where necessary
         final_df['sender'] = final_df['sender'].fillna('unknown')
         final_df['receiver'] = final_df['receiver'].fillna('unknown')
         final_df['mailto'] = final_df['mailto'].fillna('unknown')
         final_df['subject'] = final_df['subject'].fillna('unknown')
 
-        # Drop the 'date' column
-        final_df = final_df.drop(columns=['date'], errors='ignore')
-
-        # Process the 'texturls' column
-        final_df['texturls'] = final_df['texturls'].apply(lambda x: ' '.join(x) if isinstance(x, list) else (x if x is not None else ''))
-        final_df['urls'] = final_df.apply(lambda row: count_urls(row['texturls']) if pd.isna(row['urls']) or row['urls'] == 0 else row['urls'], axis=1)
+        # Fill missing values in 'urls' with 0
+        final_df['urls'] = final_df['urls'].fillna(0)
 
         # Check for missing values in all columns
         missing_values = final_df.isnull().sum()
@@ -938,63 +1004,122 @@ def main():
         # Define the columns for preprocessing
         categorical_columns = ['sender', 'receiver', 'mailto', 'subject']
         numerical_columns = ['urls']
-        text_columns = ['texturls']
 
         # Define the preprocessing pipeline
         preprocessor = ColumnTransformer(
-        transformers=[
-            # Categorical columns: Use OneHotEncoder
-            ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_columns),
-            
-            # Numerical columns: Use StandardScaler
-            ('num', StandardScaler(), numerical_columns),
-            
-            # Text columns: Use TF-IDF Vectorizer for the text content (URLs)
-            ('text', TfidfVectorizer(), 'texturls')
-        ]
+            transformers=[
+                # Categorical columns: Use OneHotEncoder
+                ('cat', OneHotEncoder(handle_unknown='ignore',
+                 max_categories=100), categorical_columns),
+
+                # Numerical columns: Use StandardScaler
+                ('num', StandardScaler(), numerical_columns)
+            ]
         )
 
         # Apply the preprocessing pipeline
         preprocessed_data = preprocessor.fit_transform(final_df)
 
         # Convert preprocessed data to a DataFrame and ensure column names are strings
-        preprocessed_df = pd.DataFrame(preprocessed_data.toarray(), columns=preprocessor.get_feature_names_out())
-        preprocessed_df.columns = preprocessed_df.columns.astype(str)  # Ensure all column names are strings
+        preprocessed_df = pd.DataFrame(
+            preprocessed_data.toarray(), columns=preprocessor.get_feature_names_out())
+        preprocessed_df.columns = preprocessed_df.columns.astype(
+            str)  # Ensure all column names are strings
 
         # Add the label column back to the preprocessed DataFrame
         preprocessed_df['label'] = final_df['label'].values
 
-        # Convert BERT features to DataFrames if needed
-        ceas_bert_features_df = pd.DataFrame(ceas_bert_features)
-        spamassassin_bert_features_df = pd.DataFrame(spamassassin_bert_features)
+        # Display some information about the preprocessed DataFrame
+        logging.info(f"Shape of preprocessed DataFrame: {
+                     preprocessed_df.shape}")
+        logging.info(f"Missing values after preprocessing:\n{
+                     preprocessed_df.isnull().sum()}")
 
-        # Merge the preprocessed data with the BERT features
-        final_features = pd.concat([preprocessed_df, ceas_bert_features_df, spamassassin_bert_features_df], axis=1)
+        # Convert BERT features to DataFrames if needed and ensure column names are strings
+        ceas_bert_features_df = pd.DataFrame(ceas_bert_features)
+        ceas_bert_features_df.columns = ceas_bert_features_df.columns.astype(
+            str)
+
+        spamassassin_bert_features_df = pd.DataFrame(
+            spamassassin_bert_features)
+        spamassassin_bert_features_df.columns = spamassassin_bert_features_df.columns.astype(
+            str)
+
+        # Check shapes
+        logging.info(f"Checking shapes:")
+        logging.info(f"Shape of preprocessed_df: {preprocessed_df.shape}")
+        logging.info(f"Shape of ceas_bert_features_df: {
+                     ceas_bert_features_df.shape}")
+        logging.info(f"Shape of spamassassin_bert_features_df: {
+                     spamassassin_bert_features_df.shape}\n")
+
+        # Verify column names
+        logging.info(f"Checking column names:")
+        logging.info(f"Columns in preprocessed_df: {
+                     preprocessed_df.columns.tolist()}")
+        logging.info(f"Columns in ceas_bert_features_df: {
+                     ceas_bert_features_df.columns.tolist()}")
+        logging.info(f"Columns in spamassassin_bert_features_df: {
+                     spamassassin_bert_features_df.columns.tolist()}\n")
+
+        # Check for missing values
+        logging.info(f"Checking missing values:")
+        logging.info(f"Missing values in preprocessed_df:\n{
+                     preprocessed_df.isnull().sum()}")
+        logging.info(f"Missing values in ceas_bert_features_df:\n{
+                     ceas_bert_features_df.isnull().sum()}")
+        logging.info(f"Missing values in spamassassin_bert_features_df:\n{
+                     spamassassin_bert_features_df.isnull().sum()}\n")
+
+        # Check the final features DataFrame
+        final_features = pd.concat(
+            [preprocessed_df, spamassassin_bert_features_df, ceas_bert_features_df], axis=1)
+
+        # Check for missing values in final_features
+        logging.info(f"Missing values in final_features:\n{
+                     final_features.isnull().sum()}")
+
+        # Check for duplicates
+        logging.info(f"Number of duplicate rows in final_features: {
+                     final_features.duplicated().sum()}")
+
+        # Cross-check counts
+        logging.info(f"Number of samples in final_features: {
+                     final_features.shape[0]}")
+        logging.info(f"Number of samples in preprocessed_df: {
+                     preprocessed_df.shape[0]}")
+
+        # Convert all column names in final_features to strings
+        final_features.columns = final_features.columns.astype(str)
 
         # Ensure no misalignment between preprocessed_df and BERT feature dataframes
         if final_features.shape[0] != final_df.shape[0]:
-            logging.info("Error: Row count mismatch between preprocessed data and BERT features.")
+            logging.info(
+                "Error: Row count mismatch between preprocessed data and BERT features.")
 
-        # Handle missing values
+        # Handle missing values in the final merged dataset
         if final_features.isnull().sum().sum() > 0:
-            logging.info("Missing values found. Applying imputation.")
+            logging.info("Warning: Missing values found after processing!\n")
 
         # Impute missing values
-        imputer = SimpleImputer(strategy='mean')  # Use 'mean' for numerical data
-        final_features = pd.DataFrame(imputer.fit_transform(final_features), columns=final_features.columns)
+        # Use 'mean' for numerical data
+        imputer = SimpleImputer(strategy='mean')
+        final_features = pd.DataFrame(imputer.fit_transform(
+            final_features), columns=final_features.columns)
 
         # Split the data into training and testing sets
         X_train, X_test, y_train, y_test = split_data(final_features)
         logging.info(f"Data split into training and testing sets.\n")
 
         # Handle data imbalance
-        X_train_balanced, y_train_balanced = handle_data_imbalance(X_train, y_train)
+        X_train_balanced, y_train_balanced = handle_data_imbalance(
+            X_train, y_train)
         logging.info(f"Data imbalance handled.\n")
 
         # Train and evaluate the ensemble model
-        train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_test)
-    
-    
+        train_and_evaluate_ensemble(
+            X_train_balanced, y_train_balanced, X_test, y_test)
+
     except Exception as e:
         logging.error(f"An error occurred: {e}")
 
