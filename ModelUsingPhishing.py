@@ -576,9 +576,17 @@ class TextDataset(Dataset):
             'labels': torch.tensor(self.labels[idx], dtype=torch.long)
         }
 
-# Define paths for saving models
-BERT_MODEL_PATH = 'bert_model.pth'
-ENSEMBLE_MODEL_PATH = 'ensemble_model.pkl'
+
+# Define the directory
+save_dir = 'SavedModelfeatures'
+
+# Create the directory if it doesn't exist
+os.makedirs(save_dir, exist_ok=True)
+
+# Update paths to include the directory
+BERT_MODEL_PATH = os.path.join(save_dir, 'bert_model.pth')
+ENSEMBLE_MODEL_PATH = os.path.join(save_dir, 'ensemble_model.pkl')
+FEATURES_PATH = os.path.join(save_dir, 'bert_features.npy')
 
 class BERTFeatureExtractor:
     def __init__(self, max_length=128, device=None):
@@ -587,19 +595,22 @@ class BERTFeatureExtractor:
         self.model = BertModel.from_pretrained('bert-base-uncased')
         self.max_length = max_length
         self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model.to(self.device)  # Ensure model is on the right device
-    
+        self.model.to(self.device)
+        
+        # Try to load the saved model right away
+        self.load_model()
+
     def save_model(self):
         torch.save(self.model.state_dict(), BERT_MODEL_PATH)
-        logging.info("Saved BERT model.")
+        logging.info(f"BERT model saved to {BERT_MODEL_PATH}.")
 
     def load_model(self):
         if os.path.exists(BERT_MODEL_PATH):
             self.model.load_state_dict(torch.load(BERT_MODEL_PATH))
             self.model.to(self.device)
-            logging.info("Loaded BERT model.")
+            logging.info(f"BERT model loaded from {BERT_MODEL_PATH}.")
         else:
-            logging.info("BERT model not found. Training a new one.")
+            logging.info(f"BERT model not found at {BERT_MODEL_PATH}. Using pretrained model.")
 
     def extract_features(self, texts, batch_size=16):
         features = []
@@ -617,6 +628,31 @@ class BERTFeatureExtractor:
                 features.extend(batch_features)
         
         return features
+
+    def save_features(self, features):
+        np.save(FEATURES_PATH, features)
+        logging.info(f"Features saved to {FEATURES_PATH}.")
+
+    def load_features(self):
+        if os.path.exists(FEATURES_PATH):
+            logging.info(f"Loading features from {FEATURES_PATH}.")
+            return np.load(FEATURES_PATH)
+        else:
+            logging.info("Features file not found. Extracting features.")
+            return None
+
+def extract_or_load_features(texts):
+    feature_extractor = BERTFeatureExtractor()
+    saved_features = feature_extractor.load_features()
+
+    if saved_features is not None:
+        return saved_features
+    
+    # Extract features if they are not saved
+    features = feature_extractor.extract_features(texts)
+    feature_extractor.save_features(features)
+    
+    return features
 
 # Split the data into training and testing sets
 def split_data(features_df, test_size=0.2, random_state=42):
@@ -709,10 +745,8 @@ def train_and_evaluate_ensemble(X_train_balanced, y_train_balanced, X_test, y_te
     print("\nClassification Report for Test Data:")
     print(classification_report(y_test, y_test_pred, target_names=target_names))
 
-
 def main():
     # Use relative paths
-    
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dataset = os.path.join(base_dir, 'CEAS_08.csv')    
     extracted_email_file = os.path.join(
@@ -747,9 +781,6 @@ def main():
         df_remove_duplicate = remove_duplicate(df)
         logging.info(f"Total number of rows remaining in the cleaned DataFrame: {df_remove_duplicate.shape[0]}\n")
         logging.debug(f"DataFrame after removing duplicates:\n{df_remove_duplicate.head()}\n")
-
-        # Visualize data before and after removing duplicate
-        #visualize_data(df, df_remove_duplicate)
        
         # Visualize data before and after removing duplicate
         #visualize_data(df, df_remove_duplicate)
@@ -773,17 +804,13 @@ def main():
         #plot_word_cloud(df_remove_duplicate['text'], "Original Dataset")
         #plot_word_cloud(df_clean['cleaned_text'], "Cleaned Dataset")
         
-        print(torch.cuda.is_available())  # Should return True if CUDA is available
-        print(torch.cuda.device_count())  # Should return the number of GPUs available
-        print(torch.cuda.current_device())  # Should return the index of the current GPU
+        #print(torch.cuda.is_available())  # Should return True if CUDA is available
+        #print(torch.cuda.device_count())  # Should return the number of GPUs available
+        #print(torch.cuda.current_device())  # Should return the index of the current GPU
         
         # Feature extraction using BERT
-        feature_extractor = BERTFeatureExtractor()
-        feature_extractor.load_model()  # Load pre-trained BERT model
         texts = df_clean['cleaned_text'].tolist()
-        bert_features = feature_extractor.extract_features(texts)
-        feature_extractor.save_model()  # Save BERT model after extraction
-        logging.info("BERT feature extraction completed.\n")
+        bert_features = extract_or_load_features(texts)
         
         headers_df['date'] = pd.to_datetime(headers_df['date'], format='%a, %d %b %Y %H:%M:%S %z', errors='coerce', utc=True)
         headers_df['day_of_week'] = headers_df['date'].dt.dayofweek
