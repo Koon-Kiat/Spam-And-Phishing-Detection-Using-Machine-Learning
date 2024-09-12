@@ -20,3 +20,4 @@ tensorflow
 scipy
 datasets
 joblib
+xgboost
