@@ -102,6 +102,8 @@ from tqdm import tqdm  # Progress bar for loops
 from transformers import AdamW, BertForSequenceClassification, BertModel, BertTokenizer, Trainer, TrainingArguments
 from wordcloud import WordCloud  # Generate word clouds
 
+import csv
+
 # Datasets
 from datasets import load_dataset  # Load datasets
 
@@ -544,6 +546,8 @@ class BERTFeatureExtractor:
 
 
     def extract_features(self, texts, batch_size=16):
+        if not isinstance(texts, (list, tuple)) or not all(isinstance(text, str) for text in texts):
+            raise ValueError("Input should be a list or tuple of strings.")
         features = []
         self.model.eval()
         with torch.no_grad():
@@ -672,7 +676,7 @@ def data_cleaning(dataset_name, df_processed, text_column, clean_file):
     df_clean = processor.transform(df_processed[text_column], df_processed['label'])
     processor.save_to_csv_cleaned(df_clean, clean_file)
     logging.info("Text processing and saving completed.")
-    logging.info(f"DataFrame columns after data cleaning: {df_clean.columns}\n")
+    logging.info(f"DataFrame columns after data cleaning: {df_clean.columns}")
     return df_clean
 
 
@@ -709,7 +713,14 @@ def load_or_clean_data(dataset_name, df, text_column, file_path, cleaning_functi
     logging.info(f"Loading or cleaning data...")
     if os.path.exists(file_path):
         logging.info(f"File {file_path} already exists. Loading from file.\n")
-        return pd.read_csv(file_path)
+        df_clean = pd.read_csv(file_path)
+        df_clean['cleaned_text'] = df_clean['cleaned_text'].astype(str).fillna('')
+        texts = df_clean['cleaned_text'].tolist()
+        if not isinstance(texts, (list, tuple)):
+            raise ValueError("Input should be a list or tuple of strings.")
+        if not all(isinstance(text, str) for text in texts):
+            raise ValueError("Input should be a list or tuple of strings. Found non-string elements.")
+        return df_clean
     else:
         logging.info(f"File {file_path} does not exist. Cleaning data.")
         cleaned_df = cleaning_function(dataset_name, df, text_column, file_path)
@@ -737,15 +748,9 @@ def load_or_extract_bert_features(dataset_name, df_clean, features_path):
     logging.info(f"BERT feature extraction from {dataset_name} dataset...")
     feature_extractor = BERTFeatureExtractor()
     saved_features = feature_extractor.load_features(features_path)
-
-
-
     if saved_features is not None:
         logging.info(f"Loaded saved BERT features from {features_path}.\n")
         return saved_features
-    
-
-
     feature_extractor = BERTFeatureExtractor()
     texts = df_clean['cleaned_text'].tolist()
     bert_features = feature_extractor.extract_features(texts)
@@ -917,12 +922,12 @@ def check_missing_values(df, df_name, num_rows=1):
         columns_with_missing = missing_values[missing_values > 0]
         logging.info(f"Columns with missing values in {df_name}:")
         for column, count in columns_with_missing.items():
-            logging.info(f"  Column '{column}': {count} missing values")
+            logging.info(f"Column '{column}': {count} missing values")
         rows_with_missing = df[df.isnull().any(axis=1)]
         if not rows_with_missing.empty:
             logging.info(f"Examples of rows with missing values in {df_name}:")
             for idx, row in rows_with_missing.head(num_rows).iterrows():
-                logging.info(f"Row {idx}:\n{row}")
+                logging.info(f"Row {idx}:{row}")
         else:
             logging.info(f"No rows with missing values found in {df_name} after initial check.")
 
@@ -982,7 +987,7 @@ def main():
         # plot_word_cloud(df_clean_ceas['cleaned_text'], "Cleaned CEAS_08 Dataset")
         # plot_word_cloud(df_clean_spamassassin['cleaned_text'], "Cleaned Spam Assassin Dataset")
         # logging.info("Word clouds plotted successfully.\n")
-
+        
 
         # Extract or load BERT features
         ceas_bert_features = load_or_extract_bert_features("CEAS_08", df_clean_ceas, CEASExtractedFeatures)
@@ -1169,7 +1174,7 @@ def main():
         if final_features.shape[0] != final_df.shape[0]:
             logging.info("Error: Row count mismatch between Final Features (All) and Final Merged Dataframe.") # Ensure no misalignment between preprocessed_df and BERT feature dataframes
         if final_features.isnull().sum().sum() > 0:
-            check_missing_values(final_features, "final_features") # Check missing values in the final merged dataset
+            check_missing_values(final_features, "Final Features (All)") # Check missing values in the final merged dataset
             logging.info(f"Imputing missing values in Final Features (All)...")
             imputer = SimpleImputer(strategy='mean')
             final_features = pd.DataFrame(imputer.fit_transform(final_features), columns=final_features.columns)
