@@ -88,7 +88,7 @@ from sklearn.model_selection import GridSearchCV, train_test_split, StratifiedKF
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler, LabelEncoder, OrdinalEncoder
 from sklearn.utils import resample  # Resampling utilities
-from xgboost import XGBClassifier
+#from xgboost import XGBClassifier
 
 # Spell checking
 from spellchecker import SpellChecker  # Spell checking
@@ -481,12 +481,10 @@ class TextProcessor(BaseEstimator, TransformerMixin):
                 logging.error(f"Error processing text: {e}")
                 cleaned_text_list.append('')
         if y is not None:
-            logging.info(f"Total amount of text processed: {
-                         len(cleaned_text_list)}")
+            logging.info(f"Total amount of text processed: {len(cleaned_text_list)}")
             return pd.DataFrame({'cleaned_text': cleaned_text_list, 'label': y})
         else:
-            logging.info(f"Total amount of text processed: {
-                         len(cleaned_text_list)}")
+            logging.info(f"Total amount of text processed: {len(cleaned_text_list)}")
             return pd.DataFrame({'cleaned_text': cleaned_text_list})
 
 
