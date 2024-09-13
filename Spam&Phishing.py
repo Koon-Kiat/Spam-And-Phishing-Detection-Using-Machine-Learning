@@ -795,84 +795,119 @@ def smote(X_train, y_train, random_state=42):
     X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
     return X_train_balanced, y_train_balanced
 
+def load_or_save_model(model, model_path, action='load'):
+    """
+    Function to either load or save a model depending on the action specified.
+    
+    Args:
+        model: The model to save (if action is 'save').
+        model_path (str): Path to save/load the model.
+        action (str): 'load' or 'save'. Default is 'load'.
+        
+    Returns:
+        If loading, returns the model; if saving, returns None.
+    """
+    if action == 'load':
+        if os.path.exists(model_path):
+            logging.info(f"Loading model from {model_path}")
+            return joblib.load(model_path)
+        else:
+            logging.info(f"No saved model found at {model_path}. Proceeding to train a new model.")
+            return None
+    elif action == 'save':
+        logging.info(f"Saving model to {model_path}")
+        joblib.dump(model, model_path)
 
 
-def model_training(X_train_balanced, y_train_balanced, X_test, y_test):
-    logreg_model = LogisticRegression(class_weight='balanced', random_state=42, max_iter=1000)
-    gbm_model = GradientBoostingClassifier(random_state=42)
+def model_training(X_train_balanced, y_train_balanced, X_test, y_test, model_path):
+    """
+    Function to train an ensemble model with hyperparameter tuning using Optuna, 
+    and optionally load or save the model.
+    
+    Args:
+        X_train_balanced: Balanced training feature data.
+        y_train_balanced: Balanced training labels.
+        X_test: Test feature data.
+        y_test: Test labels.
+        model_path (str): The path to load/save the ensemble model.
+    """
+    # Try to load the saved model
+    ensemble_model = load_or_save_model(None, model_path, action='load')
+    
+    if ensemble_model is None:
+        logging.info("Training a new model...")
 
-    # Define the objective function for Optuna
-    def objective(trial):
-        n_estimators = trial.suggest_int('n_estimators', 50, 100)
-        max_depth = trial.suggest_int('max_depth', 10, 100, log=True)
-        min_samples_split = trial.suggest_int('min_samples_split', 2, 10)
-        min_samples_leaf = trial.suggest_int('min_samples_leaf', 1, 4)
+        logreg_model = LogisticRegression(class_weight='balanced', random_state=42, max_iter=1000)
+        gbm_model = GradientBoostingClassifier(random_state=42)
 
+        # Define the objective function for Optuna
+        def objective(trial):
+            n_estimators = trial.suggest_int('n_estimators', 50, 100)
+            max_depth = trial.suggest_int('max_depth', 10, 100, log=True)
+            min_samples_split = trial.suggest_int('min_samples_split', 2, 10)
+            min_samples_leaf = trial.suggest_int('min_samples_leaf', 1, 4)
 
-        # Define the RandomForestClassifier with suggested hyperparameters
-        rf_model = RandomForestClassifier(
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            min_samples_split=min_samples_split,
-            min_samples_leaf=min_samples_leaf,
+            # Define the RandomForestClassifier with suggested hyperparameters
+            rf_model = RandomForestClassifier(
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+                min_samples_split=min_samples_split,
+                min_samples_leaf=min_samples_leaf,
+                class_weight='balanced',
+                random_state=42,
+                n_jobs=2
+            )
+
+            # Perform cross-validation to get the average accuracy score
+            rf_model.fit(X_train_balanced, y_train_balanced)
+            y_train_pred = rf_model.predict(X_train_balanced)
+            return accuracy_score(y_train_balanced, y_train_pred)
+
+        # Create an Optuna study for hyperparameter optimization
+        study = optuna.create_study(direction='maximize', sampler=TPESampler())
+        study.optimize(objective, n_trials=5)
+
+        # Retrieve the best model after optimization
+        best_params = study.best_params
+        logging.info(f"Best hyperparameters: {best_params}")
+
+        # Train RandomForest with the best hyperparameters
+        best_rf_model = RandomForestClassifier(
+            n_estimators=best_params['n_estimators'],
+            max_depth=best_params['max_depth'],
+            min_samples_split=best_params['min_samples_split'],
+            min_samples_leaf=best_params['min_samples_leaf'],
             class_weight='balanced',
             random_state=42,
             n_jobs=2
         )
+        best_rf_model.fit(X_train_balanced, y_train_balanced)
 
+        # Define the ensemble model
+        ensemble_model = VotingClassifier(estimators=[
+            ('rf', best_rf_model),
+            ('logreg', logreg_model)
+        ], voting='soft')
 
-        # Perform cross-validation to get the average accuracy score
-        rf_model.fit(X_train_balanced, y_train_balanced)
-        y_train_pred = rf_model.predict(X_train_balanced)
-        return accuracy_score(y_train_balanced, y_train_pred)
+        # Train the ensemble model with a progress bar
+        for _ in tqdm(range(1), desc="Training ensemble model"):
+            ensemble_model.fit(X_train_balanced, y_train_balanced)
 
+        # Save the trained ensemble model
+        load_or_save_model(ensemble_model, model_path, action='save')
+        logging.info(f"Ensemble model trained and saved to {model_path}.\n")
 
-    # Create an Optuna study for hyperparameter optimization
-    study = optuna.create_study(direction='maximize', sampler=TPESampler())
-    study.optimize(objective, n_trials=5)
-
-
-    # Retrieve the best model after optimization
-    best_params = study.best_params
-    logging.info(f"Best hyperparameters: {best_params}")
-
-
-    # Train RandomForest with the best hyperparameters
-    best_rf_model = RandomForestClassifier(
-        n_estimators=best_params['n_estimators'],
-        max_depth=best_params['max_depth'],
-        min_samples_split=best_params['min_samples_split'],
-        min_samples_leaf=best_params['min_samples_leaf'],
-        class_weight='balanced',
-        random_state=42,
-        n_jobs=2
-    )
-    best_rf_model.fit(X_train_balanced, y_train_balanced)
-
-
-    # Define the ensemble model
-    ensemble_model = VotingClassifier(estimators=[
-        ('rf', best_rf_model),
-        ('logreg', logreg_model)
-        #('gbm', gbm_model)
-    ], voting='soft')
-
-
-    # Train the ensemble model with a progress bar
-    for _ in tqdm(range(1), desc="Training ensemble model"):
-        ensemble_model.fit(X_train_balanced, y_train_balanced)
-
+    else:
+        logging.info(f"Using the pre-trained model loaded from {model_path}")
 
     # Make predictions
     y_train_pred = ensemble_model.predict(X_train_balanced)
     y_test_pred = ensemble_model.predict(X_test)
 
-
     # Evaluate the model
     train_accuracy = accuracy_score(y_train_balanced, y_train_pred)
     test_accuracy = accuracy_score(y_test, y_test_pred)
     target_names = ['Safe', 'Phishing', 'Spam']
-
 
     # Logging the performance metrics
     print(f"\nTraining Accuracy: {train_accuracy * 100:.2f}%")
