@@ -274,15 +274,15 @@ class EmailHeaderExtractor:
 
 
 
-    def detect_url_shorteners(self, links: List[str]) -> List[str]:
-        # Common URL shortener domains
-        shortener_domains = ['bit.ly', 'tinyurl.com', 'goo.gl', 'ow.ly', 't.co', 'is.gd', 'buff.ly', 
-        'adf.ly', 'bl.ink', 'lnkd.in', 'shorte.st', 'mcaf.ee', 'q.gs', 'po.st', 
-        'bc.vc', 's.coop', 'u.to', 'cutt.ly', 't2mio.com', 'rb.gy', 'clck.ru', 
-        'shorturl.at', '1url.com', 'hyperurl.co', 'urlzs.com', 'v.gd', 'x.co']  
+    def detect_url_shorteners(self, links: List[str]) -> int:
+        shortener_domains = [
+            'bit.ly', 'tinyurl.com', 'goo.gl', 'ow.ly', 't.co', 'is.gd', 'buff.ly', 
+            'adf.ly', 'bl.ink', 'lnkd.in', 'shorte.st', 'mcaf.ee', 'q.gs', 'po.st', 
+            'bc.vc', 's.coop', 'u.to', 'cutt.ly', 't2mio.com', 'rb.gy', 'clck.ru', 
+            'shorturl.at', '1url.com', 'hyperurl.co', 'urlzs.com', 'v.gd', 'x.co'
+        ]
         short_urls = [link for link in links if any(domain in link for domain in shortener_domains)]
-
-        return short_urls
+        return len(short_urls)
 
 
 
@@ -345,8 +345,6 @@ class EmailHeaderExtractor:
                     headers_list.append(
                         {'sender': None, 'receiver': None, 'mailto': None, 'texturls': [], 'blacklisted_keywords_count': 0, 'short_urls': [], 'has_ip_address': False})
             self.headers_df = pd.DataFrame(headers_list)
-            self.headers_df['texturls'] = self.headers_df['texturls'].apply(self.clean_links)
-            self.headers_df['short_urls'] = self.headers_df['short_urls'].apply(self.clean_links)
 
             return self.headers_df
 
@@ -386,7 +384,6 @@ class EmailHeaderExtractor:
                         'has_ip_address': False
                     })
             self.headers_df = pd.DataFrame(headers_list)
-            self.headers_df['short_urls'] = self.headers_df['short_urls'].apply(self.clean_links)
 
             return self.headers_df
 
@@ -801,7 +798,7 @@ def data_cleaning(dataset_name, df_processed, text_column, clean_file):
     df_clean = processor.transform(df_processed[text_column], df_processed['label'])
     processor.save_to_csv_cleaned(df_clean, clean_file)
     logging.info("Text processing and saving completed.")
-    logging.info(f"DataFrame columns after data cleaning: {df_clean.columns}\n")
+    logging.info(f"DataFrame columns after data cleaning: {df_clean.columns}")
 
     return df_clean
 
@@ -1302,6 +1299,7 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
 
 
         # Fit and transform the pipeline
+        logging.info(f"Processing non-text features for fold {fold_idx}...")
         X_train_non_text_processed = pipeline.named_steps['preprocessor'].fit_transform(X_train.drop(columns=['cleaned_text']))
         X_test_non_text_processed = pipeline.named_steps['preprocessor'].transform(X_test.drop(columns=['cleaned_text']))
 
@@ -1548,6 +1546,7 @@ def main():
         ], axis=1)
         logging.info(f"Dataframes combined successfully.\n")
 
+
         # Verifying the Cleaned Combine DataFrame
         logging.info(f"Verifying the Cleaned Combined DataFrame...")
         combined_labels = combined_df['label'].unique()
@@ -1601,8 +1600,8 @@ def main():
 
 
             # Define columns for categorical, numerical, and text data
-            categorical_columns = ['sender', 'receiver', 'short_urls', 'has_ip_address']
-            numerical_columns = ['https_count', 'http_count', 'blacklisted_keywords_count', 'urls']
+            categorical_columns = ['sender', 'receiver', 'has_ip_address']
+            numerical_columns = ['https_count', 'http_count', 'blacklisted_keywords_count', 'urls', 'short_urls']
             text_column = 'cleaned_text'
 
 
