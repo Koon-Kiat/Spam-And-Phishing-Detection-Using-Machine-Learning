@@ -1,14 +1,9 @@
-/Spam Assassin
-/Others
+/Data Cleaning
+/Data Integration
 /Datasets
-/Previous Tests
-/Extracted Features
-/SavedModelfeatures
-/Model & Parameters
-/Model & Parameters Backup
-/Extracted Features Backup
-/Model & Parameters Backup
-/Extracted Body Features
-/Extracted Data
-/Processed Data
+/Feature Engineering
+/Feature Extraction
 /Models & Parameters
+/Models & Parameters Backup
+/Others
+/Previous Tests
