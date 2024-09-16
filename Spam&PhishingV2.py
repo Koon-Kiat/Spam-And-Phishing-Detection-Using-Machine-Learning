@@ -88,7 +88,7 @@ from sklearn.model_selection import GridSearchCV, train_test_split, StratifiedKF
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler, LabelEncoder, OrdinalEncoder
 from sklearn.utils import resample  # Resampling utilities
-#from xgboost import XGBClassifier
+from xgboost import XGBClassifier
 
 # Spell checking
 from spellchecker import SpellChecker  # Spell checking
@@ -196,13 +196,14 @@ class DatasetProcessor:
         return self.df
 
 
-#Extracting headers from spamassassin CEAS dataset
+
 class EmailHeaderExtractor:
-    
     def __init__(self, df: pd.DataFrame):
         self.df = df
         self.headers_df = pd.DataFrame()
         logging.info("Initializing EmailHeaderExtractor...")
+
+
 
     def clean_links(self, links: List[str]) -> List[str]:
         cleaned_links = []
@@ -212,18 +213,22 @@ class EmailHeaderExtractor:
             link = link.strip()  # Trim leading and trailing spaces
             if link:  # Avoid appending empty links
                 cleaned_links.append(link)
+
         return cleaned_links
+
+
 
     def extract_inline_headers(self, email_text: str) -> Dict[str, Union[str, None]]:
         from_match = re.search(r'From:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
         to_match = re.search(r'To:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
         mail_to_match = re.search(r'mailto:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
-
         from_header = from_match.group(1) if from_match else None
         to_header = to_match.group(1) if to_match else None
         mail_to_header = mail_to_match.group(1) if mail_to_match else None
 
         return {'From': from_header, 'To': to_header, 'Mail-To': mail_to_header}
+
+
 
     def extract_body_content(self, email_message: EmailMessage) -> str:
         body_content = ""
@@ -235,15 +240,18 @@ class EmailHeaderExtractor:
                     body_content += part.get_payload(decode=True).decode(errors='ignore')
         else:
             body_content = email_message.get_payload(decode=True).decode(errors='ignore')
+
         return body_content
 
+
+
     def count_https_http(self, text: str) -> Dict[str, int]:
-        """
-        Function to count occurrences of https vs http in the text.
-        """
         https_count = len(re.findall(r'https://', text))
         http_count = len(re.findall(r'http://', text))
+
         return {'https_count': https_count, 'http_count': http_count}
+
+
 
     def contains_blacklisted_keywords(self, text: str) -> int:
         blacklisted_keywords = [
@@ -258,27 +266,33 @@ class EmailHeaderExtractor:
         'reset password', 'limited offer', 'exclusive deal', 'verify account',
         'bank account', 'payment declined', 'upgrade required', 'respond immediately'
         ]
-        """
-        Function to check if text contains any blacklisted keywords.
-        """
         keyword_count = 0
         for keyword in blacklisted_keywords:
             keyword_count += len(re.findall(re.escape(keyword), text, re.IGNORECASE))
+
         return keyword_count
+
+
 
     def detect_url_shorteners(self, links: List[str]) -> List[str]:
         # Common URL shortener domains
         shortener_domains = ['bit.ly', 'tinyurl.com', 'goo.gl', 'ow.ly', 't.co', 'is.gd', 'buff.ly', 
-    'adf.ly', 'bl.ink', 'lnkd.in', 'shorte.st', 'mcaf.ee', 'q.gs', 'po.st', 
-    'bc.vc', 's.coop', 'u.to', 'cutt.ly', 't2mio.com', 'rb.gy', 'clck.ru', 
-    'shorturl.at', '1url.com', 'hyperurl.co', 'urlzs.com', 'v.gd', 'x.co']  
+        'adf.ly', 'bl.ink', 'lnkd.in', 'shorte.st', 'mcaf.ee', 'q.gs', 'po.st', 
+        'bc.vc', 's.coop', 'u.to', 'cutt.ly', 't2mio.com', 'rb.gy', 'clck.ru', 
+        'shorturl.at', '1url.com', 'hyperurl.co', 'urlzs.com', 'v.gd', 'x.co']  
         short_urls = [link for link in links if any(domain in link for domain in shortener_domains)]
+
         return short_urls
+
+
 
     def contains_ip_address(self, text: str) -> bool:
         ip_pattern = r'https?://(\d{1,3}\.){3}\d{1,3}'
+
         return bool(re.search(ip_pattern, text))
     
+
+
     def extract_headers_spamassassin(self) -> pd.DataFrame:
             headers_list: List[Dict[str, Union[str, List[str], int]]] = []
             for email_text in tqdm(self.df['text'], desc="Extracting headers"):
@@ -300,16 +314,20 @@ class EmailHeaderExtractor:
                     body_content = self.extract_body_content(email_message)
                     logging.debug(f"Email body content: {body_content}")
 
+
                     # Extract URLs from body content
                     url_pattern = r'https?:\/\/[^\s\'"()<>]+'
                     links = re.findall(url_pattern, body_content)
                     links = self.clean_links(links)
 
-                    # Count blacklisted keywords in the email body
+
+                    # Coun blacklisted keywords, http/https, short URLs, and IP addresses in the email body
                     https_http_counts = self.count_https_http(body_content)
                     blacklisted_keyword_count = self.contains_blacklisted_keywords(body_content)
                     short_urls = self.detect_url_shorteners(links)
                     has_ip_address = self.contains_ip_address(body_content)
+
+
 
                     headers_list.append({
                     'sender': from_header,
@@ -326,29 +344,30 @@ class EmailHeaderExtractor:
                     logging.error(f"Error parsing email: {e}")
                     headers_list.append(
                         {'sender': None, 'receiver': None, 'mailto': None, 'texturls': [], 'blacklisted_keywords_count': 0, 'short_urls': [], 'has_ip_address': False})
-
             self.headers_df = pd.DataFrame(headers_list)
             self.headers_df['texturls'] = self.headers_df['texturls'].apply(self.clean_links)
             self.headers_df['short_urls'] = self.headers_df['short_urls'].apply(self.clean_links)
 
-
             return self.headers_df
 
-#CEAS dataset
+
+
     def extract_headers_ceas(self) -> pd.DataFrame:
             headers_list: List[Dict[str, int]] = []
             
             for email_text in tqdm(self.df['body'], desc="Extracting headers"):
                 try:
-                    # Extract body content directly if already in the text field
                     body_content = email_text  # Assuming 'email_text' contains the email body directly
                     logging.debug(f"Email body content: {body_content}")
+
 
                     # Count blacklisted keywords and http/https occurrences in the email body
                     https_http_counts = self.count_https_http(body_content)
                     blacklisted_keyword_count = self.contains_blacklisted_keywords(body_content)
                     short_urls = self.detect_url_shorteners(self.clean_links(re.findall(r'https?:\/\/[^\s\'"()<>]+', body_content)))
                     has_ip_address = self.contains_ip_address(body_content)
+
+
 
                     headers_list.append({
                     'https_count': https_http_counts['https_count'],
@@ -366,10 +385,11 @@ class EmailHeaderExtractor:
                         'short_urls': [],
                         'has_ip_address': False
                     })
-
             self.headers_df = pd.DataFrame(headers_list)
             self.headers_df['short_urls'] = self.headers_df['short_urls'].apply(self.clean_links)
+
             return self.headers_df
+
 
 
     def save_to_csv(self, file_path: str):
@@ -781,7 +801,7 @@ def data_cleaning(dataset_name, df_processed, text_column, clean_file):
     df_clean = processor.transform(df_processed[text_column], df_processed['label'])
     processor.save_to_csv_cleaned(df_clean, clean_file)
     logging.info("Text processing and saving completed.")
-    logging.info(f"DataFrame columns after data cleaning: {df_clean.columns}")
+    logging.info(f"DataFrame columns after data cleaning: {df_clean.columns}\n")
 
     return df_clean
 
@@ -831,7 +851,7 @@ def load_or_clean_data(dataset_name, df, text_column, file_path, cleaning_functi
     else:
         logging.info(f"File {file_path} does not exist. Cleaning data.")
         cleaned_df = cleaning_function(dataset_name, df, text_column, file_path)
-        logging.info(f"Data cleaning and saving to {file_path} completed.")
+        #logging.info(f"Data cleaning and saving to {file_path} completed.")
 
         return cleaned_df
    
@@ -841,27 +861,25 @@ def load_or_extract_headers(df: pd.DataFrame, file_path: str, extractor_class, d
     logging.info("Loading or extracting email headers...")
     if os.path.exists(file_path):
             logging.info(f"File {file_path} already exists. Loading from file.")
+
             return pd.read_csv(file_path)
     else:
         logging.info(f"File {file_path} does not exist. Extracting headers for dataset: {dataset_type}.")
-        
         header_extractor = extractor_class(df)
         
+
         # Check dataset type and call the corresponding extraction function
-        if dataset_type == "spamassassin":
+        if dataset_type == "Spam Assassin":
             headers_df = header_extractor.extract_headers_spamassassin()
-            
-        elif dataset_type == "ceas":
+        elif dataset_type == "CEAS_08":
             headers_df = header_extractor.extract_headers_ceas()
         else:
-            raise ValueError(f"Unknown dataset type: {dataset_type}. Please specify either 'spamassassin' or 'ceas'.")
-        
+            raise ValueError(f"Unknown dataset type: {dataset_type}. Please specify either 'Spam Assassin' or 'CEAS_08'.")
         header_extractor.save_to_csv(file_path)
-        logging.info(f"Email header extraction and saving to {file_path} completed for dataset: {dataset_type}.\n")
+        logging.info(f"Email header extraction and saving to {file_path} completed for dataset: {dataset_type}.")
         
         return headers_df
     
-
 
 # Redundant function
 def extract_features_for_fold(X_train, X_test, fold_idx, feature_column='cleaned_text', feature_path_prefix="Extracted Body Features"):
@@ -993,7 +1011,7 @@ def stratified_k_fold_split(df, n_splits=3, random_state=42):
     
 
     # Check if DataFrame contains necessary columns
-    columns_to_use = ['sender', 'receiver', 'urls', 'cleaned_text', 'label']
+    columns_to_use = ['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'cleaned_text', 'label']
     if not set(columns_to_use).issubset(df.columns):
         missing_cols = set(columns_to_use) - set(df.columns)
         raise ValueError(f"Missing columns in DataFrame: {missing_cols}")
@@ -1114,6 +1132,7 @@ def model_training(X_train, y_train, X_test, y_test, model_path, params_path):
     print("\nClassification Report for Test Data:" + classification_report(y_test, y_test_pred, target_names=target_names))
     
     return ensemble_model, test_accuracy
+
 
 
 def conduct_optuna_study(X_train, y_train):
@@ -1267,7 +1286,7 @@ def load_data_pipeline(data_path, labels_path):
 
 def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
     # Define paths
-    base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Processed Data')
+    base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Feature Extraction')
     os.makedirs(base_dir, exist_ok=True)
     train_data_path, test_data_path, train_labels_path, test_labels_path = get_fold_paths(fold_idx, base_dir)
 
@@ -1283,11 +1302,14 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
 
 
         # Transform the text features
+        logging.info(f"Extracting BERT features for X_train for {fold_idx}...")
         X_train_text_processed = pipeline.named_steps['bert_features'].transform(X_train['cleaned_text'].tolist())
+        logging.info(f"Extracting BERT features for X_test for {fold_idx}...")
         X_test_text_processed = pipeline.named_steps['bert_features'].transform(X_test['cleaned_text'].tolist())
 
 
         # Combine processed features
+        logging.info(f"Combining processed features for fold {fold_idx}...")
         X_train_combined = np.hstack([X_train_non_text_processed, X_train_text_processed])
         X_test_combined = np.hstack([X_test_non_text_processed, X_test_text_processed])
 
@@ -1310,23 +1332,22 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
     return X_train_balanced, X_test_combined, y_train_balanced, y_test
 
 
-
 # Main processing function
 def main():
     # Use relative paths to access the datasets and save the extracted data
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dataset = os.path.join(base_dir, 'CEAS_08.csv')
-    ExtractedSpamAssassinEmailHeaderFile = os.path.join(base_dir, 'Extracted Data', 'SpamAssassinExtractedEmailHeader.csv')
-    ExtractedCEASEmailHeaderFile = os.path.join(base_dir, 'Extracted Data', 'CEASExtractedEmailHeader.csv')
-    MergedSpamAssassinFile = os.path.join(base_dir, 'Extracted Data', 'MergedSpamAssassin.csv')
-    MergedDataFrame = os.path.join(base_dir, 'Extracted Data', 'MergedDataFrame.csv')
-    CleanedDataFrame = os.path.join(base_dir, 'Extracted Data', 'CleanedDataFrame.csv')
+    ExtractedSpamAssassinEmailHeaderFile = os.path.join(base_dir, 'Feature Engineering', 'SpamAssassinExtractedEmailHeader.csv')
+    ExtractedCEASEmailHeaderFile = os.path.join(base_dir, 'Feature Engineering', 'CEASExtractedEmailHeader.csv')
+    MergedSpamAssassinFile = os.path.join(base_dir, 'Data Integration', 'MergedSpamAssassin.csv')
+    MergedCEASFile = os.path.join(base_dir, 'Data Integration', 'MergedCEAS_08.csv')
+    MergedDataFrame = os.path.join(base_dir, 'Data Integration', 'MergedDataFrame.csv')
+    CleanedDataFrame = os.path.join(base_dir, 'Data Cleaning', 'CleanedDataFrame.csv')
+    MergedCleanedDataFrame = os.path.join(base_dir, 'Data Cleaning', 'MergedCleanedDataFrame.csv')
     
 
     SavedModel = os.path.join(base_dir, 'Model & Parameters', 'EnsembleModel.pkl')
     SavedParameters = os.path.join(base_dir, 'Model & Parameters', 'BestParameters.json')
-
-
     #BertFeatures = os.path.join(base_dir, 'Extracted Features')
     #CleanedCeasFile = os.path.join(base_dir, 'Extracted Data', 'CleanedCEAS_08Text.csv')
     #CleanedSpamAssassinFile = os.path.join(base_dir, 'Extracted Data', 'CleanedSpamAssassinText.csv')
@@ -1334,17 +1355,20 @@ def main():
     #CEASExtractedFeatures = os.path.join(base_dir, 'Extracted Features', 'CEASExtractedBertFeatures.npy')
     #SpamAssassinExtractedFeatures = os.path.join(base_dir, 'Extracted Features', 'SpamAssassinExtractedBertFeatures.npy')
 
+
     # Load the datasets
     df_ceas = pd.read_csv(dataset)
     dataset = load_dataset('talby/spamassassin',split='train', trust_remote_code=True)
     df_spamassassin = dataset.to_pandas()
 
 
+
     try:
-        '''
-        Data Preprocessing
-        '''
-        logging.info(f"Beginning data preprocessing...")
+        # ****************************** #
+        #       Data Preprocessing       #
+        # ****************************** #
+
+        logging.info(f"Beginning Data Preprocessing...")
 
 
         # Change label values to match the labeling scheme
@@ -1365,55 +1389,57 @@ def main():
         # Check if DataFrame has merged correctly
         log_label_percentages(df_processed_ceas, 'CEAS_08')
         log_label_percentages(df_processed_spamassassin, 'SpamAssassin')
-        log_label_percentages(combined_percentage_df,'Combined CEAS_08 and SpamAssassin')
-        check_missing_values(combined_percentage_df, 'Combined CEAS_08 and SpamAssassin')
+        log_label_percentages(combined_percentage_df,'Combined CEAS_08 and SpamAssassin (No Processing)')
+        check_missing_values(combined_percentage_df, 'Combined CEAS_08 and SpamAssassin (No Processing)')
         logging.info(f"Data Preprocessing completed.\n")
         #Columns in CEAS_08 dataset: ['sender', 'receiver', 'date', 'subject', 'body', 'label', 'urls']
         #Columns in SpamAssassin dataset: ['label', 'group', 'text']
         
 
-        '''
-        Feature Engineering
-        '''
-        logging.info(f"Beginning feature engineering...")
+        # ****************************** #
+        #       Feature Engineering      #
+        # ****************************** #
+
+        logging.info(f"Beginning Feature Engineering...")
 
 
         # Extract email headers from the SpamAssassin dataset
-        spamassassin_headers_df = load_or_extract_headers(df_processed_spamassassin, ExtractedSpamAssassinEmailHeaderFile, EmailHeaderExtractor, 'spamassassin')
-        print(spamassassin_headers_df.columns.to_list())
-        logging.info("Email header extraction and saving from Spam Assassin completed.")
-        # Columns in current extracted email headers: ['sender', 'receiver', 'mailto', 'texturls']
+        spamassassin_headers_df = load_or_extract_headers(df_processed_spamassassin, ExtractedSpamAssassinEmailHeaderFile, EmailHeaderExtractor, 'Spam Assassin')
+        logging.info("Email header extraction and saving from Spam Assassin completed.\n")
+        # Columns in current spam assassin email headers: ['sender', 'receiver', 'mailto', 'texturls', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address']
         spamassassin_headers_df['urls'] = spamassassin_headers_df['texturls'].apply(count_urls) # Convert text to number for URLs
-        # Columns in current extracted email headers: ['sender', 'receiver', 'mailto', 'urls']
+        # Columns in current spam assassin email headers: ['sender', 'receiver', 'mailto', 'texturls', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls']
         spamassassin_headers_df.drop(columns=['mailto'], inplace=True) # Drop the 'mailto' column
         spamassassin_headers_df.drop(columns=['texturls'], inplace=True) # Drop the 'texturls' column
-        # Columns in current extracted email headers: ['sender', 'receiver', 'urls']
-        ceas_headers_df = load_or_extract_headers(df_processed_ceas, ExtractedCEASEmailHeaderFile, EmailHeaderExtractor, 'ceas')
-        print(ceas_headers_df.columns.to_list())
-        #logging.info("Email header extraction and saving from CEAS completed.")
-        logging.info(f"Feature engineering completed.\n")
+        # Columns in current spam assassin email headers: ['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls']
+        ceas_headers_df = load_or_extract_headers(df_processed_ceas, ExtractedCEASEmailHeaderFile, EmailHeaderExtractor, 'CEAS_08')
+        # Columns in current ceas email headers: ['https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address']
+        logging.info("Email header extraction and saving from CEAS completed.")
+        logging.info(f"Feature Engineering completed.\n")
 
 
-        '''
-        Data Integration
-        '''
-        logging.info(f"Beginning data integration...")
+        # ****************************** #
+        #       Data Integration         #
+        # ****************************** #
+
+        logging.info(f"Beginning Data Integration...")
 
 
-        # Merging the processed SpamAssassin dataset with the extracted email headers
+        # Merging Processed SpamAssassin dataset with the extracted information
+        logging.info(f"Merging Processed Spam Assassin and Spam Assassin Header Dataframes...")
         df_processed_spamassassin.reset_index(inplace=True)
         spamassassin_headers_df.reset_index(inplace=True)
         spamassassin_headers_df.fillna({'sender': 'unknown', 'receiver': 'unknown'}, inplace=True)
         if len(df_processed_spamassassin) == len(spamassassin_headers_df):
             merged_spamassassin_df = pd.merge(df_processed_spamassassin, spamassassin_headers_df, on='index', how='left')
             merged_spamassassin_df = merged_spamassassin_df.rename(columns={'text': 'body'})
-            merged_spamassassin_df = merged_spamassassin_df[['sender', 'receiver', 'urls', 'body', 'label', 'index']]
+            merged_spamassassin_df = merged_spamassassin_df[['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'body', 'label', 'index']]
             missing_in_merged_df = merged_spamassassin_df[merged_spamassassin_df['index'].isnull()]
             logging.info(f"Number of missing rows in Merged Spam Assassin Dataframe: {len(missing_in_merged_df)}")
             logging.info(f'Total rows in Processed Spam Assassin Dataframe: {len(df_processed_spamassassin)}')
             logging.info(f"Total rows in Merged Spam Assassin Dataframe: {len(merged_spamassassin_df)}")
             merged_spamassassin_df.drop(columns=['index'], inplace=True)
-            # Columns in merged_spamassassin_df: ['sender', 'receiver', 'urls', 'body', 'label']
+            # Columns in merged_spamassassin_df: ['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'body', 'label']
         else:
             logging.error("The number of rows in Processed Spam Assassin and Spam Assassin Header do not match.")
             raise ValueError("The number of rows in Processed Spam Assassin and Spam Assassin Header do not match.")
@@ -1426,13 +1452,42 @@ def main():
         else:
             logging.info("The number of rows in the Merged Spam Assassin DataFrame matches Processed Spam Assassin.")
             merged_spamassassin_df.to_csv(MergedSpamAssassinFile, index=False)
-            logging.info(f"Merged Spam Assassin DataFrame successfully saved to {MergedSpamAssassinFile}")
+            logging.info(f"Merged Spam Assassin DataFrame successfully saved to {MergedSpamAssassinFile}\n")
+    
 
+        # Merge Processed CEAS_08 dataset with the extracted information
+        logging.info(f"Merging Processed CEAS_08 and CEAS_08 Header Dataframes...")
+        df_processed_ceas.reset_index(inplace=True)
+        ceas_headers_df.reset_index(inplace=True)
+        if len(df_processed_spamassassin) == len(spamassassin_headers_df):
+            merged_ceas_df = pd.merge(df_processed_ceas, ceas_headers_df, on='index', how='left')
+            merged_ceas_df = merged_ceas_df[['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'body', 'label', 'index']]
+            missing_in_merged_df = merged_ceas_df[merged_ceas_df['index'].isnull()]
+            logging.info(f"Number of missing rows in Merged CEAS_08 Dataframe: {len(missing_in_merged_df)}")
+            logging.info(f'Total rows in Processed CEAS_08 Dataframe: {len(df_processed_ceas)}')
+            logging.info(f"Total rows in Merged CEAS_08 Dataframe: {len(merged_ceas_df)}")
+            merged_ceas_df.drop(columns=['index'], inplace=True)
+            # Columns in merged_ceas_df: ['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'body', 'label']
+        else:
+            logging.error("The number of rows in Processed CEAS_08 and CEAS_08 Header do not match.")
+            raise ValueError("The number of rows in Processed CEAS_08 and CEAS_08 Header do not match.")
+        
+
+        # Verifying the merged CEAS_08 DataFrame
+        if len(merged_ceas_df) != len(df_processed_ceas):
+            logging.error("The number of rows in the Merged CEAS_08 DataFrame DataFrame does not match Processed CEAS_08.")
+            raise ValueError("The number of rows in the Merged CEAS_08 DataFrame does not match Processed CEAS_08.")
+        else:
+            logging.info(f"The number of rows in the Merged CEAS_08 DataFrame matches Processed CEAS_08.")
+            merged_ceas_df.to_csv(MergedCEASFile, index=False)
+            logging.info(f"Merged CEAS_08 DataFrame successfully saved to {MergedCEASFile}\n")
+        
 
         # Merge Spam Assassin and CEAS_08 datasets
-        common_columns = ['sender', 'receiver', 'urls', 'body', 'label']
+        logging.info(f"Merging Spam Assassin and CEAS_08 Dataframes...")
+        common_columns = ['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'body', 'label']
         df_spamassassin_common = merged_spamassassin_df[common_columns]
-        df_ceas_common = df_processed_ceas[common_columns]
+        df_ceas_common = merged_ceas_df[common_columns]
         combined_df = pd.concat([df_spamassassin_common, df_ceas_common])
 
 
@@ -1440,47 +1495,56 @@ def main():
         combined_labels = set(combined_df['label'].unique())
         percentage_labels = set(combined_percentage_df['label'].unique())
         if combined_labels != percentage_labels:
-            logging.error(f"Labels in Merged DataFrame do not match those in Combined Processed DataFrame. "
+            logging.error(f"Labels in Merged DataFrame do not match those in Combined CEAS_08 and SpamAssassin (No Processing). "
                         f"Merged DataFrame labels: {combined_labels}, "
                         f"Combined Processed DataFrame labels: {percentage_labels}")
-            raise ValueError("Labels do not match between Merged DataFrame and Combined Processed DataFrame.")
+            raise ValueError("Labels do not match between Merged DataFrame and Combined CEAS_08 and SpamAssassin (No Processing).")
         else:
-            logging.info("Labels in Merged DataFrame match those in Combined Processed DataFrame.")
+            logging.info("Labels in Merged DataFrame match those in Combined CEAS_08 and SpamAssassin (No Processing).")
         combined_label_counts = combined_df['label'].value_counts().sort_index()
         percentage_label_counts = combined_percentage_df['label'].value_counts().sort_index()
         if not combined_label_counts.equals(percentage_label_counts):
-            logging.error("Label distributions in Merged DataFrame do not match those in Combined Processed DataFrame.")
+            logging.error("Label distributions in Merged DataFrame do not match those in Combined CEAS_08 and SpamAssassin (No Processing).")
             logging.error(f"Merged DataFrame distributions:\n{combined_label_counts}")
-            logging.error(f"Combined Processed DataFrame distributions:\n{percentage_label_counts}")
-            raise ValueError("Label distributions do not match between Merged DataFrame and Combined Processed DataFrame.")
+            logging.error(f"Combined CEAS_08 and SpamAssassin (No Processing) distributions:\n{percentage_label_counts}")
+            raise ValueError("Label distributions do not match between Merged DataFrame and Combined CEAS_08 and SpamAssassin (No Processing).")
         else:
-            logging.info("Label distributions in Merged DataFrame match those in Combined Processed DataFrame.")
+            logging.info("Label distributions in Merged DataFrame match those in Combined CEAS_08 and SpamAssassin (No Processing).")
+
+        if len(combined_df) != len(combined_percentage_df):
+            logging.error("The number of rows in the Merged DataFrame does not match the Combined CEAS_08 and SpamAssassin (No Processing).")
+            raise ValueError("The number of rows in the Merged DataFrame does not match the Combined CEAS_08 and SpamAssassin (No Processing).")
+        else:
+            logging.info("The number of rows in the Merged DataFrame matches the Combined CEAS_08 and SpamAssassin (No Processing).")
 
 
         # Save the Merged DataFrame
         combined_df.to_csv(MergedDataFrame, index=False)
-        # Columns in Merged DataFrame: ['sender', 'receiver', 'urls', 'body', 'label']
+        # Columns in Merged DataFrame: ['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'body', 'label']
         logging.info(f"Merged DataFrame successfully saved to {MergedDataFrame}")
         logging.info(f"Data Integration completed.\n")
 
 
-        '''
-        Data Cleaning
-        '''
-        logging.info(f"Beginning data cleaning...")
+        # ************************* #
+        #       Data Cleaning       #
+        # ************************* #
+
+        logging.info(f"Beginning Data Cleaning...")
         df_clean = load_or_clean_data('Merged Dataframe', combined_df, 'body', CleanedDataFrame, data_cleaning)
 
 
         # Concatenate the Cleaned DataFrame with the Merged DataFrame
+        logging.info(f"Combining Cleaned DataFrame with Merged DataFrame...")
         combined_df_reset = combined_df.reset_index(drop=True)
         df_clean_reset = df_clean.reset_index(drop=True)
         df_cleaned_combined = pd.concat([
-            combined_df_reset[['sender', 'receiver', 'urls', 'label']],  # Select necessary columns from merged
+            combined_df_reset[['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'label']],  # Select necessary columns from merged
             df_clean_reset[['cleaned_text']]  # Select the cleaned_text and label from df_clean
         ], axis=1)
-
+        logging.info(f"Dataframes combined successfully.\n")
 
         # Verifying the Cleaned Combine DataFrame
+        logging.info(f"Verifying the Cleaned Combined DataFrame...")
         combined_labels = combined_df['label'].unique()
         df_cleaned_combined_labels = df_cleaned_combined['label'].unique()
         if set(combined_labels) != set(df_cleaned_combined_labels):
@@ -1502,16 +1566,17 @@ def main():
 
 
         # Final columns to keep
-        df_cleaned_combined = df_cleaned_combined[['sender', 'receiver', 'urls', 'cleaned_text', 'label']]
+        df_cleaned_combined = df_cleaned_combined[['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'cleaned_text', 'label']]
         logging.info(f"Final combined DataFrame has {len(df_cleaned_combined)} rows and columns: {df_cleaned_combined.columns.tolist()}")
-        check_missing_values(df_cleaned_combined, 'Cleaned Combined DataFrame')
+        df_cleaned_combined.to_csv(MergedCleanedDataFrame, index=False)
         logging.info(f"Data Cleaning completed.\n")
 
     
-        '''
-        Data Splitting
-        '''
-        logging.info(f"Beginning data splitting...")
+        # ************************* #
+        #       Data Splitting      #
+        # ************************* #
+
+        logging.info(f"Beginning Data Splitting...")
         folds = stratified_k_fold_split(df_cleaned_combined)
         logging.info(f"Data Splitting completed.\n")
 
@@ -1523,15 +1588,16 @@ def main():
 
 
         for fold_idx, (X_train, X_test, y_train, y_test) in enumerate(folds, start=1):
-            '''
-            Feature Extraction and Data Imbalance Handling
-            '''
-            logging.info(f"Beginning feature extraction for Fold {fold_idx}...")
+            # ************************************************************ #
+            #       Feature Extraction and Data Imbalance Handling         #
+            # ************************************************************ #
+
+            logging.info(f"Beginning Feature Extraction for Fold {fold_idx}...")
 
 
             # Define columns for categorical, numerical, and text data
-            categorical_columns = ['sender', 'receiver']
-            numerical_columns = ['urls']
+            categorical_columns = ['sender', 'receiver', 'short_urls', 'has_ip_address']
+            numerical_columns = ['https_count', 'http_count', 'blacklisted_keywords_count', 'urls']
             text_column = 'cleaned_text'
 
 
@@ -1552,7 +1618,7 @@ def main():
                         ('scaler', StandardScaler())
                     ]), numerical_columns)
                 ],
-                remainder='passthrough'  # Keep other columns unchanged
+                remainder='passthrough'  # Keep other columns unchanged, like 'cleaned_text' and 'label'
             )
 
 
@@ -1576,9 +1642,10 @@ def main():
             logging.info(f"Data for Fold {fold_idx} has been processed or loaded successfully.")
 
 
-            '''
-            Model Training and Evaluation
-            '''
+            # ***************************************** #
+            #       Model Training and Evaluation       #
+            # ***************************************** #
+
             # Train the model and evaluate the performance for each fold
             model_path = os.path.join('Models & Parameters', f'ensemble_model_fold_{fold_idx}.pkl')
             params_path = os.path.join('Models & Parameters', f'best_params_fold_{fold_idx}.json')
@@ -1594,6 +1661,7 @@ def main():
             logging.info(f"Data for Fold {fold_idx} has been processed, model trained, and evaluated.\n")
         
         
+        logging.info(f"Training and evaluation completed for all folds.\n")
         # Calculate and log the overall test accuracy
         mean_test_accuracy = np.mean(fold_test_accuracies)
         logging.info(f"Overall Test Accuracy: {mean_test_accuracy * 100:.2f}%")
