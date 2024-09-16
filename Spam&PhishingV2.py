@@ -196,7 +196,7 @@ class DatasetProcessor:
         return self.df
 
 
-#Extracting headers from spamassassin dataset
+#Extracting headers from spamassassin CEAS dataset
 class EmailHeaderExtractor:
     
     def __init__(self, df: pd.DataFrame):
@@ -266,6 +266,19 @@ class EmailHeaderExtractor:
             keyword_count += len(re.findall(re.escape(keyword), text, re.IGNORECASE))
         return keyword_count
 
+    def detect_url_shorteners(self, links: List[str]) -> List[str]:
+        # Common URL shortener domains
+        shortener_domains = ['bit.ly', 'tinyurl.com', 'goo.gl', 'ow.ly', 't.co', 'is.gd', 'buff.ly', 
+    'adf.ly', 'bl.ink', 'lnkd.in', 'shorte.st', 'mcaf.ee', 'q.gs', 'po.st', 
+    'bc.vc', 's.coop', 'u.to', 'cutt.ly', 't2mio.com', 'rb.gy', 'clck.ru', 
+    'shorturl.at', '1url.com', 'hyperurl.co', 'urlzs.com', 'v.gd', 'x.co']  
+        short_urls = [link for link in links if any(domain in link for domain in shortener_domains)]
+        return short_urls
+
+    def contains_ip_address(self, text: str) -> bool:
+        ip_pattern = r'https?://(\d{1,3}\.){3}\d{1,3}'
+        return bool(re.search(ip_pattern, text))
+    
     def extract_headers_spamassassin(self) -> pd.DataFrame:
             headers_list: List[Dict[str, Union[str, List[str], int]]] = []
             for email_text in tqdm(self.df['text'], desc="Extracting headers"):
@@ -295,23 +308,29 @@ class EmailHeaderExtractor:
                     # Count blacklisted keywords in the email body
                     https_http_counts = self.count_https_http(body_content)
                     blacklisted_keyword_count = self.contains_blacklisted_keywords(body_content)
+                    short_urls = self.detect_url_shorteners(links)
+                    has_ip_address = self.contains_ip_address(body_content)
 
                     headers_list.append({
-                        'sender': from_header,
-                        'receiver': to_header,
-                        'mailto': mail_to_header,
-                        'texturls': links,
-                        'https_count': https_http_counts['https_count'],
-                        'http_count': https_http_counts['http_count'],
-                        'blacklisted_keywords_count': blacklisted_keyword_count
-                    })
+                    'sender': from_header,
+                    'receiver': to_header,
+                    'mailto': mail_to_header,
+                    'texturls': links,
+                    'https_count': https_http_counts['https_count'],
+                    'http_count': https_http_counts['http_count'],
+                    'blacklisted_keywords_count': blacklisted_keyword_count,
+                    'short_urls': short_urls,
+                    'has_ip_address': has_ip_address
+                })
                 except Exception as e:
                     logging.error(f"Error parsing email: {e}")
                     headers_list.append(
-                        {'sender': None, 'receiver': None, 'mailto': None, 'texturls': [], 'blacklisted_keywords_count': 0})
+                        {'sender': None, 'receiver': None, 'mailto': None, 'texturls': [], 'blacklisted_keywords_count': 0, 'short_urls': [], 'has_ip_address': False})
 
             self.headers_df = pd.DataFrame(headers_list)
             self.headers_df['texturls'] = self.headers_df['texturls'].apply(self.clean_links)
+            self.headers_df['short_urls'] = self.headers_df['short_urls'].apply(self.clean_links)
+
 
             return self.headers_df
 
@@ -328,21 +347,28 @@ class EmailHeaderExtractor:
                     # Count blacklisted keywords and http/https occurrences in the email body
                     https_http_counts = self.count_https_http(body_content)
                     blacklisted_keyword_count = self.contains_blacklisted_keywords(body_content)
+                    short_urls = self.detect_url_shorteners(self.clean_links(re.findall(r'https?:\/\/[^\s\'"()<>]+', body_content)))
+                    has_ip_address = self.contains_ip_address(body_content)
 
                     headers_list.append({
-                        'https_count': https_http_counts['https_count'],
-                        'http_count': https_http_counts['http_count'],
-                        'blacklisted_keywords_count': blacklisted_keyword_count
-                    })
+                    'https_count': https_http_counts['https_count'],
+                    'http_count': https_http_counts['http_count'],
+                    'blacklisted_keywords_count': blacklisted_keyword_count,
+                    'short_urls': short_urls,
+                    'has_ip_address': has_ip_address
+                })
                 except Exception as e:
                     logging.error(f"Error processing email: {e}")
                     headers_list.append({
                         'https_count': 0,
                         'http_count': 0,
-                        'blacklisted_keywords_count': 0
+                        'blacklisted_keywords_count': 0,
+                        'short_urls': [],
+                        'has_ip_address': False
                     })
 
             self.headers_df = pd.DataFrame(headers_list)
+            self.headers_df['short_urls'] = self.headers_df['short_urls'].apply(self.clean_links)
             return self.headers_df
 
 
