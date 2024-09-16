@@ -1,5 +1,6 @@
 /Data Cleaning
 /Data Integration
+/Data Splitting
 /Datasets
 /Feature Engineering
 /Feature Extraction
@@ -7,3 +8,4 @@
 /Models & Parameters Backup
 /Others
 /Previous Tests
+/FlaskModel
