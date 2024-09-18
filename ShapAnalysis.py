@@ -1,114 +1,134 @@
 import joblib
+import shap
 import numpy as np
 import pandas as pd
-import shap
 import os
 import logging
-import pickle
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier
-from tqdm import tqdm  # Import tqdm
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+from tqdm import tqdm
+from sklearn.utils import shuffle
+import time
+import matplotlib.pyplot as plt  # Plotting library
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 
-# Define the base directory
+
+logging.basicConfig(format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s ', level=logging.INFO)
+
+
+
 base_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Define paths to your saved models, parameters, and features
 model_paths = [os.path.join(base_dir, 'Models & Parameters', f'ensemble_model_fold_{i+1}.pkl') for i in range(3)]
-param_paths = [os.path.join(base_dir, 'Models & Parameters', f'best_params_fold_{i+1}.json') for i in range(3)]
-feature_paths = [os.path.join(base_dir, 'Feature Extraction', f'fold_{i+1}_test_data.npz') for i in range(3)]
-feature_label_paths = [os.path.join(base_dir, 'Feature Extraction', f'fold_{i+1}_test_labels.pkl') for i in range(3)]
-X_test_paths = [os.path.join(base_dir, 'Data Splitting', f'X_test_fold{i+1}.csv') for i in range(3)]
-y_test_paths = [os.path.join(base_dir, 'Data Splitting', f'y_test_fold{i+1}.csv') for i in range(3)]
+X_test_paths = [os.path.join(base_dir, 'Feature Extraction', f'fold_{i+1}_test_data.npz') for i in range(3)]
+y_test_paths = [os.path.join(base_dir, 'Feature Extraction', f'fold_{i+1}_test_labels.pkl') for i in range(3)]
+features_path = [os.path.join(base_dir, 'Feature Extraction', f'fold_{i+1}_train_data.npz') for i in range(3)]
+features_label = [os.path.join(base_dir, 'Feature Extraction', f'fold_{i+1}_train_labels.npz') for i in range(3)]
+preprocessor_path = [os.path.join(base_dir, 'Feature Extraction', f'fold_{i+1}_preprocessor.pkl') for i in range(3)]
 
-def load_or_save_model(model_path, action='load'):
-    if action == 'load':
-        if os.path.exists(model_path):
-            logging.info(f"Loading model from {model_path}")
-            return joblib.load(model_path)
-        else:
-            logging.info(f"No saved model found at {model_path}. Proceeding to train a new model.")
-            return None
-    elif action == 'save':
-        raise NotImplementedError("Save action is not implemented in this function.")
 
-# Use tqdm for progress tracking
-for i, (model_path, param_path, feature_path, feature_label_path, X_test_path, y_test_path) in enumerate(
-        zip(model_paths, param_paths, feature_paths, feature_label_paths, X_test_paths, y_test_paths), start=1):
+# Define column names
+categorical_columns = ['sender', 'receiver', 'has_ip_address']
+numerical_columns = ['https_count', 'http_count', 'blacklisted_keywords_count', 'urls', 'short_urls']
+
+
+# Recreate the ColumnTransformer excluding 'cleaned_text' and 'label'
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('cat', Pipeline([
+            ('imputer', SimpleImputer(strategy='most_frequent')),
+            ('encoder', OneHotEncoder(sparse_output=False, handle_unknown='ignore'))
+        ]), categorical_columns),
+        ('num', Pipeline([
+            ('imputer', SimpleImputer(strategy='mean')),
+            ('scaler', StandardScaler())
+        ]), numerical_columns)
+    ],
+    remainder='passthrough'  # Keep other columns unchanged
+)
+column_names = categorical_columns + numerical_columns 
+
+
+# Load models, data, and feature names for each fold
+for fold in range(3):
+    logging.info(f'Processing fold {fold+1}')
     
-    logging.info(f"Processing fold {i}...")
+    # Load the model for this fold
+    start_time = time.perf_counter()
+    model = joblib.load(model_paths[fold])
+    logging.info(f'Loaded model from {model_paths[fold]}')
+    logging.info(f'Time taken to load model: {time.perf_counter() - start_time:.2f} seconds\n')
 
-    # Load the saved model using joblib
-    model = load_or_save_model(model_path, action='load')
-    
-    if model is None:
-        logging.error(f"Model could not be loaded from {model_path}")
-        continue
+    # Load the test data
+    start_time = time.perf_counter()
+    X_test_combined = np.load(X_test_paths[fold])['data']
+    logging.info(f'Loaded test data from {X_test_paths[fold]}')
+    logging.info(f'Time taken to load test data: {time.perf_counter() - start_time:.2f} seconds\n')
 
-    logging.info("Model loaded successfully.")
+    # Load the training data to extract feature names
+    start_time = time.perf_counter()
+    X_train_combined = np.load(features_path[fold])['data']
+    logging.info(f'Loaded train data from {features_path[fold]}')
+    logging.info(f'Time taken to load train data: {time.perf_counter() - start_time:.2f} seconds\n')
 
-    # Load the saved features from .npz file
-    try:
-        with np.load(feature_path) as data:
-            X_test_features = data['data']  # Use the 'data' key as it matches your saving method
-    except KeyError as e:
-        logging.error(f"KeyError while loading features from {feature_path}: {e}")
-        continue
+    # Load the preprocessor
+    start_time = time.perf_counter()
+    preprocessor = joblib.load(preprocessor_path[fold])
+    logging.info(f'Loaded preprocessor')
+    logging.info(f'Time taken to load preprocessor: {time.perf_counter() - start_time:.2f} seconds\n')
 
-    logging.info("Features loaded successfully.")
+    # Extract feature names
+    start_time = time.perf_counter()
+    feature_names_non_text = preprocessor.get_feature_names_out()  # Original non-text feature names
+    feature_names_text = [f"bert_feature_{i}" for i in range(X_train_combined.shape[1] - len(feature_names_non_text))]
+    feature_names = np.concatenate([feature_names_non_text, feature_names_text])
+    logging.info(f'Extracted feature names')
+    logging.info(f'Time taken to extract feature names: {time.perf_counter() - start_time:.2f} seconds\n')
 
-    # Load the saved labels from .pkl file
-    try:
-        with open(feature_label_path, 'rb') as f:
-            y_test_labels = pickle.load(f)
-    except Exception as e:
-        logging.error(f"Error loading labels from {feature_label_path}: {e}")
-        continue
+    # Define a function to predict using the model
+    def predict_fn(X):
+        return model.predict_proba(X)
 
-    logging.info("Labels loaded successfully.")
+    # Reduce the number of background samples using ksample
+    start_time = time.perf_counter()
+    logging.info('Reducing number of background samples using ksample...')
+    sample_size = min(1000, X_train_combined.shape[0])  # Sample up to 1000 data points
+    X_train_sample = shuffle(X_train_combined, n_samples=sample_size, random_state=42)
+    background_samples = shap.sample(X_train_sample, 100)  # Perform ksample with reduced sample size
+    logging.info('Completed ksample sampling.')
+    logging.info(f'Time taken for ksample sampling: {time.perf_counter() - start_time:.2f} seconds\n')
 
-    # Load X_test and y_test data from CSV files (if needed)
-    try:
-        X_test_csv = pd.read_csv(X_test_path)
-        y_test_csv = pd.read_csv(y_test_path)
-    except Exception as e:
-        logging.error(f"Error loading X_test or y_test from CSV files: {e}")
-        continue
+    # Initialize SHAP explainer based on model type
+    start_time = time.perf_counter()
+    if hasattr(model, 'named_estimators_'):
+        model_rf = model.named_estimators_['rf']
+        logging.info('Initializing SHAP TreeExplainer...')
+        explainer = shap.TreeExplainer(model_rf, background_samples)
+    else:
+        logging.info('Initializing SHAP KernelExplainer...')
+        explainer = shap.KernelExplainer(predict_fn, background_samples)
+    logging.info('Initialized SHAP Explainer.')
+    logging.info(f'Time taken to initialize SHAP Explainer: {time.perf_counter() - start_time:.2f} seconds\n')
 
-    logging.info("CSV data loaded successfully.")
+    # Calculate SHAP values
+    start_time = time.perf_counter()
+    logging.info('Calculating SHAP values...')
+    X_test_subset = X_test_combined[:2000]  # Use a subset of the test data
+    shap_values = explainer.shap_values(X_test_subset, check_additivity=False)
+    logging.info('Completed SHAP value calculation.')
+    logging.info(f'Time taken to calculate SHAP values: {time.perf_counter() - start_time:.2f} seconds\n')
 
-    # Determine model type for SHAP explainer
-    try:
-        if isinstance(model, VotingClassifier):
-            # Extract base models correctly
-            for name, base_model in model.named_estimators_.items():
-                if isinstance(base_model, RandomForestClassifier):
-                    explainer = shap.TreeExplainer(base_model)
-                    shap_values = explainer.shap_values(X_test_features)
-                    np.save(os.path.join(base_dir, f'shap_values_{name}_fold_{i}.npy'), shap_values)
-                    shap.summary_plot(shap_values, X_test_features)
-                elif isinstance(base_model, LogisticRegression):
-                    explainer = shap.KernelExplainer(base_model.predict_proba, X_test_features)
-                    shap_values = explainer.shap_values(X_test_features)
-                    np.save(os.path.join(base_dir, f'shap_values_{name}_fold_{i}.npy'), shap_values)
-                    shap.summary_plot(shap_values, X_test_features)
-        elif isinstance(model, RandomForestClassifier):
-            explainer = shap.TreeExplainer(model)
-            shap_values = explainer.shap_values(X_test_features)
-            np.save(os.path.join(base_dir, f'shap_values_fold_{i}.npy'), shap_values)
-            shap.summary_plot(shap_values, X_test_features)
-        elif isinstance(model, LogisticRegression):
-            explainer = shap.KernelExplainer(model.predict_proba, X_test_features)
-            shap_values = explainer.shap_values(X_test_features)
-            np.save(os.path.join(base_dir, f'shap_values_fold_{i}.npy'), shap_values)
-            shap.summary_plot(shap_values, X_test_features)
-        else:
-            logging.warning(f"SHAP explanation not supported for model type: {type(model)}")
-    except Exception as e:
-        logging.error(f"Error during SHAP explanation: {e}")
+    # Generate SHAP summary plot
+    logging.info('Generating SHAP summary plot...')
+    plt.figure(figsize=(12, 8))  # Adjust the figure size for better visibility
+    shap.summary_plot(shap_values, X_test_subset, feature_names=feature_names, max_display=20, plot_type="bar")  # Limit the number of features displayed
+    plot_path = os.path.join(base_dir, f'shap_summary_plot_fold_{fold+1}.png')
+    plt.savefig(plot_path)
+    logging.info(f'SHAP summary plot saved to {plot_path}.')
+    plt.close()  # Close the plot to free up memory
 
-    logging.info(f"Fold {i} processing completed.")
-
-logging.info("All folds processed.")
+    # If it's the first fold, you might want to stop early for testing
+    if fold == 0:
+        logging.info('Ending after the first fold for testing.')
+        break  # Exit the loop after processing the first fold
