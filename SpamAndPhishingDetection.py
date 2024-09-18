@@ -1028,6 +1028,16 @@ def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='Data Sp
         logging.info(f"Processing Fold {fold_idx}...")
         X_train, X_test = X.iloc[train_index], X.iloc[test_index]
         y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+
+
+        # Log the distribution of each split
+        y_train_counts = y_train.value_counts().to_dict()
+        y_test_counts = y_test.value_counts().to_dict()
+        logging.info(f"Fold {fold_idx} - y_train distribution: {y_train_counts}, Total: {len(y_train)}")
+        logging.info(f"Fold {fold_idx} - y_test distribution: {y_test_counts}, Total: {len(y_test)}")
+        logging.info(f"Fold {fold_idx} - Total Combined: {len(y_test)+len(y_train)}")
+
+
         X_test_file = os.path.join(output_dir, f'X_test_fold{fold_idx}.csv')
         y_test_file = os.path.join(output_dir, f'y_test_fold{fold_idx}.csv')
         X_test.to_csv(X_test_file, index=False)
@@ -1132,7 +1142,7 @@ def model_training(X_train, y_train, X_test, y_test, model_path, params_path):
     print(f"Confusion Matrix:\n{confusion_matrix(y_test, y_test_pred)}")
     print(f"Classification Report for Training Data:\n{classification_report(y_train, y_train_pred, target_names=target_names)}")
     print(f"\nClassification Report for Test Data:\n{classification_report(y_test, y_test_pred, target_names=target_names)}")
-    
+
     return ensemble_model, test_accuracy
 
 
@@ -1596,8 +1606,6 @@ def main():
         fold_train_accuracies = []
         fold_test_accuracies = []
 
-
-
         for fold_idx, (X_train, X_test, y_train, y_test) in enumerate(folds, start=1):
             # ************************************************************ #
             #       Feature Extraction and Data Imbalance Handling         #
@@ -1666,7 +1674,7 @@ def main():
                 X_test_combined,
                 y_test,
                 model_path=model_path,
-                params_path=params_path
+                params_path=params_path,
             )
             fold_test_accuracies.append(test_accuracy)
             logging.info(f"Data for Fold {fold_idx} has been processed, model trained, and evaluated.\n")
