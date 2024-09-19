@@ -108,6 +108,7 @@ import csv
 # Datasets
 from datasets import load_dataset  # Load datasets
 
+from sklearn.model_selection import learning_curve
 
 # Define the mapping of label values to descriptions
 label_descriptions = {
@@ -1181,7 +1182,8 @@ def conduct_optuna_study(X_train, y_train):
 
     return study.best_params
 
-
+def load_optuna_model(path):
+    return joblib.load(path)
 
 def train_ensemble_model(best_params, X_train, y_train, model_path):
     logging.info(f"Training new ensemble model with best parameters: {best_params}")
@@ -1270,6 +1272,58 @@ def check_missing_values(df, df_name, num_rows=1):
 
 
 
+
+def plot_learning_curve(estimator, X, y, title="Learning Curve", ylim=None, cv=None, n_jobs=-1, train_sizes=np.linspace(0.1, 1.0, 3)):
+    """
+    Generate a learning curve plot.
+    
+    Parameters:
+    - estimator: the model or pipeline used for training
+    - X: feature data
+    - y: target data
+    - title: plot title
+    - ylim: y-axis limits
+    - cv: cross-validation strategy
+    - n_jobs: number of jobs to run in parallel
+    - train_sizes: proportion of the training data to use
+    """
+    
+    # Setup logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
+    logger.info("Starting the plot_learning_curve function.")
+    
+    plt.figure()
+    plt.title(title)
+    if ylim is not None:
+        plt.ylim(*ylim)
+    
+    plt.xlabel("Training examples")
+    plt.ylabel("Score")
+    
+    try:
+        logger.info("Calling sklearn's learning_curve function.")
+        train_sizes, train_scores, valid_scores = learning_curve(
+            estimator, X, y, train_sizes=train_sizes, cv=cv, n_jobs=n_jobs
+        )
+        logger.info("learning_curve function executed successfully.")
+        
+        # Plot the learning curves
+        plt.plot(train_sizes, train_scores.mean(axis=1), 'o-', color='r', label='Training score')
+        plt.plot(train_sizes, valid_scores.mean(axis=1), 'o-', color='g', label='Validation score')
+        
+        plt.legend(loc='best')
+        plt.grid()
+        
+        logger.info("Plotting the learning curve.")
+        plt.show()
+        logger.info("Learning curve plot displayed successfully.")
+    
+    except Exception as e:
+        logger.error(f"An error occurred while plotting the learning curve: {e}")
+
+
 def get_fold_paths(fold_idx, base_dir='Processed Data'):
     train_data_path = os.path.join(base_dir, f"fold_{fold_idx}_train_data.npz")
     test_data_path = os.path.join(base_dir, f"fold_{fold_idx}_test_data.npz")
@@ -1296,7 +1350,7 @@ def load_data_pipeline(data_path, labels_path):
 
 
 
-def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
+def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, plot_learning_curve_flag=False):
     # Define paths
     base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Feature Extraction')
     os.makedirs(base_dir, exist_ok=True)
@@ -1306,7 +1360,7 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
     if not all([os.path.exists(train_data_path), os.path.exists(test_data_path), os.path.exists(train_labels_path), os.path.exists(test_labels_path), os.path.exists(preprocessor_path)]):
         logging.info(f"Running pipeline for fold {fold_idx}...")
 
-        # Fit and transform the pipeline
+        # Process non-text features
         logging.info(f"Processing non-text features for fold {fold_idx}...")
         X_train_non_text = X_train.drop(columns=['cleaned_text'])
         X_test_non_text = X_test.drop(columns=['cleaned_text'])
@@ -1339,6 +1393,7 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         logging.info(f"Saving processed data for fold {fold_idx}...")
         save_data_pipeline(X_train_balanced, y_train_balanced, train_data_path, train_labels_path)
         save_data_pipeline(X_test_combined, y_test, test_data_path, test_labels_path)
+
     else:
         # Load the preprocessor
         logging.info(f"Loading preprocessor from {preprocessor_path}...")
@@ -1350,6 +1405,7 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         X_test_combined, y_test = load_data_pipeline(test_data_path, test_labels_path)
 
     return X_train_balanced, X_test_combined, y_train_balanced, y_test
+
 
 
 # Main processing function
@@ -1605,6 +1661,7 @@ def main():
         # Initialize lists to store accuracies for each fold
         fold_train_accuracies = []
         fold_test_accuracies = []
+        learning_curve_data = []
 
         for fold_idx, (X_train, X_test, y_train, y_test) in enumerate(folds, start=1):
             # ************************************************************ #
@@ -1612,7 +1669,6 @@ def main():
             # ************************************************************ #
 
             logging.info(f"Beginning Feature Extraction for Fold {fold_idx}...")
-
 
             # Define columns for categorical, numerical, and text data
             categorical_columns = ['sender', 'receiver', 'has_ip_address']
@@ -1640,12 +1696,12 @@ def main():
                 remainder='passthrough'  # Keep other columns unchanged, like 'cleaned_text' and 'label'
             )
 
-
+            
             # Define pipeline with preprocessor, BERT, and SMOTE
             pipeline = Pipeline(steps=[
                 ('preprocessor', preprocessor),
                 ('bert_features', bert_transformer),  # Custom transformer for BERT
-                ('smote', SMOTE(random_state=42))  # Apply SMOTE after feature extraction
+                ('smote', SMOTE(random_state=42)) # Apply SMOTE after feature extraction
             ])
 
 
@@ -1656,18 +1712,22 @@ def main():
                 X_test=X_test,
                 y_train=y_train,
                 y_test=y_test,
-                pipeline=pipeline
+                pipeline=pipeline,
+                plot_learning_curve_flag=True  # Ensure this flag is set to plot learning curves
+
+
             )
             logging.info(f"Data for Fold {fold_idx} has been processed or loaded successfully.")
 
+            
 
             # ***************************************** #
             #       Model Training and Evaluation       #
             # ***************************************** #
 
             # Train the model and evaluate the performance for each fold
-            model_path = os.path.join('Models & Parameters', f'ensemble_model_fold_{fold_idx}.pkl')
-            params_path = os.path.join('Models & Parameters', f'best_params_fold_{fold_idx}.json')
+            model_path = os.path.join(base_dir, 'Models & Parameters', f'ensemble_model_fold_{fold_idx}.pkl')
+            params_path = os.path.join(base_dir, 'Models & Parameters', f'best_params_fold_{fold_idx}.json')
             ensemble_model, test_accuracy = model_training(
                 X_train_balanced,
                 y_train_balanced,
@@ -1678,14 +1738,30 @@ def main():
             )
             fold_test_accuracies.append(test_accuracy)
             logging.info(f"Data for Fold {fold_idx} has been processed, model trained, and evaluated.\n")
-        
-        
+
+            # Store learning curve data for later plotting
+            learning_curve_data.append((X_train_balanced, y_train_balanced, ensemble_model, fold_idx))
+
+            # ***************************************** #
+            #       Plot Learning Curves                 #
+            # ***************************************** #
+
+            for X_train, y_train, ensemble_model, fold_idx in learning_curve_data:
+                plot_learning_curve(
+                    estimator=ensemble_model,
+                    X=X_train,
+                    y=y_train,
+                    title=f"Learning Curve for Fold {fold_idx}",
+                    train_sizes=np.linspace(0.1, 1.0, 3),
+                    cv=3
+                )
+            
         logging.info(f"Training and evaluation completed for all folds.\n")
         # Calculate and log the overall test accuracy
         mean_test_accuracy = np.mean(fold_test_accuracies)
         logging.info(f"Overall Test Accuracy: {mean_test_accuracy * 100:.2f}%")
                 
-
+      
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")
