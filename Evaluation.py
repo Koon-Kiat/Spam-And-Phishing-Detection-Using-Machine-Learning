@@ -34,6 +34,9 @@ import torch
 from torch.utils.data import Dataset
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import StratifiedKFold
+from sklearn.decomposition import PCA
+from collections import Counter
+from sklearn.metrics import confusion_matrix
 
 
 def load_or_extract_headers(df: pd.DataFrame, file_path: str, extractor_class, dataset_type: str) -> pd.DataFrame:
@@ -274,7 +277,6 @@ def load_data_pipeline(data_path, labels_path):
 
 
 def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
-    # Define paths
     base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Evaluation')
     os.makedirs(base_dir, exist_ok=True)
     train_data_path, test_data_path, train_labels_path, test_labels_path, preprocessor_path = get_fold_paths(fold_idx, base_dir)
@@ -308,9 +310,24 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         X_train_combined = np.hstack([X_train_non_text_processed, X_train_text_processed])
         X_test_combined = np.hstack([X_test_non_text_processed, X_test_text_processed])
 
-        # Apply SMOTE
+        logging.info(f"Class distribution before SMOTE for fold {fold_idx}: {Counter(y_train)}")
         logging.info(f"Applying SMOTE to balance the training data for fold {fold_idx}...")
         X_train_balanced, y_train_balanced = pipeline.named_steps['smote'].fit_resample(X_train_combined, y_train)
+        logging.info(f"Class distribution after SMOTE for fold {fold_idx}: {Counter(y_train_balanced)}")
+
+        # Dynamically set n_components for PCA
+        n_features = X_train_balanced.shape[1]
+        n_components = min(25, n_features)
+        pipeline.named_steps['pca'].n_components = n_components
+
+        logging.info(f"Applying PCA for dimensionality reduction for fold {fold_idx}...")
+        X_train_balanced = pipeline.named_steps['pca'].fit_transform(X_train_balanced)
+        X_test_combined = pipeline.named_steps['pca'].transform(X_test_combined)
+
+        # Log the number of features after PCA
+        logging.info(f"Number of components after PCA: {n_components}")
+        logging.info(f"Shape of X_train after PCA: {X_train_balanced.shape}")
+        logging.info(f"Shape of X_test after PCA: {X_test_combined.shape}")
 
         # Save the preprocessed data
         logging.info(f"Saving processed data for fold {fold_idx}...")
@@ -326,7 +343,21 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         X_train_balanced, y_train_balanced = load_data_pipeline(train_data_path, train_labels_path)
         X_test_combined, y_test = load_data_pipeline(test_data_path, test_labels_path)
 
+        # Ensure PCA is applied to the loaded data
+        logging.info(f"Applying PCA to loaded data for fold {fold_idx}...")
+        n_features = X_train_balanced.shape[1]
+        n_components = min(25, n_features)
+        pipeline.named_steps['pca'].n_components = n_components
+        X_train_balanced = pipeline.named_steps['pca'].fit_transform(X_train_balanced)
+        X_test_combined = pipeline.named_steps['pca'].transform(X_test_combined)
+
+        # Log the number of features after PCA
+        logging.info(f"Number of components after PCA: {n_components}")
+        logging.info(f"Shape of X_train after PCA: {X_train_balanced.shape}")
+        logging.info(f"Shape of X_test after PCA: {X_test_combined.shape}")
+
     return X_train_balanced, X_test_combined, y_train_balanced, y_test
+
 
 
 class BERTFeatureTransformer(BaseEstimator, TransformerMixin):
@@ -372,7 +403,6 @@ class TextDataset(Dataset):
             'attention_mask': attention_mask,
             'labels': torch.tensor(self.labels[idx], dtype=torch.long)
         }
-
 
 
 class BERTFeatureExtractor:
@@ -485,6 +515,7 @@ def main():
     # ****************************** #
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dataset = os.path.join(base_dir, 'Datasets', 'Phishing_Email.csv')
+    PreprocessedEvaluationDataset = os.path.join(base_dir, 'Evaluation', 'PreprocessedEvaluationDataset.csv')
     ExtractedEvaluationHeaderFile = os.path.join(base_dir, 'Evaluation', 'ExtractedEvaluationHeaderFile.csv')
     CleanedEvaluationDataFrame = os.path.join(base_dir, 'Evaluation', 'CleanedEvaluationDataFrame.csv')
     MergedEvaluationFile = os.path.join(base_dir, 'Evaluation', 'MergedEvaluation.csv')
@@ -502,7 +533,7 @@ def main():
     # Drop the original 'Email Type' column if no longer needed
     df_evaluation = df_evaluation.drop(columns=['Email Type'])
 
-    processor_evaluation = DatasetProcessor(df_evaluation, "text", "Evaluation Dataset")
+    processor_evaluation = DatasetProcessor(df_evaluation, "text", "Evaluation Dataset", PreprocessedEvaluationDataset)
     df_processed_evaluation = processor_evaluation.process_dataset()
 
     log_label_percentages(df_processed_evaluation, 'Evaluation Dataset')
@@ -634,13 +665,19 @@ def main():
             remainder='passthrough'  # Keep other columns unchanged, like 'cleaned_text' and 'label'
         )
 
+        # Calculate the number of features in the training data
+        n_features = X_train.shape[1]
+        # Set n_components to the minimum of 50 or the number of features
+        n_components = min(25, n_features)
 
-        # Define pipeline with preprocessor, BERT, and SMOTE
+        # Define pipeline with preprocessor, BERT, SMOTE, and PCA
         pipeline = Pipeline(steps=[
             ('preprocessor', preprocessor),
             ('bert_features', bert_transformer),  # Custom transformer for BERT
-            ('smote', SMOTE(random_state=42))  # Apply SMOTE after feature extraction
+            ('smote', SMOTE(random_state=42)),  # Apply SMOTE after feature extraction
+            ('pca', PCA(n_components=25))
         ])
+
         # Call the function to either run the pipeline or load preprocessed data
         X_train_balanced, X_test_combined, y_train_balanced, y_test = run_pipeline_or_load(
             fold_idx=fold_idx,
@@ -652,20 +689,7 @@ def main():
         )
         logging.info(f"Data for Fold {fold_idx} has been processed or loaded successfully.")
 
-        saved_model = joblib.load(SavedModel)
-        X_test_transformed = saved_model.transform(X_test_combined)
-
-        # Make predictions on the test data
-        y_pred = saved_model.predict(X_test_transformed)
-
-        # Evaluate the model
-        test_accuracy = accuracy_score(y_test, y_pred)
-        classification_rep = classification_report(y_test, y_pred)
-
-        logging.info(f"Test Accuracy: {test_accuracy}")
-        logging.info(f"Classification Report:\n{classification_rep}")
-
-         # Load the saved model
+        # Load the saved model
         saved_model = joblib.load(SavedModel)
 
         # Make predictions on the test data
@@ -673,14 +697,12 @@ def main():
 
         # Evaluate the model
         test_accuracy = accuracy_score(y_test, y_pred)
-        classification_rep = classification_report(y_test, y_pred)
+        target_names = ['Safe', 'Phishing', 'Spam']
 
-        logging.info(f"Fold {fold_idx} - Test Accuracy: {test_accuracy}")
-        logging.info(f"Fold {fold_idx} - Classification Report:\n{classification_rep}")
-
-        fold_test_accuracies.append(test_accuracy)
-
-
+        # Print the performance metrics
+        print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
+        print(f"Confusion Matrix:\n{confusion_matrix(y_test, y_pred)}")
+        print(f"\nClassification Report for Test Data:\n{classification_report(y_test, y_pred, target_names=target_names, zero_division=1)}")
 
 
 
