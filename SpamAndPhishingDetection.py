@@ -101,6 +101,7 @@ from tqdm import tqdm  # Progress bar for loops
 # BERT models and training utilities
 from transformers import AdamW, BertForSequenceClassification, BertModel, BertTokenizer, Trainer, TrainingArguments
 from wordcloud import WordCloud  # Generate word clouds
+from collections import Counter  # Counter class for counting occurrences
 
 import pickle  # Pickle (de)serialization
 import csv
@@ -145,11 +146,11 @@ warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
 
 class DatasetProcessor:
-    def __init__(self, df, column_name, dataset_name):
+    def __init__(self, df, column_name, dataset_name, save_path):
         self.df = df
         self.column_name = column_name
         self.dataset_name = dataset_name
-
+        self.save_path = save_path
 
 
     def drop_unnamed_column(self):
@@ -186,13 +187,29 @@ class DatasetProcessor:
 
 
 
+    def save_processed_data(self):
+        try:
+            self.df.to_csv(self.save_path, index=False)
+            logging.info(f"Processed data saved to {self.save_path}")
+        except PermissionError as e:
+            logging.error(f"Permission denied: {e}")
+        except Exception as e:
+            logging.error(f"An error occurred while saving the file: {e}")
+
+
+
     def process_dataset(self):
-        logging.info(f"Total number of rows in {self.dataset_name} DataFrame: {self.df.shape[0]}")
-        self.drop_unnamed_column()
-        self.check_and_remove_missing_values()
-        self.remove_duplicates()
-        logging.info(f"Total number of rows remaining in the {self.dataset_name}: {self.df.shape[0]}\n")
-        logging.debug(f"{self.dataset_name} after removing duplicates:\n{self.df.head()}\n")
+        if os.path.exists(self.save_path):
+            logging.info(f"Processed file already exists at {self.save_path}. Loading the file...")
+            self.df = pd.read_csv(self.save_path)
+        else:
+            logging.info(f"Total number of rows in {self.dataset_name} DataFrame: {self.df.shape[0]}")
+            self.drop_unnamed_column()
+            self.check_and_remove_missing_values()
+            self.remove_duplicates()
+            logging.info(f"Total number of rows remaining in the {self.dataset_name}: {self.df.shape[0]}\n")
+            logging.debug(f"{self.dataset_name} after removing duplicates:\n{self.df.head()}\n")
+            self.save_processed_data()
 
         return self.df
 
@@ -526,7 +543,7 @@ class TextProcessor(BaseEstimator, TransformerMixin):
 
 
     def remove_words(self, text):
-        return re.sub(r'\b(url|original message)\b', '', text, flags=re.IGNORECASE) # Combine both words using the | (OR) operator in regex
+        return re.sub(r'\b(url|original message|submissionid|submission)\b', '', text, flags=re.IGNORECASE) # Combine all words using the | (OR) operator in regex
 
 
 
@@ -1041,8 +1058,12 @@ def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='Data Sp
 
         X_test_file = os.path.join(output_dir, f'X_test_fold{fold_idx}.csv')
         y_test_file = os.path.join(output_dir, f'y_test_fold{fold_idx}.csv')
+        X_train_file = os.path.join(output_dir, f'X_train_fold{fold_idx}.csv')
+        y_train_file = os.path.join(output_dir, f'y_train_fold{fold_idx}.csv')
         X_test.to_csv(X_test_file, index=False)
         y_test.to_csv(y_test_file, index=False)
+        X_train.to_csv(X_train_file, index=False)
+        y_train.to_csv(y_train_file, index=False)
         folds.append((X_train, X_test, y_train, y_test))
     logging.info("Completed Stratified K-Fold splitting.")
 
@@ -1182,8 +1203,12 @@ def conduct_optuna_study(X_train, y_train):
 
     return study.best_params
 
+
+
 def load_optuna_model(path):
     return joblib.load(path)
+
+
 
 def train_ensemble_model(best_params, X_train, y_train, model_path):
     logging.info(f"Training new ensemble model with best parameters: {best_params}")
@@ -1272,56 +1297,40 @@ def check_missing_values(df, df_name, num_rows=1):
 
 
 
-
 def plot_learning_curve(estimator, X, y, title="Learning Curve", ylim=None, cv=None, n_jobs=-1, train_sizes=np.linspace(0.1, 1.0, 3)):
-    """
-    Generate a learning curve plot.
-    
-    Parameters:
-    - estimator: the model or pipeline used for training
-    - X: feature data
-    - y: target data
-    - title: plot title
-    - ylim: y-axis limits
-    - cv: cross-validation strategy
-    - n_jobs: number of jobs to run in parallel
-    - train_sizes: proportion of the training data to use
-    """
-    
     # Setup logging
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
-    
     logger.info("Starting the plot_learning_curve function.")
     
+
+
     plt.figure()
     plt.title(title)
     if ylim is not None:
         plt.ylim(*ylim)
-    
     plt.xlabel("Training examples")
     plt.ylabel("Score")
     
+
+
     try:
         logger.info("Calling sklearn's learning_curve function.")
-        train_sizes, train_scores, valid_scores = learning_curve(
-            estimator, X, y, train_sizes=train_sizes, cv=cv, n_jobs=n_jobs
-        )
+        train_sizes, train_scores, valid_scores = learning_curve(estimator, X, y, train_sizes=train_sizes, cv=cv, n_jobs=n_jobs)
         logger.info("learning_curve function executed successfully.")
         
+
         # Plot the learning curves
         plt.plot(train_sizes, train_scores.mean(axis=1), 'o-', color='r', label='Training score')
         plt.plot(train_sizes, valid_scores.mean(axis=1), 'o-', color='g', label='Validation score')
-        
         plt.legend(loc='best')
         plt.grid()
-        
         logger.info("Plotting the learning curve.")
         plt.show()
-        logger.info("Learning curve plot displayed successfully.")
-    
+        logger.info("Learning curve plot displayed successfully.\n")
     except Exception as e:
         logger.error(f"An error occurred while plotting the learning curve: {e}")
+
 
 
 def get_fold_paths(fold_idx, base_dir='Processed Data'):
@@ -1350,29 +1359,33 @@ def load_data_pipeline(data_path, labels_path):
 
 
 
-def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, plot_learning_curve_flag=False):
-    # Define paths
+def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
     base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Feature Extraction')
     os.makedirs(base_dir, exist_ok=True)
     train_data_path, test_data_path, train_labels_path, test_labels_path, preprocessor_path = get_fold_paths(fold_idx, base_dir)
+
 
     # Check if the files already exist
     if not all([os.path.exists(train_data_path), os.path.exists(test_data_path), os.path.exists(train_labels_path), os.path.exists(test_labels_path), os.path.exists(preprocessor_path)]):
         logging.info(f"Running pipeline for fold {fold_idx}...")
 
-        # Process non-text features
+
+        # Fit and transform the pipeline
         logging.info(f"Processing non-text features for fold {fold_idx}...")
         X_train_non_text = X_train.drop(columns=['cleaned_text'])
         X_test_non_text = X_test.drop(columns=['cleaned_text'])
+
 
         # Fit the preprocessor
         preprocessor = pipeline.named_steps['preprocessor']
         X_train_non_text_processed = preprocessor.fit_transform(X_train_non_text)
         X_test_non_text_processed = preprocessor.transform(X_test_non_text)
 
+
         # Save the preprocessor
         joblib.dump(preprocessor, preprocessor_path)
         logging.info(f"Saved preprocessor to {preprocessor_path}")
+
 
         # Transform the text features
         logging.info(f"Extracting BERT features for X_train for {fold_idx}...")
@@ -1380,20 +1393,36 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, p
         logging.info(f"Extracting BERT features for X_test for {fold_idx}...")
         X_test_text_processed = pipeline.named_steps['bert_features'].transform(X_test['cleaned_text'].tolist())
 
+
         # Combine processed features
         logging.info(f"Combining processed features for fold {fold_idx}...")
         X_train_combined = np.hstack([X_train_non_text_processed, X_train_text_processed])
         X_test_combined = np.hstack([X_test_non_text_processed, X_test_text_processed])
 
-        # Apply SMOTE
+
+
+        logging.info(f"Class distribution before SMOTE for fold {fold_idx}: {Counter(y_train)}")
         logging.info(f"Applying SMOTE to balance the training data for fold {fold_idx}...")
         X_train_balanced, y_train_balanced = pipeline.named_steps['smote'].fit_resample(X_train_combined, y_train)
+        logging.info(f"Class distribution after SMOTE for fold {fold_idx}: {Counter(y_train_balanced)}")
+
+
+
+        logging.info(f"Applying PCA for dimensionality reduction for fold {fold_idx}...")
+        X_train_balanced = pipeline.named_steps['pca'].fit_transform(X_train_balanced)
+        X_test_combined = pipeline.named_steps['pca'].transform(X_test_combined)
+
+
+        # Log the number of features after PCA
+        n_components = pipeline.named_steps['pca'].n_components_
+        logging.info(f"Number of components after PCA: {n_components}")
+        logging.info(f"Shape of X_train after PCA: {X_train_balanced.shape}")
+
 
         # Save the preprocessed data
         logging.info(f"Saving processed data for fold {fold_idx}...")
         save_data_pipeline(X_train_balanced, y_train_balanced, train_data_path, train_labels_path)
         save_data_pipeline(X_test_combined, y_test, test_data_path, test_labels_path)
-
     else:
         # Load the preprocessor
         logging.info(f"Loading preprocessor from {preprocessor_path}...")
@@ -1408,17 +1437,61 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, p
 
 
 
+def extract_email(text):
+    if isinstance(text, str):
+        match = re.search(r'<([^>]+)>', text)
+        if match:
+            return match.group(1)
+        elif re.match(r'^[^@]+@[^@]+\.[^@]+$', text):
+            return text
+    return None
+
+
+
+def process_and_save_emails(df, output_file):
+    # Extract sender and receiver emails
+    df['sender'] = df['sender'].apply(extract_email)
+    df['receiver'] = df['receiver'].apply(extract_email)
+    
+    # Create a new DataFrame with the extracted emails
+    email_df = df[['sender', 'receiver']]
+    
+    # Save the new DataFrame to a CSV file
+    email_df.to_csv(output_file, index=False)
+    return email_df
+
+
+
+def load_or_save_emails(df, output_file, df_name = 'CEAS_08'):
+    if os.path.exists(output_file):
+        logging.info(f"Output file {output_file} already exists. Loading data from {output_file}...")
+        df_cleaned = pd.read_csv(output_file)
+    else:
+        logging.info(f"Output file {output_file} does not exist. Loading data from {df_name}...")
+        logging.info(f"Data loaded from {df_name}. Beginning processing...")
+        
+        df_cleaned = process_and_save_emails(df, output_file)
+        
+        logging.info(f"Data processing completed. Cleaned data saved to {output_file}.")
+    
+    return df_cleaned
+
+
 # Main processing function
 def main():
     # Use relative paths to access the datasets and save the extracted data
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dataset = os.path.join(base_dir, 'CEAS_08.csv')
+    PreprocessedSpamAssassinFile = os.path.join(base_dir, 'Data Preprocessing', 'PreprocessedSpamAssassin.csv')
+    PreprocessedCEASFile = os.path.join(base_dir, 'Data Preprocessing', 'PreprocessedCEAS_08.csv')
     ExtractedSpamAssassinEmailHeaderFile = os.path.join(base_dir, 'Feature Engineering', 'SpamAssassinExtractedEmailHeader.csv')
     ExtractedCEASEmailHeaderFile = os.path.join(base_dir, 'Feature Engineering', 'CEASExtractedEmailHeader.csv')
     MergedSpamAssassinFile = os.path.join(base_dir, 'Data Integration', 'MergedSpamAssassin.csv')
     MergedCEASFile = os.path.join(base_dir, 'Data Integration', 'MergedCEAS_08.csv')
     MergedDataFrame = os.path.join(base_dir, 'Data Integration', 'MergedDataFrame.csv')
     CleanedDataFrame = os.path.join(base_dir, 'Data Cleaning', 'CleanedDataFrame.csv')
+    CleanedCEASHeaders = os.path.join(base_dir, 'Data Cleaning', 'CleanedCEASHeaders.csv')
+    MergedCleanedCEASHeaders = os.path.join(base_dir, 'Data Cleaning', 'MergedCleanedCEASHeaders.csv')
     MergedCleanedDataFrame = os.path.join(base_dir, 'Data Cleaning', 'MergedCleanedDataFrame.csv')
     
 
@@ -1452,9 +1525,9 @@ def main():
 
 
         # Remove duplicates and missing values
-        processor_spamassassin = DatasetProcessor(df_spamassassin, 'text', 'SpamAssassin')
+        processor_spamassassin = DatasetProcessor(df_spamassassin, 'text', 'SpamAssassin', PreprocessedSpamAssassinFile)
         df_processed_spamassassin = processor_spamassassin.process_dataset()
-        processor_ceas = DatasetProcessor(df_ceas, 'body', 'CEAS_08')
+        processor_ceas = DatasetProcessor(df_ceas, 'body', 'CEAS_08', PreprocessedCEASFile)
         df_processed_ceas = processor_ceas.process_dataset()
 
 
@@ -1492,6 +1565,46 @@ def main():
         # Columns in current ceas email headers: ['https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address']
         logging.info("Email header extraction and saving from CEAS completed.")
         logging.info(f"Feature Engineering completed.\n")
+
+
+
+        # ************************* #
+        #       Data Cleaning       #
+        # ************************* #
+        
+        logging.info(f"Beginning Data Cleaning of CEAS_08 ['sender', 'receiver']...")
+        df_cleaned_ceas_headers = load_or_save_emails(df_processed_ceas, CleanedCEASHeaders)
+        # Columns in cleaned ceas email headers: ['sender', 'receiver']
+        logging.info(f"Data Cleaning of CEAS_08 ['sender', 'receiver'] completed.")
+
+
+
+        logging.info(f"Begining merging of Cleaned Headers of CEAS_08 with Processed CEAS_08...")
+        if len(df_cleaned_ceas_headers) != len(df_processed_ceas):
+            logging.error("The number of rows in the Merged Cleaned Headers of CEAS_08 DataFrame does not match Processed CEAS_08.")
+            raise ValueError("The number of rows in the Merged Cleaned Headers of CEAS_08 DataFrame does not match Processed CEAS_08.")
+        else:
+            df_processed_ceas.drop(columns=['sender', 'receiver'], inplace=True)
+            logging.info(f"Columns in df_cleaned_ceas_headers: {df_cleaned_ceas_headers.columns.tolist()}")
+            logging.info(f"Columns in df_processed_ceas: {df_processed_ceas.columns.tolist()}")
+            df_cleaned_ceas_headers_merge = pd.concat([df_cleaned_ceas_headers.reset_index(drop=True), df_processed_ceas.reset_index(drop=True)], axis=1)
+            df_cleaned_ceas_headers_merge.fillna({'sender': 'unknown', 'receiver': 'unknown'}, inplace=True)
+            missing_in_cleaned_ceas_header_merged = df_cleaned_ceas_headers_merge[(df_cleaned_ceas_headers_merge['sender'].isnull()) | (df_cleaned_ceas_headers_merge['receiver'].isnull())]
+            logging.info(f"Number of missing rows in Merged Cleaned Headers of CEAS_08 DataFrame: {len(missing_in_cleaned_ceas_header_merged)}")
+            logging.info(f'Total rows in Processed CEAS_08 Dataframe: {len(df_processed_ceas)}')
+            logging.info(f"Total rows in Merged Cleaned Headers of CEAS_08 Dataframe: {len(df_cleaned_ceas_headers_merge)}")
+        if len(df_cleaned_ceas_headers_merge) != len(df_processed_ceas):
+            logging.error("The number of rows in the Merged Cleaned Headers of CEAS_08 DataFrame does not match Processed CEAS_08.")
+            raise ValueError("The number of rows in the Merged Cleaned Headers of CEAS_08 DataFrame does not match Processed CEAS_08.\n")
+        else:
+            logging.info("The number of rows in the Merged Cleaned Headers of CEAS_08 DataFrame matches Processed CEAS_08.")
+            df_cleaned_ceas_headers_merge.to_csv(MergedCleanedCEASHeaders, index=False)
+            logging.info(f"Merged Cleaned Headers of CEAS_08 DataFrame successfully saved to {MergedCleanedCEASHeaders}\n")
+
+
+
+            log_label_percentages(df_cleaned_ceas_headers_merge, 'Merged Cleaned Headers of CEAS_08')
+
 
 
         # ****************************** #
@@ -1533,14 +1646,14 @@ def main():
 
         # Merge Processed CEAS_08 dataset with the extracted information
         logging.info(f"Merging Processed CEAS_08 and CEAS_08 Header Dataframes...")
-        df_processed_ceas.reset_index(inplace=True)
+        df_cleaned_ceas_headers_merge.reset_index(inplace=True)
         ceas_headers_df.reset_index(inplace=True)
         if len(df_processed_spamassassin) == len(spamassassin_headers_df):
-            merged_ceas_df = pd.merge(df_processed_ceas, ceas_headers_df, on='index', how='left')
+            merged_ceas_df = pd.merge(df_cleaned_ceas_headers_merge, ceas_headers_df, on='index', how='left')
             merged_ceas_df = merged_ceas_df[['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'body', 'label', 'index']]
             missing_in_merged_df = merged_ceas_df[merged_ceas_df['index'].isnull()]
             logging.info(f"Number of missing rows in Merged CEAS_08 Dataframe: {len(missing_in_merged_df)}")
-            logging.info(f'Total rows in Processed CEAS_08 Dataframe: {len(df_processed_ceas)}')
+            logging.info(f'Total rows in Processed CEAS_08 Dataframe: {len(df_cleaned_ceas_headers_merge)}')
             logging.info(f"Total rows in Merged CEAS_08 Dataframe: {len(merged_ceas_df)}")
             merged_ceas_df.drop(columns=['index'], inplace=True)
             # Columns in merged_ceas_df: ['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'body', 'label']
@@ -1550,7 +1663,7 @@ def main():
         
 
         # Verifying the merged CEAS_08 DataFrame
-        if len(merged_ceas_df) != len(df_processed_ceas):
+        if len(merged_ceas_df) != len(df_cleaned_ceas_headers_merge):
             logging.error("The number of rows in the Merged CEAS_08 DataFrame DataFrame does not match Processed CEAS_08.")
             raise ValueError("The number of rows in the Merged CEAS_08 DataFrame does not match Processed CEAS_08.")
         else:
@@ -1606,16 +1719,16 @@ def main():
         # ************************* #
 
         logging.info(f"Beginning Data Cleaning...")
-        df_clean = load_or_clean_data('Merged Dataframe', combined_df, 'body', CleanedDataFrame, data_cleaning)
+        df_clean_body = load_or_clean_data('Merged Dataframe', combined_df, 'body', CleanedDataFrame, data_cleaning)
 
 
         # Concatenate the Cleaned DataFrame with the Merged DataFrame
         logging.info(f"Combining Cleaned DataFrame with Merged DataFrame...")
         combined_df_reset = combined_df.reset_index(drop=True)
-        df_clean_reset = df_clean.reset_index(drop=True)
+        df_clean_body_reset = df_clean_body.reset_index(drop=True)
         df_cleaned_combined = pd.concat([
             combined_df_reset[['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'label']],  # Select necessary columns from merged
-            df_clean_reset[['cleaned_text']]  # Select the cleaned_text and label from df_clean
+            df_clean_body_reset[['cleaned_text']]  # Select the cleaned_text and label from df_clean
         ], axis=1)
         logging.info(f"Dataframes combined successfully.\n")
 
@@ -1645,6 +1758,10 @@ def main():
         # Final columns to keep
         df_cleaned_combined = df_cleaned_combined[['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'cleaned_text', 'label']]
         logging.info(f"Final combined DataFrame has {len(df_cleaned_combined)} rows and columns: {df_cleaned_combined.columns.tolist()}")
+        
+        
+        
+        
         df_cleaned_combined.to_csv(MergedCleanedDataFrame, index=False)
         logging.info(f"Data Cleaning completed.\n")
 
@@ -1701,7 +1818,8 @@ def main():
             pipeline = Pipeline(steps=[
                 ('preprocessor', preprocessor),
                 ('bert_features', bert_transformer),  # Custom transformer for BERT
-                ('smote', SMOTE(random_state=42)) # Apply SMOTE after feature extraction
+                ('smote', SMOTE(random_state=42)),  # Apply SMOTE after feature extraction
+                ('pca', PCA(n_components=50))
             ])
 
 
@@ -1713,9 +1831,6 @@ def main():
                 y_train=y_train,
                 y_test=y_test,
                 pipeline=pipeline,
-                plot_learning_curve_flag=True  # Ensure this flag is set to plot learning curves
-
-
             )
             logging.info(f"Data for Fold {fold_idx} has been processed or loaded successfully.")
 
