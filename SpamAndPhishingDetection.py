@@ -89,10 +89,13 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler, LabelEncoder, OrdinalEncoder
 from sklearn.utils import resample  # Resampling utilities
 from xgboost import XGBClassifier
+from sklearn.ensemble import StackingClassifier
+from sklearn.svm import SVC
 
 # Spell checking
 from spellchecker import SpellChecker  # Spell checking
 from torch.utils.data import DataLoader, Dataset  # Data handling in PyTorch
+
 
 # Progress bar
 from tqdm import tqdm  # Progress bar for loops
@@ -1170,38 +1173,61 @@ def model_training(X_train, y_train, X_test, y_test, model_path, params_path):
 
 
 def conduct_optuna_study(X_train, y_train):
-    # Define the objective function for Optuna
-    def objective(trial):
-        n_estimators = trial.suggest_int('n_estimators', 50, 100)
-        max_depth = trial.suggest_int('max_depth', 10, 100, log=True)
-        min_samples_split = trial.suggest_int('min_samples_split', 2, 10)
-        min_samples_leaf = trial.suggest_int('min_samples_leaf', 1, 4)
+    best_params = {}
 
+    # Define the objective function for XGBoost
+    def xgb_objective(trial):
+        n_estimators_xgb = trial.suggest_int('n_estimators_xgb', 50, 100)
+        max_depth_xgb = trial.suggest_int('max_depth_xgb', 3, 10)
+        learning_rate_xgb = trial.suggest_float('learning_rate_xgb', 0.01, 0.3)
 
-        # Define the RandomForestClassifier with suggested hyperparameters
-        rf_model = RandomForestClassifier(
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            min_samples_split=min_samples_split,
-            min_samples_leaf=min_samples_leaf,
-            class_weight='balanced',
+        model = XGBClassifier(
+            n_estimators=n_estimators_xgb,
+            max_depth=max_depth_xgb,
+            learning_rate=learning_rate_xgb,
             random_state=42,
-            n_jobs=2
+            eval_metric='logloss'
         )
 
-
-        # Perform cross-validation to get the average accuracy score
-        rf_model.fit(X_train, y_train)
-        y_train_pred = rf_model.predict(X_train)
+        model.fit(X_train, y_train)
+        y_train_pred = model.predict(X_train)
         return accuracy_score(y_train, y_train_pred)
 
+    # Optimize XGBoost parameters
+    xgb_study = optuna.create_study(direction='maximize', sampler=TPESampler())
+    xgb_study.optimize(xgb_objective, n_trials=5)
+    best_params['xgb'] = xgb_study.best_params
 
-    # Create an Optuna study for hyperparameter optimization
-    study = optuna.create_study(direction='maximize', sampler=TPESampler())
-    study.optimize(objective, n_trials=5)
-    logging.info(f"Best hyperparameters: {study.best_params}")
+    # Define the objective function for SVM
+    def svm_objective(trial):
+        try:
+            C_svm = trial.suggest_float('C_svm', 0.1, 10.0)
+            kernel_svm = trial.suggest_categorical('kernel_svm', ['linear', 'rbf', 'poly'])
 
-    return study.best_params
+            model = SVC(
+                C=C_svm,
+                kernel=kernel_svm,
+                probability=True,
+                class_weight='balanced',
+                random_state=42
+            )
+            model.fit(X_train, y_train)
+            y_train_pred = model.predict(X_train)
+            return accuracy_score(y_train, y_train_pred)
+        except Exception as e:
+            logging.error(f"Error in SVM objective function: {e}")
+            return 0  # Return a low score if there's an error
+
+    # Optimize SVM parameters
+    svm_study = optuna.create_study(direction='maximize', sampler=TPESampler())
+    svm_study.optimize(svm_objective, n_trials=5)
+    best_params['svm'] = svm_study.best_params
+
+    # Define the meta model parameters for Logistic Regression
+    best_params['logreg'] = {'C_logreg': 1.0}  # Example, set as needed
+
+    logging.info(f"Best hyperparameters: {best_params}")
+    return best_params
 
 
 
@@ -1213,43 +1239,42 @@ def load_optuna_model(path):
 def train_ensemble_model(best_params, X_train, y_train, model_path):
     logging.info(f"Training new ensemble model with best parameters: {best_params}")
 
-
-    # Define the base models for the ensemble
-    logreg_model = LogisticRegression(class_weight='balanced', random_state=42, max_iter=1000)
-    gbm_model = GradientBoostingClassifier(random_state=42)
-
-
-    # Train RandomForest with the best hyperparameters
-    best_rf_model = RandomForestClassifier(
-        n_estimators=best_params['n_estimators'],
-        max_depth=best_params['max_depth'],
-        min_samples_split=best_params['min_samples_split'],
-        min_samples_leaf=best_params['min_samples_leaf'],
-        class_weight='balanced',
+    xgb_model = XGBClassifier(
+        n_estimators=best_params['xgb']['n_estimators_xgb'],
+        max_depth=best_params['xgb']['max_depth_xgb'],
+        learning_rate=best_params['xgb']['learning_rate_xgb'],
         random_state=42,
         n_jobs=2
     )
-    best_rf_model.fit(X_train, y_train)
 
+    svm_model = SVC(
+        C=best_params['svm']['C_svm'],
+        kernel=best_params['svm']['kernel_svm'],
+        probability=True,
+        class_weight='balanced',
+        random_state=42
+    )
 
-    # Create the ensemble model
-    ensemble_model = VotingClassifier(estimators=[
-        ('rf', best_rf_model),
-        ('logreg', logreg_model)
-        #('gbm', gbm_model)
-    ], voting='soft')
+    meta_model = LogisticRegression(
+        C=best_params['logreg']['C_logreg'],
+        class_weight='balanced',
+        random_state=42
+    )
 
+    stacking_model = StackingClassifier(
+        estimators=[('xgb', xgb_model), ('svm', svm_model)],
+        final_estimator=meta_model
+    )
 
     # Train the ensemble model
     for _ in tqdm(range(1), desc="Training ensemble model"):
-        ensemble_model.fit(X_train, y_train)
-
+        stacking_model.fit(X_train, y_train)
 
     # Save the ensemble model
-    load_or_save_model(ensemble_model, model_path, action='save')
+    joblib.dump(stacking_model, model_path)
     logging.info(f"Ensemble model trained and saved to {model_path}.\n")
-    
-    return ensemble_model
+
+    return stacking_model
 
 
 
@@ -1297,7 +1322,7 @@ def check_missing_values(df, df_name, num_rows=1):
 
 
 
-def plot_learning_curve(estimator, X, y, title="Learning Curve", ylim=None, cv=None, n_jobs=-1, train_sizes=np.linspace(0.1, 1.0, 3)):
+def plot_learning_curve(estimator, X, y, title="Learning Curve", ylim=None, cv=None, n_jobs=3, train_sizes=np.linspace(0.1, 1.0, 3)):
     # Setup logging
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
@@ -1819,7 +1844,7 @@ def main():
                 ('preprocessor', preprocessor),
                 ('bert_features', bert_transformer),  # Custom transformer for BERT
                 ('smote', SMOTE(random_state=42)),  # Apply SMOTE after feature extraction
-                ('pca', PCA(n_components=50))
+                ('pca', PCA(n_components=25))
             ])
 
 
