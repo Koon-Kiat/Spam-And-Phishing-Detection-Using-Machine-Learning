@@ -5,60 +5,70 @@
 ![Lines of code](https://img.shields.io/tokei/lines/github/Koon-Kiat/Phishing-Email-Detection)
 
 ## Overview
-This project aims to detect phishing emails using machine learning techniques. It involves data preprocessing, feature engineering, model training, and evaluation. The goal is to build a robust classifier that can distinguish between phishing and legitimate emails.
+The Phishing Email Detection project leverages advanced machine learning techniques to identify and classify phishing emails. By employing a comprehensive pipeline that includes data preprocessing, feature engineering, and model training, the project aims to build a highly accurate and robust classifier capable of distinguishing between legitimate emails and potential phishing threats.
 
-## Features
-- Data cleaning and preprocessing
-- Feature engineering using BERT
-- Model training and evaluation with various classifiers (e.g., Logistic Regression, Random Forest)
-- Handling imbalanced data using SMOTE
-- Visualization of results
-- Progress bar for feature extraction
-- Logging and warning management
+This project utilizes state-of-the-art techniques such as BERT for feature extraction, ensemble learning methods including Logistic Regression, Random Forest, SVM, and XGBoost, and advanced hyperparameter tuning through Optuna. Additionally, it addresses challenges like imbalanced datasets using SMOTE and incorporates effective preprocessing strategies such as rare category removal and feature scaling. The goal is to enhance email security by providing reliable classification to help users identify phishing attempts.
 
-## Installation Guide
-1. Clone the repository:
-    ```sh
-    git clone https://github.com/Koon-Kiat/Phishing-Detection.git
-    cd Phishing-Detection
-    ```
+## Installation
 
-2. Install the required libraries:
-    ```sh
-    pip install -r requirements.txt
-    ```
+To set up the project, clone the repository and install the necessary dependencies:
 
-3. Download necessary NLTK resources:
-    ```python
-    import nltk
-    nltk.download('punkt')
-    nltk.download('stopwords')
-    nltk.download('wordnet')
-    ```
+```bash
+git clone https://github.com/yourusername/phishing-email-detection.git
+cd phishing-email-detection
+pip install -r requirements.txt
+```
 
-## Usage
-1. **Data Cleaning and Preprocessing**:
-    - Remove duplicates
-    - Extract email information
-    - Clean text data
+## Data
+The dataset consists of labeled emails, which are preprocessed and stored in the following structure:
+- Data Cleaning/
+- Data Integration/
+- Data Preprocessing/
+- Data Splitting/
+- Feature Engineering/
+- Feature Extraction/
+- Models & Parameters/
 
-2. **Feature Extraction**:
-    - Use BERT for feature extraction
-    - Handle imbalanced data using SMOTE
+## Merging Datasets
+The project supports merging multiple datasets to create a more robust training set. Specifically, it combines the **[Spam Assassin](https://huggingface.co/datasets/talby/spamassassin)** dataset from Hugging Face and the **[CEAS_08](https://www.kaggle.com/datasets/naserabdullahalam/phishing-email-dataset?select=CEAS_08.csv)** dataset from Kaggle. This approach enhances model performance by providing a richer set of features and examples, leading to more reliable phishing detection.
 
-3. **Model Training and Evaluation**:
-    - Train models using Logistic Regression, Random Forest, etc.
-    - Evaluate models using accuracy, precision, recall, and F1 score
 
-4. **Visualization**:
-    - Plot word clouds
-    - Visualize model performance
+## Model Training Methodologies
+The following methodologies were employed to enhance the model's performance:
 
-## Example
-Here is an example of how to run the main processing function:
+- **BERT Feature Extraction:** Leveraging BERT to extract contextual features from email content, which improves the model's understanding of the text.
 
-```python
-from main import main
+- **Ensemble Learning:** Combining multiple models (e.g., Logistic Regression, SVM, XGBoost) using meta-modeling techniques to improve predictive performance and robustness.
 
-if __name__ == "__main__":
-    main()
+- **Hyperparameter Optimization with Optuna:** Using Optuna to systematically tune model hyperparameters, ensuring optimal settings for better accuracy and reduced overfitting.
+
+- **Cross-Validation:** Implementing stratified K-fold cross-validation to ensure the model generalizes well across different subsets of data.
+
+- **Preprocessing Pipelines:** Utilizing pipelines that include:
+
+    - Rare Category Removal: To eliminate categories with very few occurrences, enhancing model performance.
+    - Imputation: Filling missing values in the dataset.
+    - Encoding: Applying One-Hot Encoding for categorical variables.
+    - Standard Scaling: Normalizing numerical features for improved model performance.
+
+## Evaluation
+The model's performance is evaluated using the following metrics:
+
+- Accuracy
+- Confusion Matrix
+- Classification Report
+- Learning Plot Curve
+
+
+### Example Output
+```
+Training Accuracy: XX.XX%
+Test Accuracy: XX.XX%
+Confusion Matrix:
+[[TN FP]
+ [FN TP]]
+Classification Report for Test Data:
+              precision    recall  f1-score   support
+       Safe       0.XX      0.XX      0.XX      XX
+   Not Safe       0.XX      0.XX      0.XX      XX
+```
