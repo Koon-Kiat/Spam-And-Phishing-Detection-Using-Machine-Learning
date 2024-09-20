@@ -1,42 +1,49 @@
-import numpy as np  # Numerical operations
-import pandas as pd 
 import os
-import logging
-from SpamAndPhishingDetection import DatasetProcessor
-from SpamAndPhishingDetection import log_label_percentages
-from SpamAndPhishingDetection import count_urls
 import re
+import logging
+import pickle
+import joblib
+import numpy as np  # Numerical operations
+import pandas as pd
 from typing import Optional, List, Dict, Union, Tuple
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed  # Multithreading
+from functools import lru_cache  # Least Recently Used (LRU) cache
+from tqdm import tqdm  # Progress bar
+
 from email import policy
 from email.message import EmailMessage
 from email.parser import BytesParser
-from functools import lru_cache  # Least Recently Used (LRU) cache
-from tqdm import tqdm  # Progress bar
-from email.utils import parseaddr, getaddresses
-from email.policy import default
-from SpamAndPhishingDetection import check_missing_values
-from SpamAndPhishingDetection import load_or_clean_data
-from SpamAndPhishingDetection import data_cleaning
-from SpamAndPhishingDetection import TextProcessor
-from email.utils import formataddr
+from email.utils import parseaddr, getaddresses, formataddr
 from email.headerregistry import Address
+from email.policy import default
+
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from imblearn.over_sampling import SMOTE
-import joblib
-import pickle
-from sklearn.base import BaseEstimator, TransformerMixin
-from transformers import BertTokenizer, BertModel
-import torch
-from torch.utils.data import Dataset
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.model_selection import StratifiedKFold
 from sklearn.decomposition import PCA
-from collections import Counter
-from sklearn.metrics import confusion_matrix
+
+from imblearn.over_sampling import SMOTE
+
+from transformers import BertTokenizer, BertModel
+
+import torch
+from torch.utils.data import Dataset
+
+from SpamAndPhishingDetection import (
+    DatasetProcessor,
+    log_label_percentages,
+    count_urls,
+    check_missing_values,
+    load_or_clean_data,
+    data_cleaning,
+    TextProcessor,
+    RareCategoryRemover
+)
 
 
 def load_or_extract_headers(df: pd.DataFrame, file_path: str, extractor_class, dataset_type: str) -> pd.DataFrame:
@@ -134,7 +141,8 @@ class EmailHeaderExtractor:
 
     def contains_ip_address(self, text: str) -> bool:
         ip_pattern = r'https?://(\d{1,3}\.){3}\d{1,3}'
-        return bool(re.search(ip_pattern, text))
+
+        return len(re.findall(ip_pattern, text))
 
     
 
@@ -193,7 +201,7 @@ class EmailHeaderExtractor:
                     'http_count': 0,
                     'blacklisted_keywords_count': 0,
                     'short_urls': [],
-                    'has_ip_address': False
+                    'has_ip_address': 0
                 })
 
         self.headers_df = pd.DataFrame(headers_list)
@@ -281,53 +289,74 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
     os.makedirs(base_dir, exist_ok=True)
     train_data_path, test_data_path, train_labels_path, test_labels_path, preprocessor_path = get_fold_paths(fold_idx, base_dir)
 
+
     # Check if the files already exist
     if not all([os.path.exists(train_data_path), os.path.exists(test_data_path), os.path.exists(train_labels_path), os.path.exists(test_labels_path), os.path.exists(preprocessor_path)]):
         logging.info(f"Running pipeline for fold {fold_idx}...")
+        logging.info(f"Initial shape of X_train: {X_train.shape}")
 
         # Fit and transform the pipeline
         logging.info(f"Processing non-text features for fold {fold_idx}...")
         X_train_non_text = X_train.drop(columns=['cleaned_text'])
         X_test_non_text = X_test.drop(columns=['cleaned_text'])
 
+
         # Fit the preprocessor
+        logging.info(f"Fitting the preprocessor for fold {fold_idx}...")
         preprocessor = pipeline.named_steps['preprocessor']
         X_train_non_text_processed = preprocessor.fit_transform(X_train_non_text)
         X_test_non_text_processed = preprocessor.transform(X_test_non_text)
+        feature_names = preprocessor.named_transformers_['cat'].named_steps['encoder'].get_feature_names_out()
+        logging.info(f"Columns in X_train after processing non-text features: {X_train_non_text_processed.shape}")
+        logging.info(f"Feature names: {feature_names}")
+        if X_train_non_text_processed.shape[0] != y_train.shape[0]:
+            logging.error(f"Row mismatch: {X_train_non_text_processed.shape[0]} vs {y_train.shape[0]}")
+        logging.info(f"Non text features processed for fold {fold_idx}.\n")
+
 
         # Save the preprocessor
+        logging.info(f"Saving preprocessor for fold {fold_idx}...")
         joblib.dump(preprocessor, preprocessor_path)
-        logging.info(f"Saved preprocessor to {preprocessor_path}")
+        logging.info(f"Saved preprocessor to {preprocessor_path}\n")
+
 
         # Transform the text features
         logging.info(f"Extracting BERT features for X_train for {fold_idx}...")
         X_train_text_processed = pipeline.named_steps['bert_features'].transform(X_train['cleaned_text'].tolist())
         logging.info(f"Extracting BERT features for X_test for {fold_idx}...")
         X_test_text_processed = pipeline.named_steps['bert_features'].transform(X_test['cleaned_text'].tolist())
+        logging.info(f"Number of features extracted from BERT for fold {fold_idx}: {X_train_text_processed.shape}")
+        logging.info(f"Bert features extracted for fold {fold_idx}.\n")
+
+
 
         # Combine processed features
         logging.info(f"Combining processed features for fold {fold_idx}...")
         X_train_combined = np.hstack([X_train_non_text_processed, X_train_text_processed])
         X_test_combined = np.hstack([X_test_non_text_processed, X_test_text_processed])
+        logging.info(f"Total number of combined features for fold {fold_idx}: {X_train_combined.shape}")
+        logging.info(f"Combined processed features for fold {fold_idx}.\n")
+
+
 
         logging.info(f"Class distribution before SMOTE for fold {fold_idx}: {Counter(y_train)}")
         logging.info(f"Applying SMOTE to balance the training data for fold {fold_idx}...")
         X_train_balanced, y_train_balanced = pipeline.named_steps['smote'].fit_resample(X_train_combined, y_train)
         logging.info(f"Class distribution after SMOTE for fold {fold_idx}: {Counter(y_train_balanced)}")
+        logging.info(f"SMOTE applied for fold {fold_idx}.\n")
 
-        # Dynamically set n_components for PCA
-        n_features = X_train_balanced.shape[1]
-        n_components = min(25, n_features)
-        pipeline.named_steps['pca'].n_components = n_components
+
 
         logging.info(f"Applying PCA for dimensionality reduction for fold {fold_idx}...")
         X_train_balanced = pipeline.named_steps['pca'].fit_transform(X_train_balanced)
         X_test_combined = pipeline.named_steps['pca'].transform(X_test_combined)
 
+
         # Log the number of features after PCA
+        n_components = pipeline.named_steps['pca'].n_components_
         logging.info(f"Number of components after PCA: {n_components}")
         logging.info(f"Shape of X_train after PCA: {X_train_balanced.shape}")
-        logging.info(f"Shape of X_test after PCA: {X_test_combined.shape}")
+
 
         # Save the preprocessed data
         logging.info(f"Saving processed data for fold {fold_idx}...")
@@ -338,23 +367,11 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         logging.info(f"Loading preprocessor from {preprocessor_path}...")
         preprocessor = joblib.load(preprocessor_path)
 
+
         # Load the preprocessed data
         logging.info(f"Loading preprocessed data for fold {fold_idx}...")
         X_train_balanced, y_train_balanced = load_data_pipeline(train_data_path, train_labels_path)
         X_test_combined, y_test = load_data_pipeline(test_data_path, test_labels_path)
-
-        # Ensure PCA is applied to the loaded data
-        logging.info(f"Applying PCA to loaded data for fold {fold_idx}...")
-        n_features = X_train_balanced.shape[1]
-        n_components = min(25, n_features)
-        pipeline.named_steps['pca'].n_components = n_components
-        X_train_balanced = pipeline.named_steps['pca'].fit_transform(X_train_balanced)
-        X_test_combined = pipeline.named_steps['pca'].transform(X_test_combined)
-
-        # Log the number of features after PCA
-        logging.info(f"Number of components after PCA: {n_components}")
-        logging.info(f"Shape of X_train after PCA: {X_train_balanced.shape}")
-        logging.info(f"Shape of X_test after PCA: {X_test_combined.shape}")
 
     return X_train_balanced, X_test_combined, y_train_balanced, y_test
 
@@ -405,6 +422,7 @@ class TextDataset(Dataset):
         }
 
 
+
 class BERTFeatureExtractor:
     def __init__(self, max_length=128, device=None):
         logging.info("Initializing BERT Feature Extractor...")
@@ -434,31 +452,6 @@ class BERTFeatureExtractor:
 
         return features
     
-
-    # Redundant function
-    def save_features(self, features, features_path):
-        logging.info(f"Saving features to {features_path}.")
-        np.save(features_path, features)
-        logging.info(f"Features saved to {features_path}.")
-
-
-    # Redundant function
-    def load_features(self, features_path):
-        logging.info(f"Loading features from {features_path}.")
-        if os.path.exists(features_path):
-            logging.info(f"Loading features from {features_path}.")
-            return np.load(features_path)
-        else:
-            logging.info("Features file not found. Extracting features.")
-
-            return None
-
-
-def smote(X_train, y_train, random_state=42):
-    smote = SMOTE(random_state=random_state)
-    X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
-
-    return X_train_balanced, y_train_balanced
 
 
 def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='Evaluation'):
@@ -504,6 +497,7 @@ def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='Evaluat
     logging.info("Completed Stratified K-Fold splitting.")
 
     return folds
+
 
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s ', level=logging.INFO)
@@ -555,7 +549,7 @@ def main():
     # ****************************** #
     df_processed_evaluation.reset_index(inplace=True)
     evaluation_email_headers.reset_index(inplace=True)
-    evaluation_email_headers.fillna({'sender': 'unknown', 'receiver': 'unknown'}, inplace=True)
+    #evaluation_email_headers.fillna({'sender': 'unknown', 'receiver': 'unknown'}, inplace=True)
     if len(df_processed_evaluation) == len(evaluation_email_headers):
         # Merge dataframes
         merged_evaluation = pd.merge(df_processed_evaluation, evaluation_email_headers, on='index', how='left')
@@ -640,8 +634,8 @@ def main():
     fold_test_accuracies = []
 
     for fold_idx, (X_train, X_test, y_train, y_test) in enumerate(folds, start=1):
-        categorical_columns = ['sender', 'receiver', 'has_ip_address']
-        numerical_columns = ['https_count', 'http_count', 'blacklisted_keywords_count', 'urls', 'short_urls']
+        categorical_columns = ['sender', 'receiver']
+        numerical_columns = ['https_count', 'http_count', 'blacklisted_keywords_count', 'urls', 'short_urls', 'has_ip_address']
         text_column = 'cleaned_text'
 
 
@@ -654,28 +648,24 @@ def main():
         preprocessor = ColumnTransformer(
             transformers=[
                 ('cat', Pipeline([
-                    ('imputer', SimpleImputer(strategy='most_frequent')),  # Fill missing categorical values with the most frequent
+                    ('rare_cat_remover', RareCategoryRemover(threshold=0.05)),  # Remove rare categories
+                    ('imputer', SimpleImputer(strategy='most_frequent')),  # Fill missing categorical values
                     ('encoder', OneHotEncoder(sparse_output=False, handle_unknown='ignore'))
                 ]), categorical_columns),
                 ('num', Pipeline([
-                    ('imputer', SimpleImputer(strategy='mean')),  # Fill missing numerical values with the mean
+                    ('imputer', SimpleImputer(strategy='mean')),  # Fill missing numerical values
                     ('scaler', StandardScaler())
                 ]), numerical_columns)
             ],
             remainder='passthrough'  # Keep other columns unchanged, like 'cleaned_text' and 'label'
         )
 
-        # Calculate the number of features in the training data
-        n_features = X_train.shape[1]
-        # Set n_components to the minimum of 50 or the number of features
-        n_components = min(25, n_features)
-
         # Define pipeline with preprocessor, BERT, SMOTE, and PCA
         pipeline = Pipeline(steps=[
             ('preprocessor', preprocessor),
             ('bert_features', bert_transformer),  # Custom transformer for BERT
             ('smote', SMOTE(random_state=42)),  # Apply SMOTE after feature extraction
-            ('pca', PCA(n_components=25))
+            ('pca', PCA(n_components=10))
         ])
 
         # Call the function to either run the pipeline or load preprocessed data
