@@ -1,124 +1,105 @@
-# Description: This file is used to test the data cleaning and processing functions.
-
-# Data manipulation
-import codecs  # Codec registry and base classes
-import cProfile  # Profiling
-
-# Email parsing
-import email  # Email handling
-import email.policy  # Email policies
-import json  # JSON parsing and manipulation
-
-# Logging
-import logging  # Logging library
-
-# Operating system interfaces
+# Standard Libraries
 import os  # Interact with the operating system
+import json  # JSON parsing and manipulation
+import codecs  # Codec registry and base classes
 import re  # Regular expressions
-
-# String and regular expression operations
+import time  # Time-related functions
+import logging  # Logging library
+import warnings  # Warning control
+import pickle  # Pickle (de)serialization
 import string  # String operations
 
-# Profiling and job management
-import time  # Time-related functions
-import urllib.parse  # URL parsing
 
-# Warnings
-import warnings  # Warning control
-
-# Concurrent execution
-from concurrent.futures import ThreadPoolExecutor, as_completed  # Multithreading
-from email import policy
-from email.message import EmailMessage
-from email.parser import BytesParser
-from functools import lru_cache  # Least Recently Used (LRU) cache
-
-# Typing support
-from typing import Dict, List, Union  # Type hints
-from unittest.mock import patch
-
-# Text processing
-import contractions  # Expand contractions in text
-import joblib  # Job management
-from joblib import Parallel, delayed  # Parallel processing
-
-# Data visualization
-import matplotlib.pyplot as plt  # Plotting library
-
-# Natural Language Toolkit (NLTK)
-import nltk  # Natural language processing
+# Data Manipulation and Analysis
 import numpy as np  # Numerical operations
 import pandas as pd  # Data manipulation and analysis
+import csv  # CSV file handling
+
+# Data Visualization
+import matplotlib.pyplot as plt  # Plotting library
 import seaborn as sns  # Statistical data visualization
+from wordcloud import WordCloud  # Generate word clouds
 
-# TensorFlow
-import tensorflow as tf  # TensorFlow library
-
-# PyTorch
-import torch  # PyTorch library
-
-
-import optuna # Hyperparameter optimization
-from optuna.samplers import TPESampler
-
-# HTML and XML parsing
-from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning  # HTML and XML parsing
-from imblearn.over_sampling import SMOTE  # Handling imbalanced data
+# Text Processing
+import nltk  # Natural language processing
 from nltk.corpus import stopwords  # Stop words
 from nltk.stem import WordNetLemmatizer  # Lemmatization
 from nltk.tokenize import word_tokenize  # Tokenization
+import contractions  # Expand contractions in text
 
-# Sparse matrices
-from scipy.sparse import csr_matrix, hstack  # Sparse matrix operations
-
-# Machine learning libraries
+# Machine Learning Libraries
 from sklearn.base import BaseEstimator, TransformerMixin  # Scikit-learn base classes
 from sklearn.compose import ColumnTransformer
-from sklearn.decomposition import PCA, IncrementalPCA # Principal Component Analysis
-
-# Ensemble classifiers
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier, GradientBoostingClassifier
-
-# Text feature extraction
-from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer, CountVectorizer 
+from sklearn.decomposition import PCA, IncrementalPCA  # Principal Component Analysis
+from sklearn.ensemble import (RandomForestClassifier, VotingClassifier, 
+                              GradientBoostingClassifier, StackingClassifier)  # Ensemble classifiers
+from sklearn.feature_extraction.text import (ENGLISH_STOP_WORDS, 
+                                             TfidfVectorizer, CountVectorizer)  # Text feature extraction
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression  # Logistic Regression
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score, precision_score, recall_score
-from sklearn.model_selection import GridSearchCV, train_test_split, StratifiedKFold, cross_val_score # Model selection
+from sklearn.metrics import (accuracy_score, classification_report, 
+                             confusion_matrix, f1_score, precision_score, recall_score)  # Metrics
+from sklearn.model_selection import (GridSearchCV, train_test_split, 
+                                       StratifiedKFold, cross_val_score, learning_curve)  # Model selection
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler, LabelEncoder, OrdinalEncoder
+from sklearn.preprocessing import (OneHotEncoder, StandardScaler, 
+                                   LabelEncoder, OrdinalEncoder)  # Preprocessing
 from sklearn.utils import resample  # Resampling utilities
-from xgboost import XGBClassifier
-from sklearn.ensemble import StackingClassifier
-from sklearn.svm import SVC
+from xgboost import XGBClassifier  # XGBoost Classifier
+from sklearn.svm import SVC  # Support Vector Classifier
 
-# Spell checking
-from spellchecker import SpellChecker  # Spell checking
-from torch.utils.data import DataLoader, Dataset  # Data handling in PyTorch
+# Text Parsing and Email Handling
+import email  # Email handling
+import email.policy  # Email policies
+from email import policy
+from email.message import EmailMessage
+from email.parser import BytesParser
 
+# Data Augmentation
+from imblearn.over_sampling import SMOTE  # Handling imbalanced data
 
-# Progress bar
+# Profiling and Job Management
+import cProfile  # Profiling
 from tqdm import tqdm  # Progress bar for loops
+import joblib  # Job management
+from joblib import Parallel, delayed  # Parallel processing
 
-# Transformers library
-# BERT models and training utilities
-from transformers import AdamW, BertForSequenceClassification, BertModel, BertTokenizer, Trainer, TrainingArguments
-from wordcloud import WordCloud  # Generate word clouds
+# Natural Language Toolkit (NLTK)
 from collections import Counter  # Counter class for counting occurrences
 
-import pickle  # Pickle (de)serialization
-import csv
+# TensorFlow and PyTorch
+import tensorflow as tf  # TensorFlow library
+import torch  # PyTorch library
+from torch.utils.data import DataLoader, Dataset  # Data handling in PyTorch
+
+# Hyperparameter Optimization
+import optuna  # Hyperparameter optimization
+from optuna.samplers import TPESampler
+
+# HTML and XML Parsing
+from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning  # HTML and XML parsing
+
+# Spell Checking
+from spellchecker import SpellChecker  # Spell checking
+
+# Transformers Library
+from transformers import (AdamW, BertForSequenceClassification, BertModel, 
+                          BertTokenizer, Trainer, TrainingArguments)  # BERT models and training utilities
+
+# Sparse Matrices
+from scipy.sparse import csr_matrix, hstack  # Sparse matrix operations
+
+# Typing Support
+from typing import Dict, List, Union  # Type hints
 
 # Datasets
 from datasets import load_dataset  # Load datasets
 
-from sklearn.model_selection import learning_curve
 
 # Define the mapping of label values to descriptions
 label_descriptions = {
     0: "Safe",
-    1: "Phishing",
-    2: "Spam"
+    1: "Not Safe"
 }
 
 
@@ -193,7 +174,7 @@ class DatasetProcessor:
     def save_processed_data(self):
         try:
             self.df.to_csv(self.save_path, index=False)
-            logging.info(f"Processed data saved to {self.save_path}")
+            logging.info(f"Processed data saved to {self.save_path}\n")
         except PermissionError as e:
             logging.error(f"Permission denied: {e}")
         except Exception as e:
@@ -210,7 +191,7 @@ class DatasetProcessor:
             self.drop_unnamed_column()
             self.check_and_remove_missing_values()
             self.remove_duplicates()
-            logging.info(f"Total number of rows remaining in the {self.dataset_name}: {self.df.shape[0]}\n")
+            logging.info(f"Total number of rows remaining in the {self.dataset_name}: {self.df.shape[0]}")
             logging.debug(f"{self.dataset_name} after removing duplicates:\n{self.df.head()}\n")
             self.save_processed_data()
 
@@ -307,10 +288,10 @@ class EmailHeaderExtractor:
 
 
 
-    def contains_ip_address(self, text: str) -> bool:
+    def count_ip_addresses(self, text: str) -> int:
         ip_pattern = r'https?://(\d{1,3}\.){3}\d{1,3}'
 
-        return bool(re.search(ip_pattern, text))
+        return len(re.findall(ip_pattern, text))
     
 
 
@@ -342,11 +323,11 @@ class EmailHeaderExtractor:
                     links = self.clean_links(links)
 
 
-                    # Coun blacklisted keywords, http/https, short URLs, and IP addresses in the email body
+                    # Count blacklisted keywords, http/https, short URLs, and IP addresses in the email body
                     https_http_counts = self.count_https_http(body_content)
                     blacklisted_keyword_count = self.contains_blacklisted_keywords(body_content)
                     short_urls = self.detect_url_shorteners(links)
-                    has_ip_address = self.contains_ip_address(body_content)
+                    has_ip_address = self.count_ip_addresses(body_content)
 
 
 
@@ -364,7 +345,7 @@ class EmailHeaderExtractor:
                 except Exception as e:
                     logging.error(f"Error parsing email: {e}")
                     headers_list.append(
-                        {'sender': None, 'receiver': None, 'mailto': None, 'texturls': [], 'blacklisted_keywords_count': 0, 'short_urls': [], 'has_ip_address': False})
+                        {'sender': None, 'receiver': None, 'mailto': None, 'texturls': [], 'blacklisted_keywords_count': 0, 'short_urls': [], 'has_ip_address': 0})
             self.headers_df = pd.DataFrame(headers_list)
 
             return self.headers_df
@@ -384,7 +365,7 @@ class EmailHeaderExtractor:
                     https_http_counts = self.count_https_http(body_content)
                     blacklisted_keyword_count = self.contains_blacklisted_keywords(body_content)
                     short_urls = self.detect_url_shorteners(self.clean_links(re.findall(r'https?:\/\/[^\s\'"()<>]+', body_content)))
-                    has_ip_address = self.contains_ip_address(body_content)
+                    has_ip_address = self.count_ip_addresses(body_content)
 
 
 
@@ -402,7 +383,7 @@ class EmailHeaderExtractor:
                         'http_count': 0,
                         'blacklisted_keywords_count': 0,
                         'short_urls': [],
-                        'has_ip_address': False
+                        'has_ip_address': 0
                     })
             self.headers_df = pd.DataFrame(headers_list)
 
@@ -707,111 +688,6 @@ class BERTFeatureExtractor:
         return features
     
 
-    # Redundant function
-    def save_features(self, features, features_path):
-        logging.info(f"Saving features to {features_path}.")
-        np.save(features_path, features)
-        logging.info(f"Features saved to {features_path}.")
-
-
-    # Redundant function
-    def load_features(self, features_path):
-        logging.info(f"Loading features from {features_path}.")
-        if os.path.exists(features_path):
-            logging.info(f"Loading features from {features_path}.")
-            return np.load(features_path)
-        else:
-            logging.info("Features file not found. Extracting features.")
-
-            return None
-
-
-# Requires update
-def visualize_data(df, df_remove_duplicate):
-    logging.info("Visualizing data...")
-    label_map = {0: 'Safe', 1: 'Phishing', 2: 'Spam'}
-
-
-    # Original DataFrame counts
-    original_label_counts = df['label'].value_counts()
-    original_safe_count = original_label_counts.get(0, 0)
-    original_phishing_count = original_label_counts.get(1, 0)
-    original_spam_count = original_label_counts.get(2, 0)
-    original_total_count = original_safe_count + \
-        original_phishing_count + original_spam_count
-
-
-    # Cleaned DataFrame counts
-    cleaned_label_counts = df_remove_duplicate['label'].value_counts()
-    cleaned_safe_count = cleaned_label_counts.get(0, 0)
-    cleaned_phishing_count = cleaned_label_counts.get(1, 0)
-    cleaned_spam_count = cleaned_label_counts.get(2, 0)
-    cleaned_total_count = cleaned_safe_count + \
-        cleaned_phishing_count + cleaned_spam_count
-    if original_total_count == 0 or cleaned_total_count == 0:
-        logging.warning("No data to visualize.")
-
-        return
-
-
-    # Filter out labels with 0% for original and cleaned data
-    original_data = [(original_safe_count / original_total_count, 'Safe Emails', original_safe_count),
-                     (original_phishing_count / original_total_count,
-                      'Phishing Emails', original_phishing_count),
-                     (original_spam_count / original_total_count, 'Spam Emails', original_spam_count)]
-    original_data = [item for item in original_data if item[0] > 0]
-    cleaned_data = [(cleaned_safe_count / cleaned_total_count, 'Safe Emails', cleaned_safe_count),
-                    (cleaned_phishing_count / cleaned_total_count,
-                     'Phishing Emails', cleaned_phishing_count),
-                    (cleaned_spam_count / cleaned_total_count, 'Spam Emails', cleaned_spam_count)]
-    cleaned_data = [item for item in cleaned_data if item[0] > 0]
-
-
-    # Plot distribution of safe, phishing, and spam emails in the original and cleaned DataFrames
-    fig, axs = plt.subplots(1, 2, figsize=(24, 10))
-
-
-    # Original DataFrame pie chart
-    if original_data:
-        original_sizes, original_labels, original_counts = zip(*original_data)
-        wedges, texts, autotexts = axs[0].pie(original_sizes, labels=original_labels, autopct='%.0f%%', colors=['blue', 'red', 'green'], startangle=140, textprops={'fontsize': 14, 'color': 'black'})
-        axs[0].set_title('Distribution of Safe, Phishing, and Spam Emails (Original)', color='black')
-        for i, autotext in enumerate(autotexts):
-            autotext.set_text(f'{autotext.get_text()}\n({original_counts[i]})')
-
-
-    # Cleaned DataFrame pie chart
-    if cleaned_data:
-        cleaned_sizes, cleaned_labels, cleaned_counts = zip(*cleaned_data)
-        wedges, texts, autotexts = axs[1].pie(cleaned_sizes, labels=cleaned_labels, autopct='%.0f%%', colors=['blue', 'red', 'green'], startangle=140, textprops={'fontsize': 14, 'color': 'black'})
-        axs[1].set_title('Distribution of Safe, Phishing, and Spam Emails (After Removing Duplicates)', color='black')
-        for i, autotext in enumerate(autotexts):
-            autotext.set_text(f'{autotext.get_text()}\n({cleaned_counts[i]})')
-    plt.show()
-
-
-    # Plot count of safe, phishing, and spam emails in the original and cleaned DataFrames side by side
-    fig, ax = plt.subplots(figsize=(10, 6))
-    bar_width = 0.25
-    index = np.arange(3)
-    bar1 = ax.bar(index, [original_safe_count, original_phishing_count,
-                  original_spam_count], bar_width, label='Original', color='blue')
-    bar2 = ax.bar(index + bar_width, [cleaned_safe_count, cleaned_phishing_count,
-                  cleaned_spam_count], bar_width, label='Removed Duplicate', color='red')
-    ax.set_xlabel('Label Type', color='black')
-    ax.set_ylabel('Count', color='black')
-    ax.set_title('Safe vs Phishing vs Spam Email Count (Original vs Remove Duplicates)', color='black')
-    ax.set_xticks(index + bar_width / 2)
-    ax.set_xticklabels(['Safe', 'Phishing', 'Spam'], color='black')
-    ax.legend()
-    for p in bar1 + bar2:
-        height = p.get_height()
-        if height > 0:
-            ax.annotate(f'{height}', (p.get_x() + p.get_width() / 2., height),
-                        ha='center', va='center', xytext=(0, 5), textcoords='offset points', color='black')
-    plt.show()
-
-
 
 def data_cleaning(dataset_name, df_processed, text_column, clean_file):
     logging.info(f"Text processing {dataset_name} dataset...")
@@ -819,42 +695,14 @@ def data_cleaning(dataset_name, df_processed, text_column, clean_file):
     df_clean = processor.transform(df_processed[text_column], df_processed['label'])
     processor.save_to_csv_cleaned(df_clean, clean_file)
     logging.info("Text processing and saving completed.")
-    logging.info(f"DataFrame columns after data cleaning: {df_clean.columns}")
+    #logging.info(f"DataFrame columns after data cleaning: {df_clean.columns}")
 
     return df_clean
 
 
-# Requires update
-def plot_word_cloud(text_list, title, width=1500, height=1000, background_color='white', max_words=300, stopwords=None, colormap='viridis', save_to_file=None):
-    try:
-        logging.info(f"Generating word cloud for {title}...")
-
-
-        # Ensure text_list is not empty
-        if text_list.empty:
-            raise ValueError("text_list is empty. Cannot generate word cloud.")
-
-
-        # Initialize stopwords if None
-        if stopwords is None:
-            stopwords = set()
-        unique_string = " ".join(text_list)
-        wordcloud = WordCloud(width=width, height=height, background_color=background_color, max_words=max_words, stopwords=stopwords, colormap=colormap).generate(unique_string)
-        plt.figure(figsize=(15, 8))
-        plt.imshow(wordcloud, interpolation='bilinear')
-        plt.axis("off")
-        plt.title(title, fontsize=20)
-        plt.show()
-        if save_to_file:
-            wordcloud.to_file(save_to_file)
-            logging.info(f"Word cloud saved to {save_to_file}")
-    except Exception as e:
-        logging.error(f"An error occurred: {e}")
-
-
 
 def load_or_clean_data(dataset_name, df, text_column, file_path, cleaning_function):
-    logging.info(f"Loading or cleaning data...")
+    #logging.info(f"Loading or cleaning data...")
     if os.path.exists(file_path):
         logging.info(f"File {file_path} already exists. Loading from file.")
         df_clean = pd.read_csv(file_path)
@@ -898,130 +746,6 @@ def load_or_extract_headers(df: pd.DataFrame, file_path: str, extractor_class, d
         
         return headers_df
     
-
-# Redundant function
-def extract_features_for_fold(X_train, X_test, fold_idx, feature_column='cleaned_text', feature_path_prefix="Extracted Body Features"):
-    feature_extractor = BERTFeatureExtractor()
-    train_texts = X_train[feature_column].tolist()
-    test_texts = X_test[feature_column].tolist()
-    
-
-    # Define paths for saving features
-    if not os.path.exists(feature_path_prefix):
-        os.makedirs(feature_path_prefix)
-    train_features_path = os.path.join(feature_path_prefix, f"fold_{fold_idx}_train_features.npy")
-    test_features_path = os.path.join(feature_path_prefix, f"fold_{fold_idx}_test_features.npy")
-    
-
-    # Extract and save features if not already saved
-    if not os.path.exists(train_features_path):
-        logging.info(f"Extracting BERT features for Fold {fold_idx} - Training data...")
-        train_features = feature_extractor.extract_features(train_texts)
-        np.save(train_features_path, train_features)
-        logging.info(f"Saved train features for Fold {fold_idx} to {train_features_path}.")
-    else:
-        logging.info(f"Loading saved train features for Fold {fold_idx} from {train_features_path}.")
-        train_features = np.load(train_features_path)
-    if not os.path.exists(test_features_path):
-        logging.info(f"Extracting BERT features for Fold {fold_idx} - Test data...")
-        test_features = feature_extractor.extract_features(test_texts)
-        np.save(test_features_path, test_features)
-        logging.info(f"Saved test features for Fold {fold_idx} to {test_features_path}.")
-    else:
-        logging.info(f"Loading saved test features for Fold {fold_idx} from {test_features_path}.")
-        test_features = np.load(test_features_path)
-    return train_features, test_features
-
-
-# Redundant function
-def extract_features_with_column_transformer(X_train, X_test, categorical_columns, numerical_columns, fold_idx, feature_path_prefix="Extracted Other Features"):
-    if not os.path.exists(feature_path_prefix):
-        os.makedirs(feature_path_prefix)
-    train_features_path = os.path.join(feature_path_prefix, f"fold_{fold_idx}_train_encoded.npy")
-    test_features_path = os.path.join(feature_path_prefix, f"fold_{fold_idx}_test_encoded.npy")
-
-    # Create the ColumnTransformer for preprocessing
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('cat', OneHotEncoder(sparse_output=False, handle_unknown='ignore'), categorical_columns),
-            ('num', StandardScaler(), numerical_columns)  # Apply scaling to numerical columns
-        ],
-        remainder='passthrough'  # This will keep other columns as they are
-    )
-
-    # Check if features are already saved
-    if not os.path.exists(train_features_path):
-        logging.info(f"Preprocessing features for Fold {fold_idx} - Training data...")
-        X_train_encoded = preprocessor.fit_transform(X_train)
-        np.save(train_features_path, X_train_encoded)
-        logging.info(f"Saved train features for Fold {fold_idx} to {train_features_path}.")
-    else:
-        logging.info(f"Loading saved train features for Fold {fold_idx} from {train_features_path}.")
-        X_train_encoded = np.load(train_features_path, allow_pickle=True)
-    if not os.path.exists(test_features_path):
-        logging.info(f"Preprocessing features for Fold {fold_idx} - Test data...")
-        X_test_encoded = preprocessor.transform(X_test)
-        np.save(test_features_path, X_test_encoded)
-        logging.info(f"Saved test features for Fold {fold_idx} to {test_features_path}.")
-    else:
-        logging.info(f"Loading saved test features for Fold {fold_idx} from {test_features_path}.")
-        X_test_encoded = np.load(test_features_path, allow_pickle=True)
-    return X_train_encoded, X_test_encoded
-
-
-# Redundant function
-def combine_features_and_labels(bert_train_features, other_train_features, bert_test_features, other_test_features, y_train, y_test, fold_idx, combined_features_path_prefix="Combined Features"):
-    # Convert features to NumPy arrays
-    bert_train_features = np.array(bert_train_features)
-    other_train_features = np.array(other_train_features)
-    bert_test_features = np.array(bert_test_features)
-    other_test_features = np.array(other_test_features)
-    
-    # Convert labels to NumPy arrays and reshape them
-    y_train = np.array(y_train).reshape(-1, 1)
-    y_test = np.array(y_test).reshape(-1, 1)
-    
-    # Define paths for saving combined features and labels
-    if not os.path.exists(combined_features_path_prefix):
-        os.makedirs(combined_features_path_prefix)
-    combined_train_features_path = os.path.join(combined_features_path_prefix, f"fold_{fold_idx}_combined_train_features.npy")
-    combined_test_features_path = os.path.join(combined_features_path_prefix, f"fold_{fold_idx}_combined_test_features.npy")
-    
-    # Check if combined features and labels are already saved
-    if not os.path.exists(combined_train_features_path):
-        # Combine features (horizontal stack) if not already saved
-        logging.info(f"Combining features and labels for Fold {fold_idx} - Training data...")
-        combined_train_features = np.hstack((bert_train_features, other_train_features))
-        combined_test_features = np.hstack((bert_test_features, other_test_features))
-        combined_train = np.hstack((combined_train_features, y_train))
-        combined_test = np.hstack((combined_test_features, y_test))
-        
-        # Save the combined features and labels
-        np.save(combined_train_features_path, combined_train)
-        logging.info(f"Saved combined train features and labels for Fold {fold_idx} to {combined_train_features_path}.")
-    else:
-        logging.info(f"Loading saved combined train features and labels for Fold {fold_idx} from {combined_train_features_path}.")
-        combined_train = np.load(combined_train_features_path, allow_pickle=True)
-        if combined_train is None:
-            raise ValueError(f"Loaded data from {combined_train_features_path} is None.")
-    
-    if not os.path.exists(combined_test_features_path):
-        # Combine features (horizontal stack) if not already saved
-        logging.info(f"Combining features and labels for Fold {fold_idx} - Test data...")
-        combined_train_features = np.hstack((bert_test_features, other_test_features))
-        combined_test = np.hstack((combined_test_features, y_test))
-        
-        # Save the combined features and labels
-        np.save(combined_test_features_path, combined_test)
-        logging.info(f"Saved combined test features and labels for Fold {fold_idx} to {combined_test_features_path}.")
-    else:
-        logging.info(f"Loading saved combined test features and labels for Fold {fold_idx} from {combined_test_features_path}.")
-        combined_test = np.load(combined_test_features_path, allow_pickle=True)
-        if combined_test is None:
-            raise ValueError(f"Loaded data from {combined_test_features_path} is None.")
-    
-    return combined_train, combined_test
-
 
 
 def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='Data Splitting'):
@@ -1073,23 +797,6 @@ def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='Data Sp
     return folds
 
 
-# Redundant function
-def pca_incremental(X_train, y_train, n_components=40, batch_size=1000):
-    logging.info("Scaling features...")
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    logging.info(f"Shape of scaled data: {X_train_scaled.shape}")
-    logging.info("Applying Incremental PCA...")
-    ipca = IncrementalPCA(n_components=n_components, batch_size=batch_size)
-    for batch in range(0, X_train_scaled.shape[0], batch_size):
-        X_batch = X_train_scaled[batch:batch + batch_size]
-        ipca.partial_fit(X_batch)
-    X_train_pca = ipca.transform(X_train_scaled)
-    logging.info(f"Shape of PCA-transformed data: {X_train_pca.shape}")
-
-    return X_train_pca, y_train
-
-
 
 def smote(X_train, y_train, random_state=42):
     smote = SMOTE(random_state=random_state)
@@ -1130,9 +837,13 @@ def load_or_save_params(params, params_path, action='load'):
 
 
 def model_training(X_train, y_train, X_test, y_test, model_path, params_path):
-    # Check if ensemble model and parameters exist
-    ensemble_model = load_or_save_model(None, model_path, action='load')
-    best_params = load_or_save_params(None, params_path, action='load')
+    try:
+        ensemble_model = load_or_save_model(None, model_path, action='load')
+        best_params = load_or_save_params(None, params_path, action='load')
+    except Exception as e:
+        logging.error(f"Error loading model or parameters: {e}")
+        ensemble_model = None
+        best_params = None
 
 
     # Train a new model if no existing model or parameters are found
@@ -1158,7 +869,7 @@ def model_training(X_train, y_train, X_test, y_test, model_path, params_path):
     # Evaluate the model
     train_accuracy = accuracy_score(y_train, y_train_pred)
     test_accuracy = accuracy_score(y_test, y_test_pred)
-    target_names = ['Safe', 'Phishing', 'Spam']
+    target_names = ['Safe', 'Not Safe']
 
 
     # Print the performance metrics
@@ -1175,33 +886,36 @@ def model_training(X_train, y_train, X_test, y_test, model_path, params_path):
 def conduct_optuna_study(X_train, y_train):
     best_params = {}
 
-    # Define the objective function for XGBoost
+
+    # Optimize XGBoost parameters
     def xgb_objective(trial):
         n_estimators_xgb = trial.suggest_int('n_estimators_xgb', 50, 100)
         max_depth_xgb = trial.suggest_int('max_depth_xgb', 3, 10)
         learning_rate_xgb = trial.suggest_float('learning_rate_xgb', 0.01, 0.3)
+        reg_alpha = trial.suggest_float('reg_alpha', 0.0, 10.0)  # Increase the range for stronger L1 regularization
+        reg_lambda = trial.suggest_float('reg_lambda', 0.0, 10.0)  # Increase the range for stronger L2 regularization
 
         model = XGBClassifier(
             n_estimators=n_estimators_xgb,
             max_depth=max_depth_xgb,
             learning_rate=learning_rate_xgb,
+            reg_alpha=reg_alpha,  # L1
+            reg_lambda=reg_lambda,  # L2
             random_state=42,
             eval_metric='logloss'
         )
-
         model.fit(X_train, y_train)
         y_train_pred = model.predict(X_train)
         return accuracy_score(y_train, y_train_pred)
+
 
     # Optimize XGBoost parameters
     xgb_study = optuna.create_study(direction='maximize', sampler=TPESampler())
     xgb_study.optimize(xgb_objective, n_trials=5)
     best_params['xgb'] = xgb_study.best_params
-
-    # Define the objective function for SVM
     def svm_objective(trial):
         try:
-            C_svm = trial.suggest_float('C_svm', 0.1, 10.0)
+            C_svm = trial.suggest_float('C_svm', 0.1, 1.0)  # Regularization parameter for SVM
             kernel_svm = trial.suggest_categorical('kernel_svm', ['linear', 'rbf', 'poly'])
 
             model = SVC(
@@ -1218,15 +932,36 @@ def conduct_optuna_study(X_train, y_train):
             logging.error(f"Error in SVM objective function: {e}")
             return 0  # Return a low score if there's an error
 
+
     # Optimize SVM parameters
     svm_study = optuna.create_study(direction='maximize', sampler=TPESampler())
     svm_study.optimize(svm_objective, n_trials=5)
     best_params['svm'] = svm_study.best_params
+    def logreg_objective(trial):
+        try:
+            C_logreg = trial.suggest_float('C_logreg', 0.0001, 1.0)  # Set a lower upper bound for stronger regularization
+            penalty = trial.suggest_categorical('penalty', ['l1', 'l2'])  # Regularization type
 
-    # Define the meta model parameters for Logistic Regression
-    best_params['logreg'] = {'C_logreg': 1.0}  # Example, set as needed
+            model = LogisticRegression(
+                C=C_logreg,
+                penalty=penalty,
+                solver='saga' if penalty == 'l1' else 'lbfgs',  # saga for L1, lbfgs for L2
+                class_weight='balanced',
+                random_state=42,
+                max_iter=1000
+            )
+            model.fit(X_train, y_train)
+            y_train_pred = model.predict(X_train)
+            return accuracy_score(y_train, y_train_pred)
+        except Exception as e:
+            logging.error(f"Error in Logistic Regression objective function: {e}")
+            return 0  # Return a low score if there's an error
 
-    logging.info(f"Best hyperparameters: {best_params}")
+    # Optimize Logistic Regression parameters
+    logreg_study = optuna.create_study(direction='maximize', sampler=TPESampler())
+    logreg_study.optimize(logreg_objective, n_trials=5)
+    best_params['logreg'] = logreg_study.best_params
+
     return best_params
 
 
@@ -1237,38 +972,58 @@ def load_optuna_model(path):
 
 
 def train_ensemble_model(best_params, X_train, y_train, model_path):
-    logging.info(f"Training new ensemble model with best parameters: {best_params}")
+    logging.info(f"Training new ensemble model with best parameters")
 
+
+    # XGBoost model with increased L1 and L2 regularization
     xgb_model = XGBClassifier(
         n_estimators=best_params['xgb']['n_estimators_xgb'],
         max_depth=best_params['xgb']['max_depth_xgb'],
         learning_rate=best_params['xgb']['learning_rate_xgb'],
+        reg_alpha=best_params['xgb'].get('reg_alpha', 0.0),  # L1 regularization (default 0.0)
+        reg_lambda=best_params['xgb'].get('reg_lambda', 1.0),  # L2 regularization (default 1.0)
         random_state=42,
         n_jobs=2
     )
 
+
+    # SVM model (regularization is already handled via C parameter)
     svm_model = SVC(
-        C=best_params['svm']['C_svm'],
+        C=best_params['svm']['C_svm'],  # Regularization strength for SVM (higher C = less regularization)
         kernel=best_params['svm']['kernel_svm'],
         probability=True,
         class_weight='balanced',
         random_state=42
     )
 
+
+    # Logistic Regression with increased regularization strength
+    penalty = best_params['logreg'].get('penalty', 'l2')  # L1 or L2 penalty
+    solver = 'saga' if penalty == 'l1' else 'lbfgs'  # Use 'saga' for L1, 'lbfgs' for L2
+
+
+    # Stronger regularization by reducing the C parameter (higher C = weaker regularization)
     meta_model = LogisticRegression(
-        C=best_params['logreg']['C_logreg'],
+        C=best_params['logreg']['C_logreg'],  # Regularization strength (smaller C = stronger regularization)
+        penalty=penalty,
         class_weight='balanced',
-        random_state=42
+        random_state=42,
+        solver=solver,
+        max_iter=1000
     )
 
+
+    # Stacking ensemble with XGBoost, SVM, and Logistic Regression as the meta-model
     stacking_model = StackingClassifier(
         estimators=[('xgb', xgb_model), ('svm', svm_model)],
         final_estimator=meta_model
     )
 
+
     # Train the ensemble model
     for _ in tqdm(range(1), desc="Training ensemble model"):
         stacking_model.fit(X_train, y_train)
+
 
     # Save the ensemble model
     joblib.dump(stacking_model, model_path)
@@ -1322,11 +1077,8 @@ def check_missing_values(df, df_name, num_rows=1):
 
 
 
-def plot_learning_curve(estimator, X, y, title="Learning Curve", ylim=None, cv=None, n_jobs=3, train_sizes=np.linspace(0.1, 1.0, 3)):
-    # Setup logging
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
-    logger.info("Starting the plot_learning_curve function.")
+def plot_learning_curve(estimator, X, y, title="Learning Curve", ylim=None, cv=6, n_jobs=4, train_sizes=np.linspace(0.1, 1.0, 6)):
+    logging.info("Starting the plot_learning_curve function.")
     
 
 
@@ -1340,9 +1092,9 @@ def plot_learning_curve(estimator, X, y, title="Learning Curve", ylim=None, cv=N
 
 
     try:
-        logger.info("Calling sklearn's learning_curve function.")
+        logging.info("Calling sklearn's learning_curve function.")
         train_sizes, train_scores, valid_scores = learning_curve(estimator, X, y, train_sizes=train_sizes, cv=cv, n_jobs=n_jobs)
-        logger.info("learning_curve function executed successfully.")
+        logging.info("learning_curve function executed successfully.")
         
 
         # Plot the learning curves
@@ -1350,11 +1102,11 @@ def plot_learning_curve(estimator, X, y, title="Learning Curve", ylim=None, cv=N
         plt.plot(train_sizes, valid_scores.mean(axis=1), 'o-', color='g', label='Validation score')
         plt.legend(loc='best')
         plt.grid()
-        logger.info("Plotting the learning curve.")
+        logging.info("Plotting the learning curve.")
         plt.show()
-        logger.info("Learning curve plot displayed successfully.\n")
+        logging.info("Learning curve plot displayed successfully.\n")
     except Exception as e:
-        logger.error(f"An error occurred while plotting the learning curve: {e}")
+        logging.error(f"An error occurred while plotting the learning curve: {e}")
 
 
 
@@ -1393,7 +1145,7 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
     # Check if the files already exist
     if not all([os.path.exists(train_data_path), os.path.exists(test_data_path), os.path.exists(train_labels_path), os.path.exists(test_labels_path), os.path.exists(preprocessor_path)]):
         logging.info(f"Running pipeline for fold {fold_idx}...")
-
+        logging.info(f"Initial shape of X_train: {X_train.shape}")
 
         # Fit and transform the pipeline
         logging.info(f"Processing non-text features for fold {fold_idx}...")
@@ -1402,14 +1154,22 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
 
 
         # Fit the preprocessor
+        logging.info(f"Fitting the preprocessor for fold {fold_idx}...")
         preprocessor = pipeline.named_steps['preprocessor']
         X_train_non_text_processed = preprocessor.fit_transform(X_train_non_text)
         X_test_non_text_processed = preprocessor.transform(X_test_non_text)
+        feature_names = preprocessor.named_transformers_['cat'].named_steps['encoder'].get_feature_names_out()
+        logging.info(f"Columns in X_train after processing non-text features: {X_train_non_text_processed.shape}")
+        logging.info(f"Feature names: {feature_names}")
+        if X_train_non_text_processed.shape[0] != y_train.shape[0]:
+            logging.error(f"Row mismatch: {X_train_non_text_processed.shape[0]} vs {y_train.shape[0]}")
+        logging.info(f"Non text features processed for fold {fold_idx}.\n")
 
 
         # Save the preprocessor
+        logging.info(f"Saving preprocessor for fold {fold_idx}...")
         joblib.dump(preprocessor, preprocessor_path)
-        logging.info(f"Saved preprocessor to {preprocessor_path}")
+        logging.info(f"Saved preprocessor to {preprocessor_path}\n")
 
 
         # Transform the text features
@@ -1417,12 +1177,16 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         X_train_text_processed = pipeline.named_steps['bert_features'].transform(X_train['cleaned_text'].tolist())
         logging.info(f"Extracting BERT features for X_test for {fold_idx}...")
         X_test_text_processed = pipeline.named_steps['bert_features'].transform(X_test['cleaned_text'].tolist())
+        logging.info(f"Number of features extracted from BERT for fold {fold_idx}: {X_train_text_processed.shape}")
+        logging.info(f"Bert features extracted for fold {fold_idx}.\n")
 
 
         # Combine processed features
         logging.info(f"Combining processed features for fold {fold_idx}...")
         X_train_combined = np.hstack([X_train_non_text_processed, X_train_text_processed])
         X_test_combined = np.hstack([X_test_non_text_processed, X_test_text_processed])
+        logging.info(f"Total number of combined features for fold {fold_idx}: {X_train_combined.shape}")
+        logging.info(f"Combined processed features for fold {fold_idx}.\n")
 
 
 
@@ -1430,6 +1194,7 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         logging.info(f"Applying SMOTE to balance the training data for fold {fold_idx}...")
         X_train_balanced, y_train_balanced = pipeline.named_steps['smote'].fit_resample(X_train_combined, y_train)
         logging.info(f"Class distribution after SMOTE for fold {fold_idx}: {Counter(y_train_balanced)}")
+        logging.info(f"SMOTE applied for fold {fold_idx}.\n")
 
 
 
@@ -1452,6 +1217,7 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         # Load the preprocessor
         logging.info(f"Loading preprocessor from {preprocessor_path}...")
         preprocessor = joblib.load(preprocessor_path)
+
 
         # Load the preprocessed data
         logging.info(f"Loading preprocessed data for fold {fold_idx}...")
@@ -1489,7 +1255,7 @@ def process_and_save_emails(df, output_file):
 
 def load_or_save_emails(df, output_file, df_name = 'CEAS_08'):
     if os.path.exists(output_file):
-        logging.info(f"Output file {output_file} already exists. Loading data from {output_file}...")
+        logging.info(f"Output file {output_file} already exists. Loading data from {output_file}...\n")
         df_cleaned = pd.read_csv(output_file)
     else:
         logging.info(f"Output file {output_file} does not exist. Loading data from {df_name}...")
@@ -1502,10 +1268,39 @@ def load_or_save_emails(df, output_file, df_name = 'CEAS_08'):
     return df_cleaned
 
 
+
+class RareCategoryRemover(BaseEstimator, TransformerMixin):
+    def __init__(self, threshold=0.05):
+        self.threshold = threshold
+        self.replacements_ = {}
+
+
+
+    def fit(self, X, y=None):
+        logging.info(f"Removing rare categories with threshold: {self.threshold}")
+        for column in X.columns:
+            frequency = X[column].value_counts(normalize=True)
+            rare_categories = frequency[frequency < self.threshold].index
+            self.replacements_[column] = {cat: 'Other' for cat in rare_categories}
+
+        return self
+
+
+
+    def transform(self, X):
+        for column, replacements in self.replacements_.items():
+            X.loc[:, column] = X[column].replace(replacements)
+        assert X.shape[0] == X.shape[0], "Row count changed during rare category removal."
+
+        return X
+    
+
 # Main processing function
 def main():
     # Use relative paths to access the datasets and save the extracted data
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    with open('config.json', 'r') as config_file:
+        config = json.load(config_file)
+    base_dir = config['base_dir']
     dataset = os.path.join(base_dir, 'CEAS_08.csv')
     PreprocessedSpamAssassinFile = os.path.join(base_dir, 'Data Preprocessing', 'PreprocessedSpamAssassin.csv')
     PreprocessedCEASFile = os.path.join(base_dir, 'Data Preprocessing', 'PreprocessedCEAS_08.csv')
@@ -1518,16 +1313,6 @@ def main():
     CleanedCEASHeaders = os.path.join(base_dir, 'Data Cleaning', 'CleanedCEASHeaders.csv')
     MergedCleanedCEASHeaders = os.path.join(base_dir, 'Data Cleaning', 'MergedCleanedCEASHeaders.csv')
     MergedCleanedDataFrame = os.path.join(base_dir, 'Data Cleaning', 'MergedCleanedDataFrame.csv')
-    
-
-    SavedModel = os.path.join(base_dir, 'Model & Parameters', 'EnsembleModel.pkl')
-    SavedParameters = os.path.join(base_dir, 'Model & Parameters', 'BestParameters.json')
-    #BertFeatures = os.path.join(base_dir, 'Extracted Features')
-    #CleanedCeasFile = os.path.join(base_dir, 'Extracted Data', 'CleanedCEAS_08Text.csv')
-    #CleanedSpamAssassinFile = os.path.join(base_dir, 'Extracted Data', 'CleanedSpamAssassinText.csv')
-    #MergedHeaderDataset = os.path.join(base_dir, 'Extracted Data', 'MergedHeaderDataset.csv')
-    #CEASExtractedFeatures = os.path.join(base_dir, 'Extracted Features', 'CEASExtractedBertFeatures.npy')
-    #SpamAssassinExtractedFeatures = os.path.join(base_dir, 'Extracted Features', 'SpamAssassinExtractedBertFeatures.npy')
 
 
     # Load the datasets
@@ -1546,7 +1331,7 @@ def main():
 
 
         # Change label values to match the labeling scheme
-        df_spamassassin['label'] = df_spamassassin['label'].map({1: 0, 0: 2})
+        df_spamassassin['label'] = df_spamassassin['label'].map({1: 0, 0: 1})
 
 
         # Remove duplicates and missing values
@@ -1600,8 +1385,7 @@ def main():
         logging.info(f"Beginning Data Cleaning of CEAS_08 ['sender', 'receiver']...")
         df_cleaned_ceas_headers = load_or_save_emails(df_processed_ceas, CleanedCEASHeaders)
         # Columns in cleaned ceas email headers: ['sender', 'receiver']
-        logging.info(f"Data Cleaning of CEAS_08 ['sender', 'receiver'] completed.")
-
+        
 
 
         logging.info(f"Begining merging of Cleaned Headers of CEAS_08 with Processed CEAS_08...")
@@ -1613,7 +1397,7 @@ def main():
             logging.info(f"Columns in df_cleaned_ceas_headers: {df_cleaned_ceas_headers.columns.tolist()}")
             logging.info(f"Columns in df_processed_ceas: {df_processed_ceas.columns.tolist()}")
             df_cleaned_ceas_headers_merge = pd.concat([df_cleaned_ceas_headers.reset_index(drop=True), df_processed_ceas.reset_index(drop=True)], axis=1)
-            df_cleaned_ceas_headers_merge.fillna({'sender': 'unknown', 'receiver': 'unknown'}, inplace=True)
+            #df_cleaned_ceas_headers_merge.fillna({'sender': 'unknown', 'receiver': 'unknown'}, inplace=True)
             missing_in_cleaned_ceas_header_merged = df_cleaned_ceas_headers_merge[(df_cleaned_ceas_headers_merge['sender'].isnull()) | (df_cleaned_ceas_headers_merge['receiver'].isnull())]
             logging.info(f"Number of missing rows in Merged Cleaned Headers of CEAS_08 DataFrame: {len(missing_in_cleaned_ceas_header_merged)}")
             logging.info(f'Total rows in Processed CEAS_08 Dataframe: {len(df_processed_ceas)}')
@@ -1624,11 +1408,8 @@ def main():
         else:
             logging.info("The number of rows in the Merged Cleaned Headers of CEAS_08 DataFrame matches Processed CEAS_08.")
             df_cleaned_ceas_headers_merge.to_csv(MergedCleanedCEASHeaders, index=False)
-            logging.info(f"Merged Cleaned Headers of CEAS_08 DataFrame successfully saved to {MergedCleanedCEASHeaders}\n")
-
-
-
-            log_label_percentages(df_cleaned_ceas_headers_merge, 'Merged Cleaned Headers of CEAS_08')
+            logging.info(f"Merged Cleaned Headers of CEAS_08 DataFrame successfully saved to {MergedCleanedCEASHeaders}")
+        logging.info(f"Data Cleaning of CEAS_08 ['sender', 'receiver'] completed.\n")
 
 
 
@@ -1643,7 +1424,7 @@ def main():
         logging.info(f"Merging Processed Spam Assassin and Spam Assassin Header Dataframes...")
         df_processed_spamassassin.reset_index(inplace=True)
         spamassassin_headers_df.reset_index(inplace=True)
-        spamassassin_headers_df.fillna({'sender': 'unknown', 'receiver': 'unknown'}, inplace=True)
+        #spamassassin_headers_df.fillna({'sender': 'unknown', 'receiver': 'unknown'}, inplace=True)
         if len(df_processed_spamassassin) == len(spamassassin_headers_df):
             merged_spamassassin_df = pd.merge(df_processed_spamassassin, spamassassin_headers_df, on='index', how='left')
             merged_spamassassin_df = merged_spamassassin_df.rename(columns={'text': 'body'})
@@ -1743,7 +1524,7 @@ def main():
         #       Data Cleaning       #
         # ************************* #
 
-        logging.info(f"Beginning Data Cleaning...")
+        logging.info(f"Beginning Data Cleaning ['body']...")
         df_clean_body = load_or_clean_data('Merged Dataframe', combined_df, 'body', CleanedDataFrame, data_cleaning)
 
 
@@ -1781,12 +1562,7 @@ def main():
 
 
         # Final columns to keep
-        df_cleaned_combined = df_cleaned_combined[['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'cleaned_text', 'label']]
-        logging.info(f"Final combined DataFrame has {len(df_cleaned_combined)} rows and columns: {df_cleaned_combined.columns.tolist()}")
-        
-        
-        
-        
+        df_cleaned_combined = df_cleaned_combined[['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'cleaned_text', 'label']]    
         df_cleaned_combined.to_csv(MergedCleanedDataFrame, index=False)
         logging.info(f"Data Cleaning completed.\n")
 
@@ -1805,6 +1581,8 @@ def main():
         fold_test_accuracies = []
         learning_curve_data = []
 
+
+
         for fold_idx, (X_train, X_test, y_train, y_test) in enumerate(folds, start=1):
             # ************************************************************ #
             #       Feature Extraction and Data Imbalance Handling         #
@@ -1813,8 +1591,8 @@ def main():
             logging.info(f"Beginning Feature Extraction for Fold {fold_idx}...")
 
             # Define columns for categorical, numerical, and text data
-            categorical_columns = ['sender', 'receiver', 'has_ip_address']
-            numerical_columns = ['https_count', 'http_count', 'blacklisted_keywords_count', 'urls', 'short_urls']
+            categorical_columns = ['sender', 'receiver']
+            numerical_columns = ['https_count', 'http_count', 'blacklisted_keywords_count', 'urls', 'short_urls', 'has_ip_address']
             text_column = 'cleaned_text'
 
 
@@ -1827,16 +1605,18 @@ def main():
             preprocessor = ColumnTransformer(
                 transformers=[
                     ('cat', Pipeline([
-                        ('imputer', SimpleImputer(strategy='most_frequent')),  # Fill missing categorical values with the most frequent
+                        ('rare_cat_remover', RareCategoryRemover(threshold=0.05)),  # Remove rare categories
+                        ('imputer', SimpleImputer(strategy='most_frequent')),  # Fill missing categorical values
                         ('encoder', OneHotEncoder(sparse_output=False, handle_unknown='ignore'))
                     ]), categorical_columns),
                     ('num', Pipeline([
-                        ('imputer', SimpleImputer(strategy='mean')),  # Fill missing numerical values with the mean
+                        ('imputer', SimpleImputer(strategy='mean')),  # Fill missing numerical values
                         ('scaler', StandardScaler())
                     ]), numerical_columns)
                 ],
                 remainder='passthrough'  # Keep other columns unchanged, like 'cleaned_text' and 'label'
             )
+
 
             
             # Define pipeline with preprocessor, BERT, and SMOTE
@@ -1844,7 +1624,7 @@ def main():
                 ('preprocessor', preprocessor),
                 ('bert_features', bert_transformer),  # Custom transformer for BERT
                 ('smote', SMOTE(random_state=42)),  # Apply SMOTE after feature extraction
-                ('pca', PCA(n_components=25))
+                ('pca', PCA(n_components=10))
             ])
 
 
@@ -1857,14 +1637,13 @@ def main():
                 y_test=y_test,
                 pipeline=pipeline,
             )
-            logging.info(f"Data for Fold {fold_idx} has been processed or loaded successfully.")
-
-            
+            logging.info(f"Data for Fold {fold_idx} has been processed or loaded successfully.\n")
 
             # ***************************************** #
             #       Model Training and Evaluation       #
             # ***************************************** #
 
+            logging.info(f"Beginning Model Training and Evaluation for Fold {fold_idx}...")
             # Train the model and evaluate the performance for each fold
             model_path = os.path.join(base_dir, 'Models & Parameters', f'ensemble_model_fold_{fold_idx}.pkl')
             params_path = os.path.join(base_dir, 'Models & Parameters', f'best_params_fold_{fold_idx}.json')
@@ -1879,12 +1658,14 @@ def main():
             fold_test_accuracies.append(test_accuracy)
             logging.info(f"Data for Fold {fold_idx} has been processed, model trained, and evaluated.\n")
 
+
             # Store learning curve data for later plotting
             learning_curve_data.append((X_train_balanced, y_train_balanced, ensemble_model, fold_idx))
 
-            # ***************************************** #
-            #       Plot Learning Curves                 #
-            # ***************************************** #
+
+            # ********************************* #
+            #       Plot Learning Curves        #
+            # ********************************* #
 
             for X_train, y_train, ensemble_model, fold_idx in learning_curve_data:
                 plot_learning_curve(
@@ -1892,10 +1673,9 @@ def main():
                     X=X_train,
                     y=y_train,
                     title=f"Learning Curve for Fold {fold_idx}",
-                    train_sizes=np.linspace(0.1, 1.0, 3),
-                    cv=3
+                    train_sizes=np.linspace(0.1, 1.0, 6),
+                    cv=6
                 )
-            
         logging.info(f"Training and evaluation completed for all folds.\n")
         # Calculate and log the overall test accuracy
         mean_test_accuracy = np.mean(fold_test_accuracies)
