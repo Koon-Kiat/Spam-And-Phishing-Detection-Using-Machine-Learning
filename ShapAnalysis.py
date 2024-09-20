@@ -12,11 +12,44 @@ from tqdm import tqdm
 from sklearn.utils import shuffle
 import time
 import matplotlib.pyplot as plt
+from sklearn.base import BaseEstimator, TransformerMixin
 
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s ', level=logging.INFO)
 
+
+
+class RareCategoryRemover(BaseEstimator, TransformerMixin):
+    def __init__(self, threshold=0.05):
+        self.threshold = threshold
+        self.replacements_ = {}
+
+
+
+    def fit(self, X, y=None):
+        logging.info(f"Removing rare categories with threshold: {self.threshold}")
+        for column in X.columns:
+            frequency = X[column].value_counts(normalize=True)
+            rare_categories = frequency[frequency < self.threshold].index
+            self.replacements_[column] = {cat: 'Other' for cat in rare_categories}
+
+        return self
+
+
+
+    def transform(self, X):
+        for column, replacements in self.replacements_.items():
+            X.loc[:, column] = X[column].replace(replacements)
+        assert X.shape[0] == X.shape[0], "Row count changed during rare category removal."
+
+        return X
+    
+
+
+    def get_feature_names_out(self, input_features=None):
+        return input_features if input_features is not None else list(self.replacements_.keys())
+    
 
 # Define paths to models, data, and feature names
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,23 +62,24 @@ preprocessor_path = [os.path.join(base_dir, 'Feature Extraction', f'fold_{i+1}_p
 
 
 # Define column names
-categorical_columns = ['sender', 'receiver', 'has_ip_address']
-numerical_columns = ['https_count', 'http_count', 'blacklisted_keywords_count', 'urls', 'short_urls']
+categorical_columns = ['sender', 'receiver']
+numerical_columns = ['https_count', 'http_count', 'blacklisted_keywords_count', 'urls', 'short_urls', 'has_ip_address']
 
 
 # Recreate the ColumnTransformer excluding 'cleaned_text' and 'label'
 preprocessor = ColumnTransformer(
     transformers=[
         ('cat', Pipeline([
-            ('imputer', SimpleImputer(strategy='most_frequent')),
+            ('rare_cat_remover', RareCategoryRemover(threshold=0.05)),  # Remove rare categories
+            ('imputer', SimpleImputer(strategy='most_frequent')),  # Fill missing categorical values
             ('encoder', OneHotEncoder(sparse_output=False, handle_unknown='ignore'))
         ]), categorical_columns),
         ('num', Pipeline([
-            ('imputer', SimpleImputer(strategy='mean')),
+            ('imputer', SimpleImputer(strategy='mean')),  # Fill missing numerical values
             ('scaler', StandardScaler())
         ]), numerical_columns)
     ],
-    remainder='passthrough'  # Keep other columns unchanged
+    remainder='passthrough'  # Keep other columns unchanged, like 'cleaned_text' and 'label'
 )
 column_names = categorical_columns + numerical_columns 
 
@@ -85,7 +119,7 @@ for fold in range(3):
 
     # Extract feature names
     start_time = time.perf_counter()
-    feature_names_non_text = preprocessor.get_feature_names_out()  # Original non-text feature names
+    feature_names_non_text = preprocessor.named_transformers_['cat'].named_steps['rare_cat_remover'].get_feature_names_out()
     feature_names_text = [f"bert_feature_{i}" for i in range(X_train_combined.shape[1] - len(feature_names_non_text))]
     feature_names = np.concatenate([feature_names_non_text, feature_names_text])
     logging.info(f'Extracted feature names')
@@ -110,24 +144,39 @@ for fold in range(3):
     # Initialize SHAP explainer based on model type
     start_time = time.perf_counter()
     if hasattr(model, 'named_estimators_'):
-        model_rf = model.named_estimators_['rf']
-        logging.info('Initializing SHAP TreeExplainer...')
-        explainer = shap.TreeExplainer(model_rf, background_samples)
+        # Check for SVM model
+        if 'svm' in model.named_estimators_:
+            model_svm = model.named_estimators_['svm']
+            logging.info('Initializing SHAP KernelExplainer for SVM...')
+            explainer = shap.KernelExplainer(predict_fn, background_samples[:100])  # Use a smaller subset of background samples
+        # Check for XGBoost model
+        elif 'xgb' in model.named_estimators_:
+            model_xgb = model.named_estimators_['xgb']
+            logging.info('Initializing SHAP TreeExplainer for XGBoost...')
+            explainer = shap.TreeExplainer(model_xgb, background_samples[:100])  # Use a smaller subset of background samples
+        # Check for Meta model
+        elif 'meta' in model.named_estimators_:
+            model_meta = model.named_estimators_['meta']
+            logging.info('Initializing SHAP KernelExplainer for Meta model...')
+            explainer = shap.KernelExplainer(predict_fn, background_samples[:100])  # Use a smaller subset of background samples
+        else:
+            logging.error("No known model found in named_estimators_. Available keys are: %s", list(model.named_estimators_.keys()))
+            raise KeyError("No known model found in named_estimators_.")
     else:
         logging.info('Initializing SHAP KernelExplainer...')
-        explainer = shap.KernelExplainer(predict_fn, background_samples)
+        explainer = shap.KernelExplainer(predict_fn, background_samples[:100]) 
+
+
     logging.info('Initialized SHAP Explainer.')
     logging.info(f'Time taken to initialize SHAP Explainer: {time.perf_counter() - start_time:.2f} seconds\n')
-
 
     # Calculate SHAP values
     start_time = time.perf_counter()
     logging.info('Calculating SHAP values...')
-    X_test_subset = X_test_combined[:2000]  # Use a subset of the test data
+    X_test_subset = X_test_combined[:500]  # Use a smaller subset of the test data
     shap_values = explainer.shap_values(X_test_subset, check_additivity=False)
     logging.info('Completed SHAP value calculation.')
     logging.info(f'Time taken to calculate SHAP values: {time.perf_counter() - start_time:.2f} seconds\n')
-
 
     # Generate SHAP summary plot
     logging.info('Generating SHAP summary plot...')
@@ -137,7 +186,6 @@ for fold in range(3):
     plt.savefig(plot_path)
     logging.info(f'SHAP summary plot saved to {plot_path}.')
     plt.close()  # Close the plot to free up memory
-
 
     # If it's the first fold, you might want to stop early for testing
     if fold == 0:
