@@ -15,3 +15,5 @@
 /__pycache__
 /config.json
 /Single Evaluation/ensemble_model_fold_1.pkl
+.venv
+.DS_Store

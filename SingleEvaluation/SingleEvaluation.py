@@ -540,12 +540,12 @@ def main():
     with open("config.json", "r") as config_file:
         config = json.load(config_file)
     base_dir = config["base_dir"]
-    TestEmail = os.path.join(base_dir, "Single Evaluation", "TestEmail.eml")
-    SavedEmail = os.path.join(base_dir, "Single Evaluation", "FormatedTest.csv")
-    CleanedEmail = os.path.join(base_dir, "Single Evaluation", "CleanedTest.csv")
-    MergedEmail = os.path.join(base_dir, "Single Evaluation", "MergedTest.csv")
+    TestEmail = os.path.join(base_dir, "SingleEvaluation", "TestEmail.eml")
+    SavedEmail = os.path.join(base_dir, "SingleEvaluation", "FormatedTest.csv")
+    CleanedEmail = os.path.join(base_dir, "SingleEvaluation", "CleanedTest.csv")
+    MergedEmail = os.path.join(base_dir, "SingleEvaluation", "MergedTest.csv")
     SavedModel = os.path.join(
-        base_dir, "Single Evaluation", "ensemble_model_fold_1.pkl"
+        base_dir, "SingleEvaluation", "ensemble_model_fold_1.pkl"
     )
     source_path = os.path.join(
         base_dir, "Models & Parameters", "ensemble_model_fold_1.pkl"
@@ -666,6 +666,7 @@ def main():
     label_map = {0: "safe", 1: "not safe"}
     for pred in predictions:
         print(f"The email is {label_map[pred]}.")
+        return f"The email is {label_map[pred]}."
 
 
 if __name__ == "__main__":
