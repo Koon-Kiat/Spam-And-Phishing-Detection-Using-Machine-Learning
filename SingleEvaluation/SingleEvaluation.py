@@ -5,6 +5,7 @@ import os
 import logging
 import string
 from email import message_from_file
+from email.utils import getaddresses
 from typing import Dict, List
 from collections import Counter
 import warnings
@@ -158,8 +159,8 @@ class EmailHeaderExtractor:
             msg = message_from_file(f)
 
         # Extract sender and receiver
-        sender = msg.get("From") if msg.get("From") else "unknown"
-        receiver = msg.get("To") if msg.get("To") else "unknown"
+        sender = ", ".join([addr for name, addr in getaddresses([msg.get("From")])]) if msg.get("From") else "unknown"
+        receiver = ", ".join([addr for name, addr in getaddresses([msg.get("To")])]) if msg.get("To") else "unknown"
 
         # Extract body (assuming plain text)
         body = ""

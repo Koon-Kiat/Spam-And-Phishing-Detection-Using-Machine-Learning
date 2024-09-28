@@ -1,5 +1,5 @@
 sender,receiver,https_count,http_count,blacklisted_keywords_count,urls,short_urls,has_ip_address,url_count,body
-"""Office365 @ COMPANY.com""",maria@microsoft.com,0,2,3,2,0,0,2,"This is a multi-part message in MIME format.
+Office365 @ COMPANY.com,maria@microsoft.com,0,2,3,2,0,0,2,"This is a multi-part message in MIME format.
 
 ----=NextPart108_37b66526-f893-4216-903d-123383a69fcc
 Content-Type: text/plain; charset=""utf-8""
