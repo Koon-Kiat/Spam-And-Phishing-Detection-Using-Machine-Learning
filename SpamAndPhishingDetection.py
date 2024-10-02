@@ -8,6 +8,7 @@ import logging  # Logging library
 import warnings  # Warning control
 import pickle  # Pickle (de)serialization
 import string  # String operations
+import random  # Random number generation
 
 
 # Data Manipulation and Analysis
@@ -23,16 +24,20 @@ from wordcloud import WordCloud  # Generate word clouds
 # Text Processing
 import nltk  # Natural language processing
 from nltk.corpus import stopwords  # Stop words
+from nltk.corpus import wordnet  # WordNet corpus
 from nltk.stem import WordNetLemmatizer  # Lemmatization
 from nltk.tokenize import word_tokenize  # Tokenization
+from nltk.data import find # Find NLTK resources
 import contractions  # Expand contractions in text
+import spacy  # NLP library
+
 
 # Machine Learning Libraries
 from sklearn.base import BaseEstimator, TransformerMixin  # Scikit-learn base classes
 from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import PCA, IncrementalPCA  # Principal Component Analysis
 from sklearn.ensemble import (RandomForestClassifier, VotingClassifier, 
-                              GradientBoostingClassifier, StackingClassifier)  # Ensemble classifiers
+                              GradientBoostingClassifier, StackingClassifier, BaggingClassifier)
 from sklearn.feature_extraction.text import (ENGLISH_STOP_WORDS, 
                                              TfidfVectorizer, CountVectorizer)  # Text feature extraction
 from sklearn.impute import SimpleImputer
@@ -43,7 +48,7 @@ from sklearn.model_selection import (GridSearchCV, train_test_split,
                                        StratifiedKFold, cross_val_score, learning_curve)  # Model selection
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (OneHotEncoder, StandardScaler, 
-                                   LabelEncoder, OrdinalEncoder)  # Preprocessing
+                                   LabelEncoder, OrdinalEncoder, FunctionTransformer)  # Preprocessing
 from sklearn.utils import resample  # Resampling utilities
 from xgboost import XGBClassifier  # XGBoost Classifier
 from sklearn.svm import SVC  # Support Vector Classifier
@@ -57,12 +62,15 @@ from email.parser import BytesParser
 
 # Data Augmentation
 from imblearn.over_sampling import SMOTE  # Handling imbalanced data
+from transformers import MarianMTModel, MarianTokenizer  # Machine translation models
 
 # Profiling and Job Management
 import cProfile  # Profiling
 from tqdm import tqdm  # Progress bar for loops
 import joblib  # Job management
 from joblib import Parallel, delayed  # Parallel processing
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed  # Concurrent processing
+
 
 # Natural Language Toolkit (NLTK)
 from collections import Counter  # Counter class for counting occurrences
@@ -85,6 +93,7 @@ from spellchecker import SpellChecker  # Spell checking
 # Transformers Library
 from transformers import (AdamW, BertForSequenceClassification, BertModel, 
                           BertTokenizer, Trainer, TrainingArguments)  # BERT models and training utilities
+from transformers.utils import logging as transformers_logging
 
 # Sparse Matrices
 from scipy.sparse import csr_matrix, hstack  # Sparse matrix operations
@@ -95,23 +104,6 @@ from typing import Dict, List, Union  # Type hints
 # Datasets
 from datasets import load_dataset  # Load datasets
 
-
-
-"""
-This script sets up the environment for spam and phishing detection.
-
-It includes the following configurations and setups:
-- Label descriptions for classification.
-- ANSI escape codes for text formatting.
-- Downloading necessary NLTK resources.
-- Configuring logging for the application.
-- Suppressing TensorFlow and other library warnings.
-
-Attributes:
-    label_descriptions (dict): A dictionary mapping label indices to their descriptions.
-    BOLD (str): ANSI escape code for bold text formatting.
-    RESET (str): ANSI escape code to reset text formatting.
-"""
 
 
 # Define the mapping of label values to descriptions
@@ -130,20 +122,32 @@ RESET = '\033[0m'
 nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
 nltk.download('wordnet', quiet=True)
-
+nltk.download('omw-1.4', quiet=True)
+nlp = spacy.load('en_core_web_sm')  # Load the spaCy English model
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s ', level=logging.INFO)
 
 
-# Suppress TensorFlow logging
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-logging.getLogger('tensorflow').setLevel(logging.ERROR)
+# Suppress TensorFlow logs
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow logs
+tf.get_logger().setLevel('CRITICAL')  # Set TensorFlow logger to suppress warnings
+logging.getLogger('tensorflow').setLevel(logging.ERROR)  # Configure the logging library to suppress TensorFlow logs
+
+# Suppress warnings globally
+warnings.simplefilter("ignore")  # Ignore all warnings
+
+# Suppress specific warnings
 warnings.filterwarnings("ignore", category=UserWarning, module='transformers')
-warnings.filterwarnings('ignore', category=UserWarning, module='tensorflow')
 warnings.filterwarnings("ignore", category=FutureWarning, module='transformers.tokenization_utils_base')
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
+warnings.filterwarnings("ignore", category=UserWarning, module='tensorflow.keras')
+
+# Optionally, configure transformers logging
+transformers_logging.set_verbosity_error()
+
+# Define loss function using the recommended method
+loss_fn = tf.compat.v1.losses.sparse_softmax_cross_entropy
 
 
 
@@ -151,11 +155,16 @@ class DatasetProcessor:
     """
     A class to process datasets by removing unnamed columns, missing values, and duplicates, and saving the processed data.
 
-    Parameters:
-    df (pandas.DataFrame): The DataFrame to be processed.
-    column_name (str): The column name to check for duplicates.
-    dataset_name (str): The name of the dataset.
-    save_path (str): The path to save the processed data.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The DataFrame to be processed.
+    column_name : str
+        The column name to check for duplicates.
+    dataset_name : str
+        The name of the dataset.
+    save_path : str
+        The path to save the processed data.
     """
     def __init__(self, df, column_name, dataset_name, save_path):
         self.df = df
@@ -168,8 +177,10 @@ class DatasetProcessor:
         """
         Drop the 'Unnamed: 0' column if it exists in the DataFrame.
 
-        Returns:
-        pandas.DataFrame: The DataFrame with the 'Unnamed: 0' column removed.
+        Returns
+        -------
+        pandas.DataFrame
+            The DataFrame with the 'Unnamed: 0' column removed if it existed.
         """
         if 'Unnamed: 0' in self.df.columns:
             self.df = self.df.drop(columns=['Unnamed: 0'])
@@ -183,8 +194,10 @@ class DatasetProcessor:
         """
         Check and remove missing values from the DataFrame.
 
-        Returns:
-        pandas.DataFrame: The DataFrame with missing values removed.
+        Returns
+        -------
+        pandas.DataFrame
+            The DataFrame with missing values removed.
         """
         check_missing_values = self.df.isnull().sum()
         total_missing_values = check_missing_values.sum()
@@ -201,8 +214,10 @@ class DatasetProcessor:
         """
         Remove duplicate rows based on the specified column.
 
-        Returns:
-        pandas.DataFrame: The DataFrame with duplicates removed.
+        Returns
+        -------
+        pandas.DataFrame
+            The DataFrame with duplicates removed.
         """
         logging.info(f"Removing duplicate data....")
         num_duplicates_before = self.df.duplicated(subset=[self.column_name], keep=False).sum()
@@ -219,6 +234,10 @@ class DatasetProcessor:
     def save_processed_data(self):
         """
         Save the processed DataFrame to a CSV file.
+
+        Returns
+        -------
+        None
         """
         try:
             self.df.to_csv(self.save_path, index=False)
@@ -233,10 +252,11 @@ class DatasetProcessor:
     def process_dataset(self):
         """
         Process the dataset by dropping unnamed columns, removing missing values, and removing duplicates.
-        If the processed file already exists, load it instead.
 
-        Returns:
-        pandas.DataFrame: The processed DataFrame.
+        Returns
+        -------
+        pandas.DataFrame
+            The processed DataFrame.
         """
         if os.path.exists(self.save_path):
             logging.info(f"Processed file already exists at {self.save_path}. Loading the file...")
@@ -258,8 +278,10 @@ class EmailHeaderExtractor:
     """
     A class to extract email headers and other relevant information from email data.
 
-    Parameters:
-    df (pandas.DataFrame): The DataFrame containing the email data.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The DataFrame containing the email data.
     """
     def __init__(self, df: pd.DataFrame):
         self.df = df
@@ -272,11 +294,15 @@ class EmailHeaderExtractor:
         """
         Clean the extracted links by removing unwanted characters and spaces.
 
-        Parameters:
-        links (List[str]): The list of links to be cleaned.
+        Parameters
+        ----------
+        links : List[str]
+            The list of links to be cleaned.
 
-        Returns:
-        List[str]: The cleaned list of links.
+        Returns
+        -------
+        List[str]
+            The cleaned list of links.
         """
         cleaned_links = []
         for link in links:
@@ -294,11 +320,15 @@ class EmailHeaderExtractor:
         """
         Extract inline headers (From, To, Mail-To) from the email text.
 
-        Parameters:
-        email_text (str): The email text to extract headers from.
+        Parameters
+        ----------
+        email_text : str
+            The email text to extract headers from.
 
-        Returns:
-        Dict[str, Union[str, None]]: A dictionary containing the extracted headers.
+        Returns
+        -------
+        Dict[str, Union[str, None]]
+            A dictionary containing the extracted headers.
         """
         from_match = re.search(r'From:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
         to_match = re.search(r'To:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
@@ -315,11 +345,15 @@ class EmailHeaderExtractor:
         """
         Extract the body content from an email message.
 
-        Parameters:
-        email_message (EmailMessage): The email message to extract the body content from.
+        Parameters
+        ----------
+        email_message : EmailMessage
+            The email message to extract the body content from.
 
-        Returns:
-        str: The extracted body content.
+        Returns
+        -------
+        str
+            The extracted body content.
         """
         body_content = ""
         if email_message.is_multipart():
@@ -339,11 +373,15 @@ class EmailHeaderExtractor:
         """
         Count the occurrences of 'https' and 'http' in the text.
 
-        Parameters:
-        text (str): The text to count the occurrences in.
+        Parameters
+        ----------
+        text : str
+            The text to count the occurrences in.
 
-        Returns:
-        Dict[str, int]: A dictionary containing the counts of 'https' and 'http'.
+        Returns
+        -------
+        Dict[str, int]
+            A dictionary containing the counts of 'https' and 'http'.
         """
         https_count = len(re.findall(r'https://', text))
         http_count = len(re.findall(r'http://', text))
@@ -356,11 +394,15 @@ class EmailHeaderExtractor:
         """
         Count the occurrences of blacklisted keywords in the text.
 
-        Parameters:
-        text (str): The text to count the occurrences in.
+        Parameters
+        ----------
+        text : str
+            The text to count the occurrences in.
 
-        Returns:
-        int: The count of blacklisted keywords in the text.
+        Returns
+        -------
+        int
+            The count of blacklisted keywords in the text.
         """
         blacklisted_keywords = [
         'click now', 'verify now', 'urgent', 'free', 'winner',
@@ -386,11 +428,15 @@ class EmailHeaderExtractor:
         """
         Detect the number of URL shorteners in the list of links.
 
-        Parameters:
-        links (List[str]): The list of links to check for URL shorteners.
+        Parameters
+        ----------
+        links : List[str]
+            The list of links to check for URL shorteners.
 
-        Returns:
-        int: The count of URL shorteners in the list of links.
+        Returns
+        -------
+        int
+            The count of URL shorteners in the list of links.
         """
         shortener_domains = [
             'bit.ly', 'tinyurl.com', 'goo.gl', 'ow.ly', 't.co', 'is.gd', 'buff.ly', 
@@ -407,11 +453,15 @@ class EmailHeaderExtractor:
         """
         Count the occurrences of IP addresses in the text.
 
-        Parameters:
-        text (str): The text to count the occurrences in.
+        Parameters
+        ----------
+        text : str
+            The text to count the occurrences in.
 
-        Returns:
-        int: The count of IP addresses in the text.
+        Returns
+        -------
+        int
+            The count of IP addresses in the text.
         """
         ip_pattern = r'https?://(\d{1,3}\.){3}\d{1,3}'
 
@@ -423,8 +473,10 @@ class EmailHeaderExtractor:
         """
         Extract headers and other relevant information from the email data for SpamAssassin dataset.
 
-        Returns:
-        pandas.DataFrame: A DataFrame containing the extracted headers and information.
+        Returns
+        -------
+        pandas.DataFrame
+            A DataFrame containing the extracted headers and information.
         """
         headers_list: List[Dict[str, Union[str, List[str], int]]] = []
         for email_text in tqdm(self.df['text'], desc="Extracting headers"):
@@ -486,8 +538,10 @@ class EmailHeaderExtractor:
         """
         Extract headers and other relevant information from the email data for CEAS dataset.
 
-        Returns:
-        pandas.DataFrame: A DataFrame containing the extracted headers and information.
+        Returns
+        -------
+        pandas.DataFrame
+            A DataFrame containing the extracted headers and information.
         """
         headers_list: List[Dict[str, int]] = []
         
@@ -531,8 +585,15 @@ class EmailHeaderExtractor:
         """
         Save the extracted headers DataFrame to a CSV file.
 
-        Parameters:
-        file_path (str): The path to save the CSV file.
+        Parameters
+        ----------
+        file_path : str
+            The path to save the CSV file.
+
+        Raises
+        ------
+        ValueError
+            If no header information has been extracted.
         """
         if not self.headers_df.empty:
             self.headers_df.to_csv(file_path, index=False)
@@ -547,15 +608,23 @@ class TextProcessor:
     """
     A class for processing text data with various cleaning and preprocessing steps.
 
-    Parameters:
-    enable_spell_check (bool): Whether to enable spell checking. Default is False.
+    Parameters
+    ----------
+    enable_spell_check : bool, optional
+        Whether to enable spell checking. Default is False.
 
-    Attributes:
-    stop_words (set): A set of stop words to be removed from the text.
-    lemmatizer (WordNetLemmatizer): An instance of WordNetLemmatizer for lemmatizing words.
-    spell_checker (SpellChecker): An instance of SpellChecker for spell checking.
-    common_words (set): A set of common words from the spell checker's word frequency.
-    enable_spell_check (bool): Whether spell checking is enabled.
+    Attributes
+    ----------
+    stop_words : set
+        A set of stop words to be removed from the text.
+    lemmatizer : WordNetLemmatizer
+        An instance of WordNetLemmatizer for lemmatizing words.
+    spell_checker : SpellChecker
+        An instance of SpellChecker for spell checking.
+    common_words : set
+        A set of common words from the spell checker's word frequency.
+    enable_spell_check : bool
+        Whether spell checking is enabled.
     """
     def __init__(self, enable_spell_check=False):
         self.stop_words = set(stopwords.words('english'))
@@ -569,11 +638,15 @@ class TextProcessor:
         """
         Expand contractions in the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text with contractions expanded.
+        Returns
+        -------
+        str
+            The text with contractions expanded.
         """
         return contractions.fix(text)
 
@@ -581,11 +654,15 @@ class TextProcessor:
         """
         Remove punctuation from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without punctuation.
+        Returns
+        -------
+        str
+            The text without punctuation.
         """
         extra_punctuation = '“”‘’—–•·’'
         all_punctuation = string.punctuation + extra_punctuation
@@ -595,11 +672,15 @@ class TextProcessor:
         """
         Tokenize the text into words.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        list: A list of words.
+        Returns
+        -------
+        list
+            A list of words.
         """
         return word_tokenize(text)
 
@@ -607,11 +688,15 @@ class TextProcessor:
         """
         Remove stop words from the list of words.
 
-        Parameters:
-        words_list (list): The list of words.
+        Parameters
+        ----------
+        words_list : list
+            The list of words.
 
-        Returns:
-        list: The list of words without stop words.
+        Returns
+        -------
+        list
+            The list of words without stop words.
         """
         return [w for w in words_list if w.lower() not in self.stop_words]
 
@@ -619,11 +704,15 @@ class TextProcessor:
         """
         Lemmatize the list of words.
 
-        Parameters:
-        words_list (list): The list of words.
+        Parameters
+        ----------
+        words_list : list
+            The list of words.
 
-        Returns:
-        list: The list of lemmatized words.
+        Returns
+        -------
+        list
+            The list of lemmatized words.
         """
         return [self.lemmatizer.lemmatize(w) for w in words_list]
 
@@ -631,11 +720,15 @@ class TextProcessor:
         """
         Remove URLs from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without URLs.
+        Returns
+        -------
+        str
+            The text without URLs.
         """
         return re.sub(r'(http[s]?|ftp):\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', '', text)
 
@@ -643,11 +736,15 @@ class TextProcessor:
         """
         Remove custom URL patterns from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without custom URL patterns.
+        Returns
+        -------
+        str
+            The text without custom URL patterns.
         """
         return re.sub(r'\b(?:http|www)[^\s]*\b', '', text)
 
@@ -655,11 +752,15 @@ class TextProcessor:
         """
         Remove numbers from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without numbers.
+        Returns
+        -------
+        str
+            The text without numbers.
         """
         return re.sub(r'\d+', '', text)
 
@@ -667,11 +768,15 @@ class TextProcessor:
         """
         Remove all HTML elements from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without HTML elements.
+        Returns
+        -------
+        str
+            The text without HTML elements.
         """
         soup = BeautifulSoup(text, 'html.parser')
         for script_or_style in soup(["script", "style"]):
@@ -684,11 +789,15 @@ class TextProcessor:
         """
         Remove email headers from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without email headers.
+        Returns
+        -------
+        str
+            The text without email headers.
         """
         headers = ['From:', 'To:', 'Subject:', 'Cc:', 'Bcc:', 'Date:', 'Reply-To:', 'Content-Type:', 'Return-Path:', 'Message-ID:',
                    'Received:', 'MIME-Version:', 'Delivered-To:', 'Authentication-Results:', 'DKIM-Signature:', 'X-', 'Mail-To:']
@@ -700,11 +809,15 @@ class TextProcessor:
         """
         Remove email addresses from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without email addresses.
+        Returns
+        -------
+        str
+            The text without email addresses.
         """
         email_pattern_with_spaces = r'\b[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         email_pattern_no_spaces = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
@@ -715,11 +828,15 @@ class TextProcessor:
         """
         Remove time patterns from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without time patterns.
+        Returns
+        -------
+        str
+            The text without time patterns.
         """
         time_pattern = r'\b(?:[01]?[0-9]|2[0-3]):[0-5][0-9](?: ?[APMapm]{2})?(?: [A-Z]{1,5})?\b'
         return re.sub(time_pattern, '', text)
@@ -728,11 +845,15 @@ class TextProcessor:
         """
         Remove month names from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without month names.
+        Returns
+        -------
+        str
+            The text without month names.
         """
         months = [
             'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october',
@@ -745,11 +866,15 @@ class TextProcessor:
         """
         Remove date patterns from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without date patterns.
+        Returns
+        -------
+        str
+            The text without date patterns.
         """
         date_pattern = (
             r'\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s*,?\s*\d{1,2}\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{4}\b|'
@@ -763,11 +888,15 @@ class TextProcessor:
         """
         Remove time zone patterns from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without time zone patterns.
+        Returns
+        -------
+        str
+            The text without time zone patterns.
         """
         timezone_pattern = r'\b(?:[A-Z]{2,4}[+-]\d{2,4}|UTC|GMT|PST|EST|CST|MST)\b'
         return re.sub(timezone_pattern, '', text)
@@ -776,11 +905,15 @@ class TextProcessor:
         """
         Remove multiple newlines from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text with multiple newlines replaced by a single newline.
+        Returns
+        -------
+        str
+            The text with multiple newlines replaced by a single newline.
         """
         return re.sub(r'\n{2,}', '\n', text)
 
@@ -788,11 +921,15 @@ class TextProcessor:
         """
         Remove specific words from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without specific words.
+        Returns
+        -------
+        str
+            The text without specific words.
         """
         return re.sub(r'\b(url|original message|submissionid|submission)\b', '', text, flags=re.IGNORECASE)
 
@@ -800,11 +937,15 @@ class TextProcessor:
         """
         Remove single characters from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without single characters.
+        Returns
+        -------
+        str
+            The text without single characters.
         """
         return re.sub(r'\b\w\b', '', text)
 
@@ -812,11 +953,15 @@ class TextProcessor:
         """
         Remove repetitive patterns from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without repetitive patterns.
+        Returns
+        -------
+        str
+            The text without repetitive patterns.
         """
         return re.sub(r'\b(nt+ts?|n+|t+|nt+)\b', '', text)
 
@@ -836,11 +981,15 @@ class TextProcessor:
         """
         Remove bullet points and similar symbols from the text.
 
-        Parameters:
-        text (str): The input text.
+        Parameters
+        ----------
+        text : str
+            The input text.
 
-        Returns:
-        str: The text without bullet points and symbols.
+        Returns
+        -------
+        str
+            The text without bullet points and symbols.
         """
         symbols = ['•', '◦', '◉', '▪', '▫', '●', '□', '■', '✦', '✧', '✪', '✫', '✬', '✭', '✮', '✯', '✰']
         for symbol in symbols:
@@ -851,11 +1000,15 @@ class TextProcessor:
         """
         Clean and preprocess a list of text data.
 
-        Parameters:
-        X (list): A list of text data to be cleaned.
+        Parameters
+        ----------
+        X : list
+            A list of text data to be cleaned.
 
-        Returns:
-        pandas.DataFrame: A DataFrame containing the cleaned text data.
+        Returns
+        -------
+        pandas.DataFrame
+            A DataFrame containing the cleaned text data.
         """
         cleaned_text_list = []
         for body in tqdm(X, desc='Cleaning Text', unit='email'):
@@ -891,11 +1044,15 @@ class TextProcessor:
         """
         Save the cleaned text data to a CSV file.
 
-        Parameters:
-        df (pandas.DataFrame): The DataFrame containing the cleaned text data.
-        filename (str): The file path to save the CSV file.
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            The DataFrame containing the cleaned text data.
+        filename : str
+            The file path to save the CSV file.
 
-        Returns:
+        Returns
+        -------
         None
         """
         try:
@@ -910,20 +1067,53 @@ class BERTFeatureTransformer(BaseEstimator, TransformerMixin):
     """
     A custom transformer to extract BERT features from text data.
 
-    Parameters:
-    feature_extractor (BERTFeatureExtractor): An instance of BERTFeatureExtractor to extract features.
+    Parameters
+    ----------
+    feature_extractor : BERTFeatureExtractor
+        An instance of BERTFeatureExtractor to extract features.
 
-    Methods:
-    fit(X, y=None): Fits the transformer to the data (no-op).
-    transform(X): Transforms the data by extracting BERT features.
+    Methods
+    -------
+    fit(X, y=None)
+        Fits the transformer to the data (no-op).
+    transform(X)
+        Transforms the data by extracting BERT features.
     """
     def __init__(self, feature_extractor):
         self.feature_extractor = feature_extractor
 
     def fit(self, X, y=None):
+        """
+        Fit the transformer to the data (no-op).
+
+        Parameters
+        ----------
+        X : array-like
+            The input data.
+        y : array-like, optional
+            The target values (default is None).
+
+        Returns
+        -------
+        self : object
+            Returns self.
+        """
         return self
 
     def transform(self, X):
+        """
+        Transform the data by extracting BERT features.
+
+        Parameters
+        ----------
+        X : array-like
+            The input data.
+
+        Returns
+        -------
+        numpy.ndarray
+            The extracted BERT features.
+        """
         return np.array(self.feature_extractor.extract_features(X))
     
 
@@ -932,15 +1122,23 @@ class TextDataset(Dataset):
     """
     A custom dataset for handling text data for BERT.
 
-    Parameters:
-    texts (list): A list of text samples.
-    labels (list): A list of labels corresponding to the text samples.
-    tokenizer (BertTokenizer): An instance of BertTokenizer for tokenizing the text.
-    max_length (int): The maximum length of the tokenized sequences.
+    Parameters
+    ----------
+    texts : list
+        A list of text samples.
+    labels : list
+        A list of labels corresponding to the text samples.
+    tokenizer : BertTokenizer
+        An instance of BertTokenizer for tokenizing the text.
+    max_length : int
+        The maximum length of the tokenized sequences.
 
-    Methods:
-    __len__(): Returns the number of samples in the dataset.
-    __getitem__(idx): Returns a dictionary containing the input IDs, attention mask, and label for the sample at index idx.
+    Methods
+    -------
+    __len__()
+        Returns the number of samples in the dataset.
+    __getitem__(idx)
+        Returns a dictionary containing the input IDs, attention mask, and label for the sample at index idx.
     """
     def __init__(self, texts, labels, tokenizer, max_length):
         self.texts = texts
@@ -951,11 +1149,32 @@ class TextDataset(Dataset):
 
 
     def __len__(self):
+        """
+        Returns the number of samples in the dataset.
+
+        Returns
+        -------
+        int
+            The number of samples in the dataset.
+        """
         return len(self.texts)
 
 
 
     def __getitem__(self, idx):
+        """
+        Returns a dictionary containing the input IDs, attention mask, and label for the sample at index idx.
+
+        Parameters
+        ----------
+        idx : int
+            The index of the sample to retrieve.
+
+        Returns
+        -------
+        dict
+            A dictionary containing the input IDs, attention mask, and label for the sample.
+        """
         inputs = self.tokenizer.encode_plus(
             self.texts[idx],
             add_special_tokens=True,
@@ -979,12 +1198,17 @@ class BERTFeatureExtractor:
     """
     A class to extract BERT features from text data.
 
-    Parameters:
-    max_length (int): The maximum length of the tokenized sequences. Default is 128.
-    device (torch.device): The device to run the BERT model on. Default is CUDA if available, otherwise CPU.
+    Parameters
+    ----------
+    max_length : int, optional
+        The maximum length of the tokenized sequences. Default is 128.
+    device : torch.device, optional
+        The device to run the BERT model on. Default is CUDA if available, otherwise CPU.
 
-    Methods:
-    extract_features(texts, batch_size=16): Extracts BERT features from a list of text samples.
+    Methods
+    -------
+    extract_features(texts, batch_size=16)
+        Extracts BERT features from a list of text samples.
     """
     def __init__(self, max_length=128, device=None):
         logging.info("Initializing BERT Feature Extractor...")
@@ -1000,12 +1224,17 @@ class BERTFeatureExtractor:
         """
         Extract BERT features from a list of text samples.
 
-        Parameters:
-        texts (list): A list of text samples.
-        batch_size (int): The batch size for processing the text samples. Default is 16.
+        Parameters
+        ----------
+        texts : list
+            A list of text samples.
+        batch_size : int, optional
+            The batch size for processing the text samples. Default is 16.
 
-        Returns:
-        list: A list of extracted BERT features.
+        Returns
+        -------
+        list
+            A list of extracted BERT features.
         """
         if not isinstance(texts, (list, tuple)) or not all(isinstance(text, str) for text in texts):
             raise ValueError("Input should be a list or tuple of strings.")
@@ -1026,18 +1255,93 @@ class BERTFeatureExtractor:
     
 
 
+class RareCategoryRemover(BaseEstimator, TransformerMixin):
+    """
+    A custom transformer to remove rare categories from categorical features.
+
+    Parameters
+    ----------
+    threshold : float, optional
+        The frequency threshold below which categories are considered rare. Default is 0.05.
+
+    Attributes
+    ----------
+    replacements_ : dict
+        A dictionary mapping each column to another dictionary of rare categories and their replacements.
+    """
+    def __init__(self, threshold=0.05):
+        self.threshold = threshold
+        self.replacements_ = {}
+
+
+
+    def fit(self, X, y=None):
+        """
+        Fit the transformer to the data by identifying rare categories.
+
+        Parameters
+        ----------
+        X : pandas.DataFrame
+            The input data with categorical features.
+        y : ignored
+            Not used, present for API consistency by convention.
+
+        Returns
+        -------
+        self : object
+            Returns the instance itself.
+        """
+        logging.info(f"Removing rare categories with threshold: {self.threshold}")
+        for column in X.columns:
+            frequency = X[column].value_counts(normalize=True)
+            rare_categories = frequency[frequency < self.threshold].index
+            self.replacements_[column] = {cat: 'Other' for cat in rare_categories}
+
+        return self
+
+
+
+    def transform(self, X):
+        """
+        Transform the data by replacing rare categories with 'Other'.
+
+        Parameters
+        ----------
+        X : pandas.DataFrame
+            The input data with categorical features.
+
+        Returns
+        -------
+        pandas.DataFrame
+            The transformed data with rare categories replaced.
+        """
+        for column, replacements in self.replacements_.items():
+            X.loc[:, column] = X[column].replace(replacements)
+        assert X.shape[0] == X.shape[0], "Row count changed during rare category removal."
+
+        return X
+
+
+
 def data_cleaning(dataset_name, df_processed, text_column, clean_file):
     """
     Cleans the text data in the specified column of the DataFrame.
 
-    Args:
-        dataset_name (str): The name of the dataset being processed.
-        df_processed (pd.DataFrame): The DataFrame containing the processed data.
-        text_column (str): The name of the column containing text data to be cleaned.
-        clean_file (str): The file path where the cleaned data will be saved.
+    Parameters
+    ----------
+    dataset_name : str
+        The name of the dataset being processed.
+    df_processed : pandas.DataFrame
+        The DataFrame containing the processed data.
+    text_column : str
+        The name of the column containing text data to be cleaned.
+    clean_file : str
+        The file path where the cleaned data will be saved.
 
-    Returns:
-        pd.DataFrame: The cleaned DataFrame.
+    Returns
+    -------
+    pandas.DataFrame
+        The cleaned DataFrame.
     """
     logging.info(f"Text processing {dataset_name} dataset...")
     processor = TextProcessor()
@@ -1054,15 +1358,23 @@ def load_or_clean_data(dataset_name, df, text_column, file_path, cleaning_functi
     """
     Loads the data from the specified file path or cleans the data if the file does not exist.
 
-    Args:
-        dataset_name (str): The name of the dataset being processed.
-        df (pd.DataFrame): The DataFrame containing the data.
-        text_column (str): The name of the column containing text data to be cleaned.
-        file_path (str): The file path where the cleaned data will be saved.
-        cleaning_function (function): The function to clean the data.
+    Parameters
+    ----------
+    dataset_name : str
+        The name of the dataset being processed.
+    df : pandas.DataFrame
+        The DataFrame containing the data.
+    text_column : str
+        The name of the column containing text data to be cleaned.
+    file_path : str
+        The file path where the cleaned data will be saved.
+    cleaning_function : function
+        The function to clean the data.
 
-    Returns:
-        pd.DataFrame: The loaded or cleaned DataFrame.
+    Returns
+    -------
+    pandas.DataFrame
+        The loaded or cleaned DataFrame.
     """
     #logging.info(f"Loading or cleaning data...")
     if os.path.exists(file_path):
@@ -1089,14 +1401,21 @@ def load_or_extract_headers(df: pd.DataFrame, file_path: str, extractor_class, d
     """
     Loads the email headers from the specified file path or extracts them if the file does not exist.
 
-    Args:
-        df (pd.DataFrame): The DataFrame containing the data.
-        file_path (str): The file path where the extracted headers will be saved.
-        extractor_class (class): The class used to extract the headers.
-        dataset_type (str): The type of dataset being processed.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The DataFrame containing the data.
+    file_path : str
+        The file path where the extracted headers will be saved.
+    extractor_class : class
+        The class used to extract the headers.
+    dataset_type : str
+        The type of dataset being processed.
 
-    Returns:
-        pd.DataFrame: The DataFrame with extracted headers.
+    Returns
+    -------
+    pandas.DataFrame
+        The DataFrame with extracted headers.
     """
     logging.info("Loading or extracting email headers...")
     if os.path.exists(file_path):
@@ -1126,14 +1445,21 @@ def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='Data Sp
     """
     Performs Stratified K-Fold splitting on the DataFrame.
 
-    Args:
-        df (pd.DataFrame): The DataFrame containing the data.
-        n_splits (int): The number of splits for Stratified K-Fold.
-        random_state (int): The random state for reproducibility.
-        output_dir (str): The directory where the split data will be saved.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The DataFrame containing the data.
+    n_splits : int
+        The number of splits for Stratified K-Fold.
+    random_state : int
+        The random state for reproducibility.
+    output_dir : str
+        The directory where the split data will be saved.
 
-    Returns:
-        list: A list of tuples containing train and test indices for each fold.
+    Returns
+    -------
+    list
+        A list of tuples containing train and test indices for each fold.
     """
     logging.info("Performing Stratified K-Fold splitting...")
     
@@ -1188,13 +1514,19 @@ def smote(X_train, y_train, random_state=42):
     """
     Applies SMOTE to balance the training data.
 
-    Args:
-        X_train (pd.DataFrame): The training data features.
-        y_train (pd.Series): The training data labels.
-        random_state (int): The random state for reproducibility.
+    Parameters
+    ----------
+    X_train : pandas.DataFrame
+        The training data features.
+    y_train : pandas.Series
+        The training data labels.
+    random_state : int, optional
+        The random state for reproducibility. Default is 42.
 
-    Returns:
-        tuple: The balanced training data features and labels.
+    Returns
+    -------
+    tuple
+        The balanced training data features and labels.
     """
     smote = SMOTE(random_state=random_state)
     X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
@@ -1207,13 +1539,19 @@ def load_or_save_model(model, model_path, action='load'):
     """
     Loads or saves the model based on the specified action.
 
-    Args:
-        model (object): The model to be loaded or saved.
-        model_path (str): The file path where the model will be saved or loaded from.
-        action (str): The action to perform ('load' or 'save').
+    Parameters
+    ----------
+    model : object
+        The model to be loaded or saved.
+    model_path : str
+        The file path where the model will be saved or loaded from.
+    action : str, optional
+        The action to perform ('load' or 'save'). Default is 'load'.
 
-    Returns:
-        object: The loaded model if action is 'load'.
+    Returns
+    -------
+    object
+        The loaded model if action is 'load'.
     """
     if action == 'load':
         if os.path.exists(model_path):
@@ -1232,13 +1570,19 @@ def load_or_save_params(params, params_path, action='load'):
     """
     Loads or saves the parameters based on the specified action.
 
-    Args:
-        params (dict): The parameters to be loaded or saved.
-        params_path (str): The file path where the parameters will be saved or loaded from.
-        action (str): The action to perform ('load' or 'save').
+    Parameters
+    ----------
+    params : dict
+        The parameters to be loaded or saved.
+    params_path : str
+        The file path where the parameters will be saved or loaded from.
+    action : str, optional
+        The action to perform ('load' or 'save'). Default is 'load'.
 
-    Returns:
-        dict: The loaded parameters if action is 'load'.
+    Returns
+    -------
+    dict
+        The loaded parameters if action is 'load'.
     """
     if action == 'load':
         if os.path.exists(params_path):
@@ -1259,16 +1603,25 @@ def model_training(X_train, y_train, X_test, y_test, model_path, params_path):
     """
     Trains the model using the provided training data and evaluates it on the test data.
 
-    Args:
-        X_train (pd.DataFrame): The training data features.
-        y_train (pd.Series): The training data labels.
-        X_test (pd.DataFrame): The test data features.
-        y_test (pd.Series): The test data labels.
-        model_path (str): The file path where the model will be saved.
-        params_path (str): The file path where the parameters will be saved.
+    Parameters
+    ----------
+    X_train : pandas.DataFrame
+        The training data features.
+    y_train : pandas.Series
+        The training data labels.
+    X_test : pandas.DataFrame
+        The test data features.
+    y_test : pandas.Series
+        The test data labels.
+    model_path : str
+        The file path where the model will be saved.
+    params_path : str
+        The file path where the parameters will be saved.
 
-    Returns:
-        None
+    Returns
+    -------
+    tuple
+        The trained ensemble model and the test accuracy.
     """
     try:
         ensemble_model = load_or_save_model(None, model_path, action='load')
@@ -1320,12 +1673,17 @@ def conduct_optuna_study(X_train, y_train):
     """
     Conducts an Optuna study to find the best hyperparameters for the models.
 
-    Args:
-        X_train (pd.DataFrame): The training data features.
-        y_train (pd.Series): The training data labels.
+    Parameters
+    ----------
+    X_train : pandas.DataFrame
+        The training data features.
+    y_train : pandas.Series
+        The training data labels.
 
-    Returns:
-        dict: The best hyperparameters for each model.
+    Returns
+    -------
+    dict
+        The best hyperparameters for each model.
     """
     best_params = {}
 
@@ -1413,11 +1771,15 @@ def load_optuna_model(path):
     """
     Loads the Optuna model from the specified path.
 
-    Args:
-        path (str): The file path where the model is saved.
+    Parameters
+    ----------
+    path : str
+        The file path where the model is saved.
 
-    Returns:
-        object: The loaded Optuna model.
+    Returns
+    -------
+    object
+        The loaded Optuna model.
     """
     return joblib.load(path)
 
@@ -1427,8 +1789,24 @@ def train_ensemble_model(best_params, X_train, y_train, model_path):
     """
     Trains an ensemble model using the best hyperparameters.
 
+    This function trains a stacking ensemble model consisting of a Bagged SVM and an XGBoost model as base models,
+    with a Logistic Regression model as the meta-model. The best hyperparameters for each model are provided
+    through the `best_params` dictionary. The trained model is saved to the specified file path.
+
     Args:
         best_params (dict): The best hyperparameters for each model.
+            - 'xgb': Hyperparameters for the XGBoost model.
+                - 'n_estimators_xgb' (int): Number of boosting rounds.
+                - 'max_depth_xgb' (int): Maximum tree depth for base learners.
+                - 'learning_rate_xgb' (float): Boosting learning rate.
+                - 'reg_alpha' (float, optional): L1 regularization term on weights (default is 0.0).
+                - 'reg_lambda' (float, optional): L2 regularization term on weights (default is 1.0).
+            - 'svm': Hyperparameters for the SVM model.
+                - 'C_svm' (float): Regularization parameter.
+                - 'kernel_svm' (str): Specifies the kernel type to be used in the algorithm.
+            - 'logreg': Hyperparameters for the Logistic Regression model.
+                - 'C_logreg' (float): Inverse of regularization strength (smaller values specify stronger regularization).
+                - 'penalty' (str, optional): Used to specify the norm used in the penalization ('l1' or 'l2', default is 'l2').
         X_train (pd.DataFrame): The training data features.
         y_train (pd.Series): The training data labels.
         model_path (str): The file path where the model will be saved.
@@ -1438,7 +1816,6 @@ def train_ensemble_model(best_params, X_train, y_train, model_path):
     """
     logging.info(f"Training new ensemble model with best parameters")
 
-
     # XGBoost model with increased L1 and L2 regularization
     xgb_model = XGBClassifier(
         n_estimators=best_params['xgb']['n_estimators_xgb'],
@@ -1446,25 +1823,28 @@ def train_ensemble_model(best_params, X_train, y_train, model_path):
         learning_rate=best_params['xgb']['learning_rate_xgb'],
         reg_alpha=best_params['xgb'].get('reg_alpha', 0.0),  # L1 regularization (default 0.0)
         reg_lambda=best_params['xgb'].get('reg_lambda', 1.0),  # L2 regularization (default 1.0)
+        scale_pos_weight=len(y_train[y_train == 0]) / len(y_train[y_train == 1]),  # Adjust for class imbalance
         random_state=42,
         n_jobs=2
     )
 
-
-    # SVM model (regularization is already handled via C parameter)
-    svm_model = SVC(
-        C=best_params['svm']['C_svm'],  # Regularization strength for SVM (higher C = less regularization)
-        kernel=best_params['svm']['kernel_svm'],
-        probability=True,
-        class_weight='balanced',
+    # Bagged SVM Model
+    bagged_svm = BaggingClassifier(
+        estimator=SVC(
+            C=best_params['svm']['C_svm'],  # Regularization strength for SVM (higher C = less regularization)
+            kernel=best_params['svm']['kernel_svm'],
+            probability=True,
+            class_weight='balanced',
+            random_state=42
+        ),
+        n_estimators=10,  # Number of bagged models
+        n_jobs=2,
         random_state=42
     )
-
 
     # Logistic Regression with increased regularization strength
     penalty = best_params['logreg'].get('penalty', 'l2')  # L1 or L2 penalty
     solver = 'saga' if penalty == 'l1' else 'lbfgs'  # Use 'saga' for L1, 'lbfgs' for L2
-
 
     # Stronger regularization by reducing the C parameter (higher C = weaker regularization)
     meta_model = LogisticRegression(
@@ -1473,21 +1853,18 @@ def train_ensemble_model(best_params, X_train, y_train, model_path):
         class_weight='balanced',
         random_state=42,
         solver=solver,
-        max_iter=1000
+        max_iter=2000
     )
 
-
-    # Stacking ensemble with XGBoost, SVM, and Logistic Regression as the meta-model
+    # Stacking ensemble with Bagged SVM and XGBoost as base models
     stacking_model = StackingClassifier(
-        estimators=[('xgb', xgb_model), ('svm', svm_model)],
+        estimators=[('bagged_svm', bagged_svm), ('xgb', xgb_model)],
         final_estimator=meta_model
     )
-
 
     # Train the ensemble model
     for _ in tqdm(range(1), desc="Training ensemble model"):
         stacking_model.fit(X_train, y_train)
-
 
     # Save the ensemble model
     joblib.dump(stacking_model, model_path)
@@ -1501,12 +1878,16 @@ def log_label_percentages(df, dataset_name):
     """
     Logs the percentage of each label in the DataFrame.
 
-    Args:
-        df (pd.DataFrame): The DataFrame containing the data.
-        dataset_name (str): The name of the dataset being processed.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The DataFrame containing the data.
+    dataset_name : str
+        The name of the dataset being processed.
 
-    Returns:
-        None
+    Returns
+    -------
+    None
     """
     total_count = len(df)
     total_rows, total_columns = df.shape
@@ -1530,11 +1911,15 @@ def count_urls(urls_list):
     """
     Counts the number of URLs in the provided list.
 
-    Args:
-        urls_list (list): The list of URLs.
+    Parameters
+    ----------
+    urls_list : list
+        The list of URLs.
 
-    Returns:
-        int: The number of URLs in the list.
+    Returns
+    -------
+    int
+        The number of URLs in the list.
     """
     if isinstance(urls_list, list):
         return len(urls_list)
@@ -1547,13 +1932,18 @@ def check_missing_values(df, df_name, num_rows=1):
     """
     Checks for missing values in the DataFrame and logs the results.
 
-    Args:
-        df (pd.DataFrame): The DataFrame to check for missing values.
-        df_name (str): The name of the DataFrame.
-        num_rows (int): The number of rows to display with missing values.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The DataFrame to check for missing values.
+    df_name : str
+        The name of the DataFrame.
+    num_rows : int, optional
+        The number of rows to display with missing values. Default is 1.
 
-    Returns:
-        None
+    Returns
+    -------
+    None
     """
     missing_values = df.isnull().sum()
     total_missing_values = missing_values.sum()
@@ -1570,7 +1960,7 @@ def check_missing_values(df, df_name, num_rows=1):
             logging.info(f"No rows with missing values found in {df_name} after initial check.")
 
 
-
+# Redundant function
 def plot_learning_curve(estimator, X, y, title="Learning Curve", ylim=None, cv=6, n_jobs=4, train_sizes=np.linspace(0.1, 1.0, 6)):
     """
     Plots the learning curve for the provided estimator.
@@ -1624,12 +2014,17 @@ def get_fold_paths(fold_idx, base_dir='Processed Data'):
     """
     Generates file paths for the train and test data and labels for the specified fold.
 
-    Args:
-        fold_idx (int): The index of the fold.
-        base_dir (str): The base directory where the data will be saved.
+    Parameters
+    ----------
+    fold_idx : int
+        The index of the fold.
+    base_dir : str, optional
+        The base directory where the data will be saved. Default is 'Processed Data'.
 
-    Returns:
-        tuple: The file paths for the train data, test data, train labels, test labels, and preprocessor.
+    Returns
+    -------
+    tuple
+        The file paths for the train data, test data, train labels, test labels, and preprocessor.
     """
     train_data_path = os.path.join(base_dir, f"fold_{fold_idx}_train_data.npz")
     test_data_path = os.path.join(base_dir, f"fold_{fold_idx}_test_data.npz")
@@ -1645,11 +2040,16 @@ def save_data_pipeline(data, labels, data_path, labels_path):
     """
     Save the data and labels to specified file paths.
 
-    Parameters:
-    data (numpy.ndarray): The data to be saved.
-    labels (numpy.ndarray): The labels to be saved.
-    data_path (str): The file path to save the data.
-    labels_path (str): The file path to save the labels.
+    Parameters
+    ----------
+    data : numpy.ndarray
+        The data to be saved.
+    labels : numpy.ndarray
+        The labels to be saved.
+    data_path : str
+        The file path to save the data.
+    labels_path : str
+        The file path to save the labels.
     """
     np.savez(data_path, data=data)
     with open(labels_path, 'wb') as f:
@@ -1661,12 +2061,17 @@ def load_data_pipeline(data_path, labels_path):
     """
     Load the data and labels from specified file paths.
 
-    Parameters:
-    data_path (str): The file path to load the data from.
-    labels_path (str): The file path to load the labels from.
+    Parameters
+    ----------
+    data_path : str
+        The file path to load the data from.
+    labels_path : str
+        The file path to load the labels from.
 
-    Returns:
-    tuple: A tuple containing the loaded data and labels.
+    Returns
+    -------
+    tuple
+        A tuple containing the loaded data and labels.
     """
     data = np.load(data_path)['data']
     with open(labels_path, 'rb') as f:
@@ -1677,34 +2082,68 @@ def load_data_pipeline(data_path, labels_path):
 
 def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
     """
-    Run the data processing pipeline or load preprocessed data if it already exists.
+    Run the data processing pipeline for a specific fold in a stratified k-fold cross-validation.
 
-    Parameters:
-    fold_idx (int): The fold index for cross-validation.
-    X_train (pandas.DataFrame): The training data.
-    X_test (pandas.DataFrame): The test data.
-    y_train (numpy.ndarray): The training labels.
-    y_test (numpy.ndarray): The test labels.
-    pipeline (sklearn.pipeline.Pipeline): The data processing pipeline.
+    This code snippet performs the following tasks:
+    1. Sets up the base directory and file paths for the fold.
+    2. Checks if the preprocessed data files already exist.
+    3. If the files do not exist:
+        a. Logs the beginning of the pipeline for the fold.
+        b. Applies data augmentation to the training data.
+        c. Processes non-text features.
+        d. Fits the preprocessor and transforms the non-text features.
+        e. Saves the preprocessor.
+        f. Extracts BERT features for the text data.
+        g. Combines the processed non-text and text features.
+        h. Applies SMOTE to balance the training data.
+        i. Applies PCA for dimensionality reduction.
+        j. Logs the number of features after PCA.
+        k. Saves the preprocessed data.
+    4. If the files exist, loads the preprocessor and preprocessed data.
+    5. Returns the balanced training data, combined test data, and their respective labels.
 
-    Returns:
-    tuple: A tuple containing the processed training data, test data, training labels, and test labels.
+    Parameters
+    ----------
+    fold_idx : int
+        The index of the current fold.
+    X_train : pandas.DataFrame
+        The training data.
+    X_test : pandas.DataFrame
+        The test data.
+    y_train : pandas.Series
+        The training labels.
+    y_test : pandas.Series
+        The test labels.
+    pipeline : sklearn.pipeline.Pipeline
+        The data processing pipeline.
+
+    Returns
+    -------
+    tuple
+        The balanced training data, combined test data, and their respective labels.
     """
     base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Feature Extraction')
     os.makedirs(base_dir, exist_ok=True)
     train_data_path, test_data_path, train_labels_path, test_labels_path, preprocessor_path = get_fold_paths(fold_idx, base_dir)
-
 
     # Check if the files already exist
     if not all([os.path.exists(train_data_path), os.path.exists(test_data_path), os.path.exists(train_labels_path), os.path.exists(test_labels_path), os.path.exists(preprocessor_path)]):
         logging.info(f"Running pipeline for fold {fold_idx}...")
         logging.info(f"Initial shape of X_train: {X_train.shape}")
 
-        # Fit and transform the pipeline
-        logging.info(f"Processing non-text features for fold {fold_idx}...")
-        X_train_non_text = X_train.drop(columns=['cleaned_text'])
-        X_test_non_text = X_test.drop(columns=['cleaned_text'])
+        # Apply Data Augmentation before processing non-text features and BERT
+        logging.info(f"Applying data augmentation for fold {fold_idx}...")
+        augment_step = pipeline.named_steps['augment']
+        
+        # Pass both features and labels to the augment function
+        X_train_augmented, y_train_augmented = augment_step.transform(X_train, y_train)  # Assuming augment_step handles y as well
+        
+        logging.info(f"Data augmentation applied for fold {fold_idx}. Shape after augmentation: {X_train_augmented.shape}\n")
 
+        # Processing non-text features
+        logging.info(f"Processing non-text features for fold {fold_idx}...")
+        X_train_non_text = X_train_augmented.drop(columns=['cleaned_text'])
+        X_test_non_text = X_test.drop(columns=['cleaned_text'])
 
         # Fit the preprocessor
         logging.info(f"Fitting the preprocessor for fold {fold_idx}...")
@@ -1714,25 +2153,22 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         feature_names = preprocessor.named_transformers_['cat'].named_steps['encoder'].get_feature_names_out()
         logging.info(f"Columns in X_train after processing non-text features: {X_train_non_text_processed.shape}")
         logging.info(f"Feature names: {feature_names}")
-        if X_train_non_text_processed.shape[0] != y_train.shape[0]:
-            logging.error(f"Row mismatch: {X_train_non_text_processed.shape[0]} vs {y_train.shape[0]}")
-        logging.info(f"Non text features processed for fold {fold_idx}.\n")
-
+        if X_train_non_text_processed.shape[0] != y_train_augmented.shape[0]:
+            logging.error(f"Row mismatch: {X_train_non_text_processed.shape[0]} vs {y_train_augmented.shape[0]}")
+        logging.info(f"Non-text features processed for fold {fold_idx}.\n")
 
         # Save the preprocessor
         logging.info(f"Saving preprocessor for fold {fold_idx}...")
         joblib.dump(preprocessor, preprocessor_path)
         logging.info(f"Saved preprocessor to {preprocessor_path}\n")
 
-
         # Transform the text features
         logging.info(f"Extracting BERT features for X_train for {fold_idx}...")
-        X_train_text_processed = pipeline.named_steps['bert_features'].transform(X_train['cleaned_text'].tolist())
+        X_train_text_processed = pipeline.named_steps['bert_features'].transform(X_train_augmented['cleaned_text'].tolist())
         logging.info(f"Extracting BERT features for X_test for {fold_idx}...")
         X_test_text_processed = pipeline.named_steps['bert_features'].transform(X_test['cleaned_text'].tolist())
         logging.info(f"Number of features extracted from BERT for fold {fold_idx}: {X_train_text_processed.shape}")
-        logging.info(f"Bert features extracted for fold {fold_idx}.\n")
-
+        logging.info(f"BERT features extracted for fold {fold_idx}.\n")
 
         # Combine processed features
         logging.info(f"Combining processed features for fold {fold_idx}...")
@@ -1741,26 +2177,22 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         logging.info(f"Total number of combined features for fold {fold_idx}: {X_train_combined.shape}")
         logging.info(f"Combined processed features for fold {fold_idx}.\n")
 
-
-
-        logging.info(f"Class distribution before SMOTE for fold {fold_idx}: {Counter(y_train)}")
+        # SMOTE to balance the training data
+        logging.info(f"Class distribution before SMOTE for fold {fold_idx}: {Counter(y_train_augmented)}")
         logging.info(f"Applying SMOTE to balance the training data for fold {fold_idx}...")
-        X_train_balanced, y_train_balanced = pipeline.named_steps['smote'].fit_resample(X_train_combined, y_train)
+        X_train_balanced, y_train_balanced = pipeline.named_steps['smote'].fit_resample(X_train_combined, y_train_augmented)
         logging.info(f"Class distribution after SMOTE for fold {fold_idx}: {Counter(y_train_balanced)}")
         logging.info(f"SMOTE applied for fold {fold_idx}.\n")
 
-
-
+        # Apply PCA for dimensionality reduction
         logging.info(f"Applying PCA for dimensionality reduction for fold {fold_idx}...")
         X_train_balanced = pipeline.named_steps['pca'].fit_transform(X_train_balanced)
         X_test_combined = pipeline.named_steps['pca'].transform(X_test_combined)
-
 
         # Log the number of features after PCA
         n_components = pipeline.named_steps['pca'].n_components_
         logging.info(f"Number of components after PCA: {n_components}")
         logging.info(f"Shape of X_train after PCA: {X_train_balanced.shape}")
-
 
         # Save the preprocessed data
         logging.info(f"Saving processed data for fold {fold_idx}...")
@@ -1770,7 +2202,6 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         # Load the preprocessor
         logging.info(f"Loading preprocessor from {preprocessor_path}...")
         preprocessor = joblib.load(preprocessor_path)
-
 
         # Load the preprocessed data
         logging.info(f"Loading preprocessed data for fold {fold_idx}...")
@@ -1785,11 +2216,15 @@ def extract_email(text):
     """
     Extract the email address from a given text.
 
-    Parameters:
-    text (str): The text containing the email address.
+    Parameters
+    ----------
+    text : str
+        The text containing the email address.
 
-    Returns:
-    str or None: The extracted email address or None if no email address is found.
+    Returns
+    -------
+    str or None
+        The extracted email address or None if no email address is found.
     """
     if isinstance(text, str):
         match = re.search(r'<([^>]+)>', text)
@@ -1805,12 +2240,17 @@ def process_and_save_emails(df, output_file):
     """
     Process the DataFrame to extract sender and receiver emails and save to a CSV file.
 
-    Parameters:
-    df (pandas.DataFrame): The DataFrame containing the email data.
-    output_file (str): The file path to save the processed email data.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The DataFrame containing the email data.
+    output_file : str
+        The file path to save the processed email data.
 
-    Returns:
-    pandas.DataFrame: The DataFrame containing the extracted emails.
+    Returns
+    -------
+    pandas.DataFrame
+        The DataFrame containing the extracted emails.
     """
     # Extract sender and receiver emails
     df['sender'] = df['sender'].apply(extract_email)
@@ -1829,13 +2269,19 @@ def load_or_save_emails(df, output_file, df_name = 'CEAS_08'):
     """
     Load the cleaned email data from a CSV file or process and save the data if the file does not exist.
 
-    Parameters:
-    df (pandas.DataFrame): The DataFrame containing the email data.
-    output_file (str): The file path to save or load the cleaned email data.
-    df_name (str): The name of the DataFrame source.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The DataFrame containing the email data.
+    output_file : str
+        The file path to save or load the cleaned email data.
+    df_name : str, optional
+        The name of the DataFrame source. Default is 'CEAS_08'.
 
-    Returns:
-    pandas.DataFrame: The cleaned email data.
+    Returns
+    -------
+    pandas.DataFrame
+        The cleaned email data.
     """
     if os.path.exists(output_file):
         logging.info(f"Output file {output_file} already exists. Loading data from {output_file}...\n")
@@ -1852,59 +2298,218 @@ def load_or_save_emails(df, output_file, df_name = 'CEAS_08'):
 
 
 
-class RareCategoryRemover(BaseEstimator, TransformerMixin):
+def generate_noisy_dataframe(data, file_path, noise_level=0.1):
     """
-    A custom transformer to remove rare categories from categorical features.
+    Generates a noisy DataFrame by injecting noise into specified columns.
 
-    Parameters:
-    threshold (float): The frequency threshold below which categories are considered rare. Default is 0.05.
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        The original DataFrame to be processed.
+    file_path : str
+        The path to save or load the noisy DataFrame.
+    noise_level : float
+        The level of noise to inject (probability for categorical/text, standard deviation for numerical).
 
-    Attributes:
-    replacements_ (dict): A dictionary mapping each column to another dictionary of rare categories and their replacements.
+    Returns
+    -------
+    pandas.DataFrame
+        The noisy DataFrame.
     """
-    def __init__(self, threshold=0.05):
-        self.threshold = threshold
-        self.replacements_ = {}
+    
+    # Function to inject noise into numerical columns
+    def inject_numerical_noise(data, columns, noise_level):
+        for column in columns:
+            noise = np.random.normal(0, noise_level, data[column].shape)
+            data[column] += noise
+        return data
+
+    # Function to inject noise into text columns
+    def inject_text_noise(data, text_column, noise_level):
+        for i in range(len(data)):
+            if random.random() < noise_level:  # With a probability of noise_level
+                text_list = list(data[text_column][i])
+                pos = random.randint(0, len(text_list) - 1)  # Choose a random position
+                text_list[pos] = random.choice('abcdefghijklmnopqrstuvwxyz')  # Replace with a random letter
+                data.at[i, text_column] = ''.join(text_list)
+        return data
+
+    # Function to inject noise into categorical columns
+    def inject_categorical_noise(data, columns, noise_level):
+        for column in columns:
+            unique_values = data[column].unique()
+            for i in range(len(data)):
+                if random.random() < noise_level:  # With a probability of noise_level
+                    data.at[i, column] = random.choice(unique_values)
+        return data
+
+    # Check if the noisy DataFrame already exists
+    if os.path.exists(file_path):
+        logging.info(f"Noisy DataFrame already exists as '{file_path}'. Loading it.")
+        df_noisy = pd.read_csv(file_path)
+    else:
+        logging.info(f"'{file_path}' does not exist. Generating a noisy DataFrame.")
+        
+        # Define the columns for noise injection
+        numerical_columns = ['https_count', 'http_count', 'blacklisted_keywords_count', 'urls', 'short_urls', 'has_ip_address']
+        categorical_columns = ['sender', 'receiver']
+        
+        # Apply noise injection
+        data = inject_numerical_noise(data, numerical_columns, noise_level)
+        data = inject_text_noise(data, 'cleaned_text', noise_level)
+        data = inject_categorical_noise(data, categorical_columns, noise_level)
+
+        # Save the noisy DataFrame
+        data.to_csv(file_path, index=False)
+        logging.info(f"Noisy DataFrame saved as '{file_path}'.")
+
+    return data
 
 
+
+def synonym_replacement(text):
+    words = text.split()
+    new_words = words.copy()
+
+    for i, word in enumerate(words):
+        try:
+            token = nlp(word)[0]
+            # Get similar words based on vector similarity
+            similar_words = [w.text for w in nlp.vocab if w.has_vector and w.is_lower and w.text != word]
+            if similar_words:
+                synonym = random.choice(similar_words)  # Choose a random similar word
+                new_words[i] = synonym  # Replace word with its similar word
+                logging.debug(f"Replaced '{word}' with synonym '{synonym}'")
+        except Exception as e:
+            logging.error(f"Error finding synonyms for '{word}': {e}")
+    logging.debug(f"Final synonym replacement result: {new_words}")  # Log the result
+    return ' '.join(new_words)
+
+# Define your back translation function
+def back_translation(text):
+    try:
+        # Load models for translation
+        model_name = "Helsinki-NLP/opus-mt-en-de"
+        tokenizer = MarianTokenizer.from_pretrained(model_name)
+        model = MarianMTModel.from_pretrained(model_name)
+        
+        # Translate to German
+        logging.debug(f"Translating to German: {text}")
+        translated = model.generate(**tokenizer(text, return_tensors="pt", padding=True))
+        german_text = tokenizer.batch_decode(translated, skip_special_tokens=True)[0]
+        logging.debug(f"Translated to German: {german_text}")
+        
+        # Translate back to English
+        model_name_back = "Helsinki-NLP/opus-mt-de-en"
+        tokenizer_back = MarianTokenizer.from_pretrained(model_name_back)
+        model_back = MarianMTModel.from_pretrained(model_name_back)
+        
+        logging.debug(f"Translating back to English: {german_text}")
+        back_translated = model_back.generate(**tokenizer_back(german_text, return_tensors="pt", padding=True))
+        english_text = tokenizer_back.batch_decode(back_translated, skip_special_tokens=True)[0]
+        logging.debug(f"Back translated to English: {english_text}")
+        return english_text
+
+    except IndexError as e:
+        logging.error(f"IndexError in back_translation: {e}")
+        raise
+    except Exception as e:
+        logging.error(f"Error in back_translation: {e}")
+        raise
+
+def random_sampling(df, categorical_columns):
+    for col in categorical_columns:
+        df[col] = df[col].sample(frac=1, replace=True).values
+    return df
+
+def mixup_data(X, y, alpha=0.2):
+    n_samples = X.shape[0]
+    index = np.random.permutation(n_samples)
+    logging.debug(f"Index array: {index}")
+    
+    lambda_val = np.random.beta(alpha, alpha)  # Mixup coefficient
+    mixed_X = lambda_val * X + (1 - lambda_val) * X[index]
+    mixed_y = lambda_val * y + (1 - lambda_val) * y[index]
+    
+    logging.debug(f"mixed_X shape: {mixed_X.shape}, mixed_y shape: {mixed_y.shape}")
+    logging.debug(f"mixed_X type: {type(mixed_X)}, mixed_y type: {type(mixed_y)}")
+    
+    return mixed_X, mixed_y
+
+def process_rows(rows):
+    augmented_rows = []
+    for _, data in rows.iterrows():
+        # Original entry
+        augmented_rows.append(data.to_dict())  # Convert to dictionary
+        logging.debug(f"Processing original row: {data.to_dict()}")
+
+        # Extract the cleaned_text for augmentation
+        text = data['cleaned_text']
+        
+        # Synonym Replacement
+        try:
+            synonym_text = synonym_replacement(text)
+            augmented_row = data.to_dict()  # Use a dictionary
+            augmented_row['cleaned_text'] = synonym_text
+            augmented_rows.append(augmented_row)
+        except Exception as e:
+            logging.error(f"Error in synonym replacement: {e}")
+
+        # Back Translation
+        try:
+            back_translated_text = back_translation(text)
+            augmented_row = data.to_dict()  # Use a dictionary
+            augmented_row['cleaned_text'] = back_translated_text
+            augmented_rows.append(augmented_row)
+        except Exception as e:
+            logging.error(f"Error in back translation: {e}")
+
+    return augmented_rows
+
+def augment_data(X, y, categorical_columns, numerical_columns, max_workers=4):
+    # Ensure X is a DataFrame
+    if isinstance(X, np.ndarray):
+        X = pd.DataFrame(X, columns=categorical_columns + numerical_columns + ['cleaned_text'])
+    
+    logging.debug(f"Initial DataFrame shape: {X.shape}")
+    augmented_data = []
+
+    # Split DataFrame into chunks
+    chunk_size = len(X) // max_workers
+    chunks = [X.iloc[i:i + chunk_size] for i in range(0, len(X), chunk_size)]
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_rows, chunk) for chunk in chunks]
+        for future in tqdm(as_completed(futures), total=len(futures), desc="Processing chunks"):
+            augmented_data.extend(future.result())
+
+    logging.debug(f"Total augmented rows: {len(augmented_data)}")
+    return pd.DataFrame(augmented_data)
+
+
+class DataAugmentationTransformer(BaseEstimator, TransformerMixin):
+    def __init__(self, categorical_columns, numerical_columns):
+        self.categorical_columns = categorical_columns
+        self.numerical_columns = numerical_columns
 
     def fit(self, X, y=None):
-        """
-        Fit the transformer to the data by identifying rare categories.
+        return self  # No fitting required
 
-        Parameters:
-        X (pandas.DataFrame): The input data with categorical features.
-        y (ignored): Not used, present for API consistency by convention.
-
-        Returns:
-        self: Returns the instance itself.
-        """
-        logging.info(f"Removing rare categories with threshold: {self.threshold}")
-        for column in X.columns:
-            frequency = X[column].value_counts(normalize=True)
-            rare_categories = frequency[frequency < self.threshold].index
-            self.replacements_[column] = {cat: 'Other' for cat in rare_categories}
-
-        return self
-
-
-
-    def transform(self, X):
-        """
-        Transform the data by replacing rare categories with 'Other'.
-
-        Parameters:
-        X (pandas.DataFrame): The input data with categorical features.
-
-        Returns:
-        pandas.DataFrame: The transformed data with rare categories replaced.
-        """
-        for column, replacements in self.replacements_.items():
-            X.loc[:, column] = X[column].replace(replacements)
-        assert X.shape[0] == X.shape[0], "Row count changed during rare category removal."
-
-        return X
+    def transform(self, X, y=None):
+        if y is None:
+            raise ValueError("Labels y must be provided for data augmentation.")
+        
+        # Ensure X is a DataFrame
+        if isinstance(X, np.ndarray):
+            X = pd.DataFrame(X, columns=self.categorical_columns + self.numerical_columns + ['cleaned_text'])
+        
+        # Call the augment_data function
+        augmented_data = augment_data(X, y, self.categorical_columns, self.numerical_columns)
+        
+        # Return the augmented data
+        return augmented_data
     
+
 
 # Main processing function
 def main():
@@ -1951,6 +2556,7 @@ def main():
     CleanedCEASHeaders = os.path.join(base_dir, 'Data Cleaning', 'CleanedCEASHeaders.csv')
     MergedCleanedCEASHeaders = os.path.join(base_dir, 'Data Cleaning', 'MergedCleanedCEASHeaders.csv')
     MergedCleanedDataFrame = os.path.join(base_dir, 'Data Cleaning', 'MergedCleanedDataFrame.csv')
+    NoisyDataFrame = os.path.join(base_dir, 'Noise Injection', 'NoisyDataFrame.csv')
 
 
     # Load the datasets
@@ -2308,6 +2914,26 @@ def main():
         df_cleaned_combined.to_csv(MergedCleanedDataFrame, index=False)
         logging.info(f"Data Cleaning completed.\n")
 
+        # ***************************** #
+        #       Noise Injection         #
+        # ***************************** #
+        """
+        Perform noise injection on the cleaned combined DataFrame.
+
+        This code snippet performs the following tasks:
+        1. Logs the beginning of the noise injection stage.
+        2. Generates a noisy DataFrame from the cleaned combined DataFrame.
+        3. Logs the completion of the noise injection stage.
+
+        Attributes:
+            df_cleaned_combined (pandas.DataFrame): The cleaned combined DataFrame.
+            NoisyDataFrame (str): File path to save the noisy DataFrame.
+            noisy_df (pandas.DataFrame): DataFrame containing the noisy data.
+        """
+        logging.info(f"Beginning Noise Injection...")
+        noisy_df = generate_noisy_dataframe(df_cleaned_combined, NoisyDataFrame)
+        logging.info(f"Noise Injection completed.\n")
+
     
         # ************************* #
         #       Data Splitting      #
@@ -2329,7 +2955,7 @@ def main():
         """
 
         logging.info(f"Beginning Data Splitting...")
-        folds = stratified_k_fold_split(df_cleaned_combined)
+        folds = stratified_k_fold_split(noisy_df)
         logging.info(f"Data Splitting completed.\n")
 
 
@@ -2345,16 +2971,15 @@ def main():
             #       Feature Extraction and Data Imbalance Handling         #
             # ************************************************************ #
             """
-            Perform feature extraction for a specific fold in a stratified k-fold cross-validation.
+            Perform feature extraction, data augmentation, and preprocessing for a specific fold in a stratified k-fold cross-validation.
 
             This code snippet performs the following tasks:
-            1. Logs the beginning of the feature extraction stage for the specified fold.
-            2. Defines columns for categorical, numerical, and text data.
-            3. Initializes BERT feature extractor and transformer.
-            4. Defines a preprocessor for categorical and numerical columns.
-            5. Defines a pipeline with preprocessor, BERT, SMOTE, and PCA.
-            6. Runs the pipeline or loads preprocessed data for the specified fold.
-            7. Logs the successful processing or loading of data for the specified fold.
+            1. Defines columns for categorical, numerical, and text data.
+            2. Initializes BERT feature extractor and transformer.
+            3. Defines a preprocessor for categorical and numerical columns.
+            4. Defines a pipeline with preprocessor, BERT, data augmentation, SMOTE, and PCA.
+            5. Runs the pipeline or loads preprocessed data for the specified fold.
+            6. Logs the successful processing or loading of data for the specified fold.
 
             Attributes:
                 categorical_columns (list): List of categorical columns.
@@ -2363,7 +2988,7 @@ def main():
                 bert_extractor (BERTFeatureExtractor): BERT feature extractor instance.
                 bert_transformer (BERTFeatureTransformer): BERT feature transformer instance.
                 preprocessor (ColumnTransformer): Preprocessor for categorical and numerical columns.
-                pipeline (Pipeline): Pipeline with preprocessor, BERT, SMOTE, and PCA.
+                pipeline (Pipeline): Pipeline with preprocessor, BERT, data augmentation, SMOTE, and PCA.
                 X_train_balanced (pandas.DataFrame): Balanced training data.
                 X_test_combined (pandas.DataFrame): Combined test data.
                 y_train_balanced (pandas.Series): Balanced training labels.
@@ -2403,9 +3028,10 @@ def main():
             
             # Define pipeline with preprocessor, BERT, and SMOTE
             pipeline = Pipeline(steps=[
+                ('augment', DataAugmentationTransformer(categorical_columns=categorical_columns, numerical_columns=numerical_columns)),
                 ('preprocessor', preprocessor),
                 ('bert_features', bert_transformer),  # Custom transformer for BERT
-                ('smote', SMOTE(random_state=42)),  # Apply SMOTE after feature extraction
+                ('smote', SMOTE(random_state=42)),  # Apply SMOTE after augmentation
                 ('pca', PCA(n_components=10))
             ])
 
