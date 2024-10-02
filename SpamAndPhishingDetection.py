@@ -96,6 +96,24 @@ from typing import Dict, List, Union  # Type hints
 from datasets import load_dataset  # Load datasets
 
 
+
+"""
+This script sets up the environment for spam and phishing detection.
+
+It includes the following configurations and setups:
+- Label descriptions for classification.
+- ANSI escape codes for text formatting.
+- Downloading necessary NLTK resources.
+- Configuring logging for the application.
+- Suppressing TensorFlow and other library warnings.
+
+Attributes:
+    label_descriptions (dict): A dictionary mapping label indices to their descriptions.
+    BOLD (str): ANSI escape code for bold text formatting.
+    RESET (str): ANSI escape code to reset text formatting.
+"""
+
+
 # Define the mapping of label values to descriptions
 label_descriptions = {
     0: "Safe",
@@ -130,6 +148,15 @@ warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
 
 class DatasetProcessor:
+    """
+    A class to process datasets by removing unnamed columns, missing values, and duplicates, and saving the processed data.
+
+    Parameters:
+    df (pandas.DataFrame): The DataFrame to be processed.
+    column_name (str): The column name to check for duplicates.
+    dataset_name (str): The name of the dataset.
+    save_path (str): The path to save the processed data.
+    """
     def __init__(self, df, column_name, dataset_name, save_path):
         self.df = df
         self.column_name = column_name
@@ -138,6 +165,12 @@ class DatasetProcessor:
 
 
     def drop_unnamed_column(self):
+        """
+        Drop the 'Unnamed: 0' column if it exists in the DataFrame.
+
+        Returns:
+        pandas.DataFrame: The DataFrame with the 'Unnamed: 0' column removed.
+        """
         if 'Unnamed: 0' in self.df.columns:
             self.df = self.df.drop(columns=['Unnamed: 0'])
             logging.info(f"Dropped 'Unnamed: 0' column from {self.dataset_name}.")
@@ -147,6 +180,12 @@ class DatasetProcessor:
 
 
     def check_and_remove_missing_values(self):
+        """
+        Check and remove missing values from the DataFrame.
+
+        Returns:
+        pandas.DataFrame: The DataFrame with missing values removed.
+        """
         check_missing_values = self.df.isnull().sum()
         total_missing_values = check_missing_values.sum()
         logging.info(f"Total missing values: {total_missing_values}")
@@ -159,6 +198,12 @@ class DatasetProcessor:
 
 
     def remove_duplicates(self):
+        """
+        Remove duplicate rows based on the specified column.
+
+        Returns:
+        pandas.DataFrame: The DataFrame with duplicates removed.
+        """
         logging.info(f"Removing duplicate data....")
         num_duplicates_before = self.df.duplicated(subset=[self.column_name], keep=False).sum()
         self.df = self.df.drop_duplicates(subset=[self.column_name], keep='first')
@@ -172,6 +217,9 @@ class DatasetProcessor:
 
 
     def save_processed_data(self):
+        """
+        Save the processed DataFrame to a CSV file.
+        """
         try:
             self.df.to_csv(self.save_path, index=False)
             logging.info(f"Processed data saved to {self.save_path}\n")
@@ -183,6 +231,13 @@ class DatasetProcessor:
 
 
     def process_dataset(self):
+        """
+        Process the dataset by dropping unnamed columns, removing missing values, and removing duplicates.
+        If the processed file already exists, load it instead.
+
+        Returns:
+        pandas.DataFrame: The processed DataFrame.
+        """
         if os.path.exists(self.save_path):
             logging.info(f"Processed file already exists at {self.save_path}. Loading the file...")
             self.df = pd.read_csv(self.save_path)
@@ -200,6 +255,12 @@ class DatasetProcessor:
 
 
 class EmailHeaderExtractor:
+    """
+    A class to extract email headers and other relevant information from email data.
+
+    Parameters:
+    df (pandas.DataFrame): The DataFrame containing the email data.
+    """
     def __init__(self, df: pd.DataFrame):
         self.df = df
         self.headers_df = pd.DataFrame()
@@ -208,6 +269,15 @@ class EmailHeaderExtractor:
 
 
     def clean_links(self, links: List[str]) -> List[str]:
+        """
+        Clean the extracted links by removing unwanted characters and spaces.
+
+        Parameters:
+        links (List[str]): The list of links to be cleaned.
+
+        Returns:
+        List[str]: The cleaned list of links.
+        """
         cleaned_links = []
         for link in links:
             link = re.sub(r'[\'\[\]\s]+', '', link)
@@ -221,6 +291,15 @@ class EmailHeaderExtractor:
 
 
     def extract_inline_headers(self, email_text: str) -> Dict[str, Union[str, None]]:
+        """
+        Extract inline headers (From, To, Mail-To) from the email text.
+
+        Parameters:
+        email_text (str): The email text to extract headers from.
+
+        Returns:
+        Dict[str, Union[str, None]]: A dictionary containing the extracted headers.
+        """
         from_match = re.search(r'From:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
         to_match = re.search(r'To:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
         mail_to_match = re.search(r'mailto:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
@@ -233,6 +312,15 @@ class EmailHeaderExtractor:
 
 
     def extract_body_content(self, email_message: EmailMessage) -> str:
+        """
+        Extract the body content from an email message.
+
+        Parameters:
+        email_message (EmailMessage): The email message to extract the body content from.
+
+        Returns:
+        str: The extracted body content.
+        """
         body_content = ""
         if email_message.is_multipart():
             for part in email_message.iter_parts():
@@ -248,6 +336,15 @@ class EmailHeaderExtractor:
 
 
     def count_https_http(self, text: str) -> Dict[str, int]:
+        """
+        Count the occurrences of 'https' and 'http' in the text.
+
+        Parameters:
+        text (str): The text to count the occurrences in.
+
+        Returns:
+        Dict[str, int]: A dictionary containing the counts of 'https' and 'http'.
+        """
         https_count = len(re.findall(r'https://', text))
         http_count = len(re.findall(r'http://', text))
 
@@ -256,6 +353,15 @@ class EmailHeaderExtractor:
 
 
     def contains_blacklisted_keywords(self, text: str) -> int:
+        """
+        Count the occurrences of blacklisted keywords in the text.
+
+        Parameters:
+        text (str): The text to count the occurrences in.
+
+        Returns:
+        int: The count of blacklisted keywords in the text.
+        """
         blacklisted_keywords = [
         'click now', 'verify now', 'urgent', 'free', 'winner',
         'limited time', 'act now', 'your account', 'risk', 'account update',
@@ -277,6 +383,15 @@ class EmailHeaderExtractor:
 
 
     def detect_url_shorteners(self, links: List[str]) -> int:
+        """
+        Detect the number of URL shorteners in the list of links.
+
+        Parameters:
+        links (List[str]): The list of links to check for URL shorteners.
+
+        Returns:
+        int: The count of URL shorteners in the list of links.
+        """
         shortener_domains = [
             'bit.ly', 'tinyurl.com', 'goo.gl', 'ow.ly', 't.co', 'is.gd', 'buff.ly', 
             'adf.ly', 'bl.ink', 'lnkd.in', 'shorte.st', 'mcaf.ee', 'q.gs', 'po.st', 
@@ -289,6 +404,15 @@ class EmailHeaderExtractor:
 
 
     def count_ip_addresses(self, text: str) -> int:
+        """
+        Count the occurrences of IP addresses in the text.
+
+        Parameters:
+        text (str): The text to count the occurrences in.
+
+        Returns:
+        int: The count of IP addresses in the text.
+        """
         ip_pattern = r'https?://(\d{1,3}\.){3}\d{1,3}'
 
         return len(re.findall(ip_pattern, text))
@@ -296,102 +420,120 @@ class EmailHeaderExtractor:
 
 
     def extract_headers_spamassassin(self) -> pd.DataFrame:
-            headers_list: List[Dict[str, Union[str, List[str], int]]] = []
-            for email_text in tqdm(self.df['text'], desc="Extracting headers"):
-                try:
-                    email_message = BytesParser(policy=policy.default).parsebytes(email_text.encode('utf-8'))
-                    from_header = email_message['From'] if 'From' in email_message else None
-                    to_header = email_message['To'] if 'To' in email_message else None
-                    mail_to_header = email_message.get('Mail-To') if email_message.get('Mail-To') else None
+        """
+        Extract headers and other relevant information from the email data for SpamAssassin dataset.
 
-                    if not from_header or not to_header:
-                        inline_headers = self.extract_inline_headers(email_text)
-                        from_header = inline_headers['From'] or from_header
-                        to_header = inline_headers['To'] or to_header
-                        mail_to_header = inline_headers['Mail-To'] or mail_to_header
+        Returns:
+        pandas.DataFrame: A DataFrame containing the extracted headers and information.
+        """
+        headers_list: List[Dict[str, Union[str, List[str], int]]] = []
+        for email_text in tqdm(self.df['text'], desc="Extracting headers"):
+            try:
+                email_message = BytesParser(policy=policy.default).parsebytes(email_text.encode('utf-8'))
+                from_header = email_message['From'] if 'From' in email_message else None
+                to_header = email_message['To'] if 'To' in email_message else None
+                mail_to_header = email_message.get('Mail-To') if email_message.get('Mail-To') else None
 
-                    from_header = from_header if from_header else None
-                    to_header = to_header if to_header else None
-                    mail_to_header = mail_to_header if mail_to_header else None
-                    body_content = self.extract_body_content(email_message)
-                    logging.debug(f"Email body content: {body_content}")
+                if not from_header or not to_header:
+                    inline_headers = self.extract_inline_headers(email_text)
+                    from_header = inline_headers['From'] or from_header
+                    to_header = inline_headers['To'] or to_header
+                    mail_to_header = inline_headers['Mail-To'] or mail_to_header
 
-
-                    # Extract URLs from body content
-                    url_pattern = r'https?:\/\/[^\s\'"()<>]+'
-                    links = re.findall(url_pattern, body_content)
-                    links = self.clean_links(links)
-
-
-                    # Count blacklisted keywords, http/https, short URLs, and IP addresses in the email body
-                    https_http_counts = self.count_https_http(body_content)
-                    blacklisted_keyword_count = self.contains_blacklisted_keywords(body_content)
-                    short_urls = self.detect_url_shorteners(links)
-                    has_ip_address = self.count_ip_addresses(body_content)
+                from_header = from_header if from_header else None
+                to_header = to_header if to_header else None
+                mail_to_header = mail_to_header if mail_to_header else None
+                body_content = self.extract_body_content(email_message)
+                logging.debug(f"Email body content: {body_content}")
 
 
+                # Extract URLs from body content
+                url_pattern = r'https?:\/\/[^\s\'"()<>]+'
+                links = re.findall(url_pattern, body_content)
+                links = self.clean_links(links)
 
-                    headers_list.append({
-                    'sender': from_header,
-                    'receiver': to_header,
-                    'mailto': mail_to_header,
-                    'texturls': links,
-                    'https_count': https_http_counts['https_count'],
-                    'http_count': https_http_counts['http_count'],
-                    'blacklisted_keywords_count': blacklisted_keyword_count,
-                    'short_urls': short_urls,
-                    'has_ip_address': has_ip_address
-                })
-                except Exception as e:
-                    logging.error(f"Error parsing email: {e}")
-                    headers_list.append(
-                        {'sender': None, 'receiver': None, 'mailto': None, 'texturls': [], 'blacklisted_keywords_count': 0, 'short_urls': [], 'has_ip_address': 0})
-            self.headers_df = pd.DataFrame(headers_list)
 
-            return self.headers_df
+                # Count blacklisted keywords, http/https, short URLs, and IP addresses in the email body
+                https_http_counts = self.count_https_http(body_content)
+                blacklisted_keyword_count = self.contains_blacklisted_keywords(body_content)
+                short_urls = self.detect_url_shorteners(links)
+                has_ip_address = self.count_ip_addresses(body_content)
+
+
+
+                headers_list.append({
+                'sender': from_header,
+                'receiver': to_header,
+                'mailto': mail_to_header,
+                'texturls': links,
+                'https_count': https_http_counts['https_count'],
+                'http_count': https_http_counts['http_count'],
+                'blacklisted_keywords_count': blacklisted_keyword_count,
+                'short_urls': short_urls,
+                'has_ip_address': has_ip_address
+            })
+            except Exception as e:
+                logging.error(f"Error parsing email: {e}")
+                headers_list.append(
+                    {'sender': None, 'receiver': None, 'mailto': None, 'texturls': [], 'blacklisted_keywords_count': 0, 'short_urls': [], 'has_ip_address': 0})
+        self.headers_df = pd.DataFrame(headers_list)
+
+        return self.headers_df
 
 
 
     def extract_headers_ceas(self) -> pd.DataFrame:
-            headers_list: List[Dict[str, int]] = []
-            
-            for email_text in tqdm(self.df['body'], desc="Extracting headers"):
-                try:
-                    body_content = email_text  # Assuming 'email_text' contains the email body directly
-                    logging.debug(f"Email body content: {body_content}")
+        """
+        Extract headers and other relevant information from the email data for CEAS dataset.
+
+        Returns:
+        pandas.DataFrame: A DataFrame containing the extracted headers and information.
+        """
+        headers_list: List[Dict[str, int]] = []
+        
+        for email_text in tqdm(self.df['body'], desc="Extracting headers"):
+            try:
+                body_content = email_text  # Assuming 'email_text' contains the email body directly
+                logging.debug(f"Email body content: {body_content}")
 
 
-                    # Count blacklisted keywords and http/https occurrences in the email body
-                    https_http_counts = self.count_https_http(body_content)
-                    blacklisted_keyword_count = self.contains_blacklisted_keywords(body_content)
-                    short_urls = self.detect_url_shorteners(self.clean_links(re.findall(r'https?:\/\/[^\s\'"()<>]+', body_content)))
-                    has_ip_address = self.count_ip_addresses(body_content)
+                # Count blacklisted keywords and http/https occurrences in the email body
+                https_http_counts = self.count_https_http(body_content)
+                blacklisted_keyword_count = self.contains_blacklisted_keywords(body_content)
+                short_urls = self.detect_url_shorteners(self.clean_links(re.findall(r'https?:\/\/[^\s\'"()<>]+', body_content)))
+                has_ip_address = self.count_ip_addresses(body_content)
 
 
 
-                    headers_list.append({
-                    'https_count': https_http_counts['https_count'],
-                    'http_count': https_http_counts['http_count'],
-                    'blacklisted_keywords_count': blacklisted_keyword_count,
-                    'short_urls': short_urls,
-                    'has_ip_address': has_ip_address
+                headers_list.append({
+                'https_count': https_http_counts['https_count'],
+                'http_count': https_http_counts['http_count'],
+                'blacklisted_keywords_count': blacklisted_keyword_count,
+                'short_urls': short_urls,
+                'has_ip_address': has_ip_address
+            })
+            except Exception as e:
+                logging.error(f"Error processing email: {e}")
+                headers_list.append({
+                    'https_count': 0,
+                    'http_count': 0,
+                    'blacklisted_keywords_count': 0,
+                    'short_urls': [],
+                    'has_ip_address': 0
                 })
-                except Exception as e:
-                    logging.error(f"Error processing email: {e}")
-                    headers_list.append({
-                        'https_count': 0,
-                        'http_count': 0,
-                        'blacklisted_keywords_count': 0,
-                        'short_urls': [],
-                        'has_ip_address': 0
-                    })
-            self.headers_df = pd.DataFrame(headers_list)
+        self.headers_df = pd.DataFrame(headers_list)
 
-            return self.headers_df
+        return self.headers_df
 
 
 
     def save_to_csv(self, file_path: str):
+        """
+        Save the extracted headers DataFrame to a CSV file.
+
+        Parameters:
+        file_path (str): The path to save the CSV file.
+        """
         if not self.headers_df.empty:
             self.headers_df.to_csv(file_path, index=False)
             logging.info(f"Data successfully saved to: {file_path}")
@@ -401,7 +543,20 @@ class EmailHeaderExtractor:
 
 
 
-class TextProcessor(BaseEstimator, TransformerMixin):
+class TextProcessor:
+    """
+    A class for processing text data with various cleaning and preprocessing steps.
+
+    Parameters:
+    enable_spell_check (bool): Whether to enable spell checking. Default is False.
+
+    Attributes:
+    stop_words (set): A set of stop words to be removed from the text.
+    lemmatizer (WordNetLemmatizer): An instance of WordNetLemmatizer for lemmatizing words.
+    spell_checker (SpellChecker): An instance of SpellChecker for spell checking.
+    common_words (set): A set of common words from the spell checker's word frequency.
+    enable_spell_check (bool): Whether spell checking is enabled.
+    """
     def __init__(self, enable_spell_check=False):
         self.stop_words = set(stopwords.words('english'))
         self.lemmatizer = WordNetLemmatizer()
@@ -410,161 +565,299 @@ class TextProcessor(BaseEstimator, TransformerMixin):
         self.enable_spell_check = enable_spell_check
         logging.info("Initializing TextProcessor...")
 
-
-
     def expand_contractions(self, text):
+        """
+        Expand contractions in the text.
+
+        Parameters:
+        text (str): The input text.
+
+        Returns:
+        str: The text with contractions expanded.
+        """
         return contractions.fix(text)
 
-
-
     def remove_punctuation(self, text):
+        """
+        Remove punctuation from the text.
+
+        Parameters:
+        text (str): The input text.
+
+        Returns:
+        str: The text without punctuation.
+        """
         extra_punctuation = '“”‘’—–•·’'
         all_punctuation = string.punctuation + extra_punctuation
         return text.translate(str.maketrans('', '', all_punctuation))
 
-
-
     def tokenize(self, text):
+        """
+        Tokenize the text into words.
+
+        Parameters:
+        text (str): The input text.
+
+        Returns:
+        list: A list of words.
+        """
         return word_tokenize(text)
 
-
-
     def remove_stop_words(self, words_list):
+        """
+        Remove stop words from the list of words.
+
+        Parameters:
+        words_list (list): The list of words.
+
+        Returns:
+        list: The list of words without stop words.
+        """
         return [w for w in words_list if w.lower() not in self.stop_words]
 
-
-
     def lemmatize(self, words_list):
+        """
+        Lemmatize the list of words.
+
+        Parameters:
+        words_list (list): The list of words.
+
+        Returns:
+        list: The list of lemmatized words.
+        """
         return [self.lemmatizer.lemmatize(w) for w in words_list]
 
-
-
     def remove_urls(self, text):
-        return re.sub(r'(http[s]?|ftp):\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', '', text) # Updated to remove non-standard URL formats (e.g., 'http ww newsisfree com')
+        """
+        Remove URLs from the text.
 
+        Parameters:
+        text (str): The input text.
 
+        Returns:
+        str: The text without URLs.
+        """
+        return re.sub(r'(http[s]?|ftp):\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', '', text)
 
     def remove_custom_urls(self, text):
-        return re.sub(r'\b(?:http|www)[^\s]*\b', '', text)  # Catch patterns like 'http ww' or 'www.' that are incomplete
+        """
+        Remove custom URL patterns from the text.
 
+        Parameters:
+        text (str): The input text.
 
+        Returns:
+        str: The text without custom URL patterns.
+        """
+        return re.sub(r'\b(?:http|www)[^\s]*\b', '', text)
 
     def remove_numbers(self, text):
+        """
+        Remove numbers from the text.
+
+        Parameters:
+        text (str): The input text.
+
+        Returns:
+        str: The text without numbers.
+        """
         return re.sub(r'\d+', '', text)
 
-
-
     def remove_all_html_elements(self, text):
+        """
+        Remove all HTML elements from the text.
+
+        Parameters:
+        text (str): The input text.
+
+        Returns:
+        str: The text without HTML elements.
+        """
         soup = BeautifulSoup(text, 'html.parser')
         for script_or_style in soup(["script", "style"]):
             script_or_style.decompose()
         for tag in soup.find_all(True):
             tag.attrs = {}
-
         return soup.get_text(separator=" ", strip=True)
 
-
-
     def remove_email_headers(self, text):
+        """
+        Remove email headers from the text.
+
+        Parameters:
+        text (str): The input text.
+
+        Returns:
+        str: The text without email headers.
+        """
         headers = ['From:', 'To:', 'Subject:', 'Cc:', 'Bcc:', 'Date:', 'Reply-To:', 'Content-Type:', 'Return-Path:', 'Message-ID:',
                    'Received:', 'MIME-Version:', 'Delivered-To:', 'Authentication-Results:', 'DKIM-Signature:', 'X-', 'Mail-To:']
         for header in headers:
             text = re.sub(rf'^{header}.*$', '', text, flags=re.MULTILINE)
-
         return text
 
-
-
     def remove_emails(self, text):
-        email_pattern_with_spaces = r'\b[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b' # Regex pattern to match emails with or without spaces around "@"
-        email_pattern_no_spaces = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b' # Regex pattern to match emails without spaces
-        combined_pattern = f"({email_pattern_with_spaces}|{email_pattern_no_spaces})" # Combine both patterns using the OR operator
+        """
+        Remove email addresses from the text.
 
+        Parameters:
+        text (str): The input text.
+
+        Returns:
+        str: The text without email addresses.
+        """
+        email_pattern_with_spaces = r'\b[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        email_pattern_no_spaces = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        combined_pattern = f"({email_pattern_with_spaces}|{email_pattern_no_spaces})"
         return re.sub(combined_pattern, '', text)
 
-
-
     def remove_time(self, text):
-        time_pattern = r'\b(?:[01]?[0-9]|2[0-3]):[0-5][0-9](?: ?[APMapm]{2})?(?: [A-Z]{1,5})?\b'  # Regex to match various time patterns
+        """
+        Remove time patterns from the text.
 
+        Parameters:
+        text (str): The input text.
+
+        Returns:
+        str: The text without time patterns.
+        """
+        time_pattern = r'\b(?:[01]?[0-9]|2[0-3]):[0-5][0-9](?: ?[APMapm]{2})?(?: [A-Z]{1,5})?\b'
         return re.sub(time_pattern, '', text)
 
-
-
     def remove_months(self, text):
+        """
+        Remove month names from the text.
+
+        Parameters:
+        text (str): The input text.
+
+        Returns:
+        str: The text without month names.
+        """
         months = [
             'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october',
             'november', 'december', 'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
         ]
         months_regex = r'\b(?:' + '|'.join(months) + r')\b'
-
         return re.sub(months_regex, '', text, flags=re.IGNORECASE)
 
-
-
     def remove_dates(self, text):
-        date_pattern = (
-            r'\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s*,?\s*\d{1,2}\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{4}\b|' # Example: Mon, 2 Sep 2002
-            r'\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|[A-Za-z]+\s\d{1,2},\s\d{4})\b|' # Example: 20-09-2002, Sep 13 2002
-            r'\b(?:\d{1,2}\s[A-Za-z]+\s\d{4})\b|'  # Example: 01 September 2002
-            r'\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{4})\b'  # Example: 24/08/2002
-        )
+        """
+        Remove date patterns from the text.
 
+        Parameters:
+        text (str): The input text.
+
+        Returns:
+        str: The text without date patterns.
+        """
+        date_pattern = (
+            r'\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s*,?\s*\d{1,2}\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{4}\b|'
+            r'\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|[A-Za-z]+\s\d{1,2},\s\d{4})\b|'
+            r'\b(?:\d{1,2}\s[A-Za-z]+\s\d{4})\b|'
+            r'\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{4})\b'
+        )
         return re.sub(date_pattern, '', text, flags=re.IGNORECASE)
 
-
-
     def remove_timezones(self, text):
-        timezone_pattern = r'\b(?:[A-Z]{2,4}[+-]\d{2,4}|UTC|GMT|PST|EST|CST|MST)\b' # Regex to match time zones (e.g., PST, EST, GMT, UTC)
+        """
+        Remove time zone patterns from the text.
 
+        Parameters:
+        text (str): The input text.
+
+        Returns:
+        str: The text without time zone patterns.
+        """
+        timezone_pattern = r'\b(?:[A-Z]{2,4}[+-]\d{2,4}|UTC|GMT|PST|EST|CST|MST)\b'
         return re.sub(timezone_pattern, '', text)
 
-
-
     def remove_multiple_newlines(self, text):
-        return re.sub(r'\n{2,}', '\n', text)  # Replace multiple newlines with a single newline
+        """
+        Remove multiple newlines from the text.
 
+        Parameters:
+        text (str): The input text.
 
+        Returns:
+        str: The text with multiple newlines replaced by a single newline.
+        """
+        return re.sub(r'\n{2,}', '\n', text)
 
     def remove_words(self, text):
-        return re.sub(r'\b(url|original message|submissionid|submission)\b', '', text, flags=re.IGNORECASE) # Combine all words using the | (OR) operator in regex
+        """
+        Remove specific words from the text.
 
+        Parameters:
+        text (str): The input text.
 
+        Returns:
+        str: The text without specific words.
+        """
+        return re.sub(r'\b(url|original message|submissionid|submission)\b', '', text, flags=re.IGNORECASE)
 
     def remove_single_characters(self, text):
-        return re.sub(r'\b\w\b', '', text) # Remove single characters that are not part of a word
+        """
+        Remove single characters from the text.
 
+        Parameters:
+        text (str): The input text.
 
+        Returns:
+        str: The text without single characters.
+        """
+        return re.sub(r'\b\w\b', '', text)
 
     def remove_repetitive_patterns(self, text):
-        return re.sub(r'\b(nt+ts?|n+|t+|nt+)\b', '', text) # Combine patterns for 'nt+ts?', repetitive 'n' or 'nt', and 't+', 'n+', 'nt+'
+        """
+        Remove repetitive patterns from the text.
 
+        Parameters:
+        text (str): The input text.
 
+        Returns:
+        str: The text without repetitive patterns.
+        """
+        return re.sub(r'\b(nt+ts?|n+|t+|nt+)\b', '', text)
 
     def lowercase_text(self, text):
+        """
+        Convert the text to lowercase.
+
+        Parameters:
+        text (str): The input text.
+
+        Returns:
+        str: The text in lowercase.
+        """
         return text.lower()
 
-
-
     def remove_bullet_points_and_symbols(self, text):
-        symbols = ['•', '◦', '◉', '▪', '▫', '●', '□', '■', '✦', '✧', '✪', '✫', '✬', '✭', '✮', '✯', '✰'] # List of bullet points and similar symbols
+        """
+        Remove bullet points and similar symbols from the text.
+
+        Parameters:
+        text (str): The input text.
+
+        Returns:
+        str: The text without bullet points and symbols.
+        """
+        symbols = ['•', '◦', '◉', '▪', '▫', '●', '□', '■', '✦', '✧', '✪', '✫', '✬', '✭', '✮', '✯', '✰']
         for symbol in symbols:
             text = text.replace(symbol, '')
-
         return text
 
+    def clean_text(self, X, y=None):
+        """
+        Clean and preprocess a list of text data.
 
+        Parameters:
+        X (list): A list of text data to be cleaned.
 
-    def fit(self, X, y=None):
-        return self
-
-
-
-    def transform(self, X, y=None):
+        Returns:
+        pandas.DataFrame: A DataFrame containing the cleaned text data.
+        """
         cleaned_text_list = []
-
-
-
         for body in tqdm(X, desc='Cleaning Text', unit='email'):
             try:
                 text = self.remove_all_html_elements(body)
@@ -592,18 +885,19 @@ class TextProcessor(BaseEstimator, TransformerMixin):
             except Exception as e:
                 logging.error(f"Error processing text: {e}")
                 cleaned_text_list.append('')
-        if y is not None:
-            logging.info(f"Total amount of text processed: {len(cleaned_text_list)}")
-
-            return pd.DataFrame({'cleaned_text': cleaned_text_list, 'label': y})
-        else:
-            logging.info(f"Total amount of text processed: {len(cleaned_text_list)}")
-
-            return pd.DataFrame({'cleaned_text': cleaned_text_list})
-
-
+        return pd.DataFrame({'cleaned_text': cleaned_text_list})
 
     def save_to_csv_cleaned(self, df, filename):
+        """
+        Save the cleaned text data to a CSV file.
+
+        Parameters:
+        df (pandas.DataFrame): The DataFrame containing the cleaned text data.
+        filename (str): The file path to save the CSV file.
+
+        Returns:
+        None
+        """
         try:
             df.to_csv(filename, index=False)
             logging.info(f"Data successfully saved to {filename}")
@@ -613,6 +907,16 @@ class TextProcessor(BaseEstimator, TransformerMixin):
 
 
 class BERTFeatureTransformer(BaseEstimator, TransformerMixin):
+    """
+    A custom transformer to extract BERT features from text data.
+
+    Parameters:
+    feature_extractor (BERTFeatureExtractor): An instance of BERTFeatureExtractor to extract features.
+
+    Methods:
+    fit(X, y=None): Fits the transformer to the data (no-op).
+    transform(X): Transforms the data by extracting BERT features.
+    """
     def __init__(self, feature_extractor):
         self.feature_extractor = feature_extractor
 
@@ -625,6 +929,19 @@ class BERTFeatureTransformer(BaseEstimator, TransformerMixin):
 
 
 class TextDataset(Dataset):
+    """
+    A custom dataset for handling text data for BERT.
+
+    Parameters:
+    texts (list): A list of text samples.
+    labels (list): A list of labels corresponding to the text samples.
+    tokenizer (BertTokenizer): An instance of BertTokenizer for tokenizing the text.
+    max_length (int): The maximum length of the tokenized sequences.
+
+    Methods:
+    __len__(): Returns the number of samples in the dataset.
+    __getitem__(idx): Returns a dictionary containing the input IDs, attention mask, and label for the sample at index idx.
+    """
     def __init__(self, texts, labels, tokenizer, max_length):
         self.texts = texts
         self.labels = labels
@@ -659,6 +976,16 @@ class TextDataset(Dataset):
 
 
 class BERTFeatureExtractor:
+    """
+    A class to extract BERT features from text data.
+
+    Parameters:
+    max_length (int): The maximum length of the tokenized sequences. Default is 128.
+    device (torch.device): The device to run the BERT model on. Default is CUDA if available, otherwise CPU.
+
+    Methods:
+    extract_features(texts, batch_size=16): Extracts BERT features from a list of text samples.
+    """
     def __init__(self, max_length=128, device=None):
         logging.info("Initializing BERT Feature Extractor...")
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
@@ -670,6 +997,16 @@ class BERTFeatureExtractor:
 
 
     def extract_features(self, texts, batch_size=16):
+        """
+        Extract BERT features from a list of text samples.
+
+        Parameters:
+        texts (list): A list of text samples.
+        batch_size (int): The batch size for processing the text samples. Default is 16.
+
+        Returns:
+        list: A list of extracted BERT features.
+        """
         if not isinstance(texts, (list, tuple)) or not all(isinstance(text, str) for text in texts):
             raise ValueError("Input should be a list or tuple of strings.")
         features = []
@@ -690,9 +1027,21 @@ class BERTFeatureExtractor:
 
 
 def data_cleaning(dataset_name, df_processed, text_column, clean_file):
+    """
+    Cleans the text data in the specified column of the DataFrame.
+
+    Args:
+        dataset_name (str): The name of the dataset being processed.
+        df_processed (pd.DataFrame): The DataFrame containing the processed data.
+        text_column (str): The name of the column containing text data to be cleaned.
+        clean_file (str): The file path where the cleaned data will be saved.
+
+    Returns:
+        pd.DataFrame: The cleaned DataFrame.
+    """
     logging.info(f"Text processing {dataset_name} dataset...")
     processor = TextProcessor()
-    df_clean = processor.transform(df_processed[text_column], df_processed['label'])
+    df_clean = processor.clean_text(df_processed[text_column], df_processed['label'])
     processor.save_to_csv_cleaned(df_clean, clean_file)
     logging.info("Text processing and saving completed.")
     #logging.info(f"DataFrame columns after data cleaning: {df_clean.columns}")
@@ -702,6 +1051,19 @@ def data_cleaning(dataset_name, df_processed, text_column, clean_file):
 
 
 def load_or_clean_data(dataset_name, df, text_column, file_path, cleaning_function):
+    """
+    Loads the data from the specified file path or cleans the data if the file does not exist.
+
+    Args:
+        dataset_name (str): The name of the dataset being processed.
+        df (pd.DataFrame): The DataFrame containing the data.
+        text_column (str): The name of the column containing text data to be cleaned.
+        file_path (str): The file path where the cleaned data will be saved.
+        cleaning_function (function): The function to clean the data.
+
+    Returns:
+        pd.DataFrame: The loaded or cleaned DataFrame.
+    """
     #logging.info(f"Loading or cleaning data...")
     if os.path.exists(file_path):
         logging.info(f"File {file_path} already exists. Loading from file.")
@@ -724,6 +1086,18 @@ def load_or_clean_data(dataset_name, df, text_column, file_path, cleaning_functi
 
 
 def load_or_extract_headers(df: pd.DataFrame, file_path: str, extractor_class, dataset_type: str) -> pd.DataFrame:
+    """
+    Loads the email headers from the specified file path or extracts them if the file does not exist.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the data.
+        file_path (str): The file path where the extracted headers will be saved.
+        extractor_class (class): The class used to extract the headers.
+        dataset_type (str): The type of dataset being processed.
+
+    Returns:
+        pd.DataFrame: The DataFrame with extracted headers.
+    """
     logging.info("Loading or extracting email headers...")
     if os.path.exists(file_path):
             logging.info(f"File {file_path} already exists. Loading from file.")
@@ -749,6 +1123,18 @@ def load_or_extract_headers(df: pd.DataFrame, file_path: str, extractor_class, d
 
 
 def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='Data Splitting'):
+    """
+    Performs Stratified K-Fold splitting on the DataFrame.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the data.
+        n_splits (int): The number of splits for Stratified K-Fold.
+        random_state (int): The random state for reproducibility.
+        output_dir (str): The directory where the split data will be saved.
+
+    Returns:
+        list: A list of tuples containing train and test indices for each fold.
+    """
     logging.info("Performing Stratified K-Fold splitting...")
     
 
@@ -799,6 +1185,17 @@ def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='Data Sp
 
 
 def smote(X_train, y_train, random_state=42):
+    """
+    Applies SMOTE to balance the training data.
+
+    Args:
+        X_train (pd.DataFrame): The training data features.
+        y_train (pd.Series): The training data labels.
+        random_state (int): The random state for reproducibility.
+
+    Returns:
+        tuple: The balanced training data features and labels.
+    """
     smote = SMOTE(random_state=random_state)
     X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
 
@@ -807,6 +1204,17 @@ def smote(X_train, y_train, random_state=42):
 
 
 def load_or_save_model(model, model_path, action='load'):
+    """
+    Loads or saves the model based on the specified action.
+
+    Args:
+        model (object): The model to be loaded or saved.
+        model_path (str): The file path where the model will be saved or loaded from.
+        action (str): The action to perform ('load' or 'save').
+
+    Returns:
+        object: The loaded model if action is 'load'.
+    """
     if action == 'load':
         if os.path.exists(model_path):
             logging.info(f"Loading model from {model_path}")
@@ -821,6 +1229,17 @@ def load_or_save_model(model, model_path, action='load'):
 
 
 def load_or_save_params(params, params_path, action='load'):
+    """
+    Loads or saves the parameters based on the specified action.
+
+    Args:
+        params (dict): The parameters to be loaded or saved.
+        params_path (str): The file path where the parameters will be saved or loaded from.
+        action (str): The action to perform ('load' or 'save').
+
+    Returns:
+        dict: The loaded parameters if action is 'load'.
+    """
     if action == 'load':
         if os.path.exists(params_path):
             logging.info(f"Loading parameters from {params_path}")
@@ -837,6 +1256,20 @@ def load_or_save_params(params, params_path, action='load'):
 
 
 def model_training(X_train, y_train, X_test, y_test, model_path, params_path):
+    """
+    Trains the model using the provided training data and evaluates it on the test data.
+
+    Args:
+        X_train (pd.DataFrame): The training data features.
+        y_train (pd.Series): The training data labels.
+        X_test (pd.DataFrame): The test data features.
+        y_test (pd.Series): The test data labels.
+        model_path (str): The file path where the model will be saved.
+        params_path (str): The file path where the parameters will be saved.
+
+    Returns:
+        None
+    """
     try:
         ensemble_model = load_or_save_model(None, model_path, action='load')
         best_params = load_or_save_params(None, params_path, action='load')
@@ -884,6 +1317,16 @@ def model_training(X_train, y_train, X_test, y_test, model_path, params_path):
 
 
 def conduct_optuna_study(X_train, y_train):
+    """
+    Conducts an Optuna study to find the best hyperparameters for the models.
+
+    Args:
+        X_train (pd.DataFrame): The training data features.
+        y_train (pd.Series): The training data labels.
+
+    Returns:
+        dict: The best hyperparameters for each model.
+    """
     best_params = {}
 
 
@@ -967,11 +1410,32 @@ def conduct_optuna_study(X_train, y_train):
 
 
 def load_optuna_model(path):
+    """
+    Loads the Optuna model from the specified path.
+
+    Args:
+        path (str): The file path where the model is saved.
+
+    Returns:
+        object: The loaded Optuna model.
+    """
     return joblib.load(path)
 
 
 
 def train_ensemble_model(best_params, X_train, y_train, model_path):
+    """
+    Trains an ensemble model using the best hyperparameters.
+
+    Args:
+        best_params (dict): The best hyperparameters for each model.
+        X_train (pd.DataFrame): The training data features.
+        y_train (pd.Series): The training data labels.
+        model_path (str): The file path where the model will be saved.
+
+    Returns:
+        object: The trained ensemble model.
+    """
     logging.info(f"Training new ensemble model with best parameters")
 
 
@@ -1034,6 +1498,16 @@ def train_ensemble_model(best_params, X_train, y_train, model_path):
 
 
 def log_label_percentages(df, dataset_name):
+    """
+    Logs the percentage of each label in the DataFrame.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the data.
+        dataset_name (str): The name of the dataset being processed.
+
+    Returns:
+        None
+    """
     total_count = len(df)
     total_rows, total_columns = df.shape
     label_counts = df['label'].value_counts(normalize=True) * 100
@@ -1053,6 +1527,15 @@ def log_label_percentages(df, dataset_name):
 
 
 def count_urls(urls_list):
+    """
+    Counts the number of URLs in the provided list.
+
+    Args:
+        urls_list (list): The list of URLs.
+
+    Returns:
+        int: The number of URLs in the list.
+    """
     if isinstance(urls_list, list):
         return len(urls_list)
     else:
@@ -1061,6 +1544,17 @@ def count_urls(urls_list):
 
 
 def check_missing_values(df, df_name, num_rows=1):
+    """
+    Checks for missing values in the DataFrame and logs the results.
+
+    Args:
+        df (pd.DataFrame): The DataFrame to check for missing values.
+        df_name (str): The name of the DataFrame.
+        num_rows (int): The number of rows to display with missing values.
+
+    Returns:
+        None
+    """
     missing_values = df.isnull().sum()
     total_missing_values = missing_values.sum()
     if total_missing_values == 0:
@@ -1078,6 +1572,22 @@ def check_missing_values(df, df_name, num_rows=1):
 
 
 def plot_learning_curve(estimator, X, y, title="Learning Curve", ylim=None, cv=6, n_jobs=4, train_sizes=np.linspace(0.1, 1.0, 6)):
+    """
+    Plots the learning curve for the provided estimator.
+
+    Args:
+        estimator (object): The estimator to plot the learning curve for.
+        X (pd.DataFrame): The training data features.
+        y (pd.Series): The training data labels.
+        title (str): The title of the plot.
+        ylim (tuple): The y-axis limits for the plot.
+        cv (int): The number of cross-validation folds.
+        n_jobs (int): The number of jobs to run in parallel.
+        train_sizes (array): The sizes of the training sets.
+
+    Returns:
+        None
+    """
     logging.info("Starting the plot_learning_curve function.")
     
 
@@ -1111,6 +1621,16 @@ def plot_learning_curve(estimator, X, y, title="Learning Curve", ylim=None, cv=6
 
 
 def get_fold_paths(fold_idx, base_dir='Processed Data'):
+    """
+    Generates file paths for the train and test data and labels for the specified fold.
+
+    Args:
+        fold_idx (int): The index of the fold.
+        base_dir (str): The base directory where the data will be saved.
+
+    Returns:
+        tuple: The file paths for the train data, test data, train labels, test labels, and preprocessor.
+    """
     train_data_path = os.path.join(base_dir, f"fold_{fold_idx}_train_data.npz")
     test_data_path = os.path.join(base_dir, f"fold_{fold_idx}_test_data.npz")
     train_labels_path = os.path.join(base_dir, f"fold_{fold_idx}_train_labels.pkl")
@@ -1122,6 +1642,15 @@ def get_fold_paths(fold_idx, base_dir='Processed Data'):
 
 
 def save_data_pipeline(data, labels, data_path, labels_path):
+    """
+    Save the data and labels to specified file paths.
+
+    Parameters:
+    data (numpy.ndarray): The data to be saved.
+    labels (numpy.ndarray): The labels to be saved.
+    data_path (str): The file path to save the data.
+    labels_path (str): The file path to save the labels.
+    """
     np.savez(data_path, data=data)
     with open(labels_path, 'wb') as f:
         pickle.dump(labels, f)
@@ -1129,6 +1658,16 @@ def save_data_pipeline(data, labels, data_path, labels_path):
 
 
 def load_data_pipeline(data_path, labels_path):
+    """
+    Load the data and labels from specified file paths.
+
+    Parameters:
+    data_path (str): The file path to load the data from.
+    labels_path (str): The file path to load the labels from.
+
+    Returns:
+    tuple: A tuple containing the loaded data and labels.
+    """
     data = np.load(data_path)['data']
     with open(labels_path, 'rb') as f:
         labels = pickle.load(f)
@@ -1137,6 +1676,20 @@ def load_data_pipeline(data_path, labels_path):
 
 
 def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
+    """
+    Run the data processing pipeline or load preprocessed data if it already exists.
+
+    Parameters:
+    fold_idx (int): The fold index for cross-validation.
+    X_train (pandas.DataFrame): The training data.
+    X_test (pandas.DataFrame): The test data.
+    y_train (numpy.ndarray): The training labels.
+    y_test (numpy.ndarray): The test labels.
+    pipeline (sklearn.pipeline.Pipeline): The data processing pipeline.
+
+    Returns:
+    tuple: A tuple containing the processed training data, test data, training labels, and test labels.
+    """
     base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Feature Extraction')
     os.makedirs(base_dir, exist_ok=True)
     train_data_path, test_data_path, train_labels_path, test_labels_path, preprocessor_path = get_fold_paths(fold_idx, base_dir)
@@ -1229,6 +1782,15 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
 
 
 def extract_email(text):
+    """
+    Extract the email address from a given text.
+
+    Parameters:
+    text (str): The text containing the email address.
+
+    Returns:
+    str or None: The extracted email address or None if no email address is found.
+    """
     if isinstance(text, str):
         match = re.search(r'<([^>]+)>', text)
         if match:
@@ -1240,6 +1802,16 @@ def extract_email(text):
 
 
 def process_and_save_emails(df, output_file):
+    """
+    Process the DataFrame to extract sender and receiver emails and save to a CSV file.
+
+    Parameters:
+    df (pandas.DataFrame): The DataFrame containing the email data.
+    output_file (str): The file path to save the processed email data.
+
+    Returns:
+    pandas.DataFrame: The DataFrame containing the extracted emails.
+    """
     # Extract sender and receiver emails
     df['sender'] = df['sender'].apply(extract_email)
     df['receiver'] = df['receiver'].apply(extract_email)
@@ -1254,6 +1826,17 @@ def process_and_save_emails(df, output_file):
 
 
 def load_or_save_emails(df, output_file, df_name = 'CEAS_08'):
+    """
+    Load the cleaned email data from a CSV file or process and save the data if the file does not exist.
+
+    Parameters:
+    df (pandas.DataFrame): The DataFrame containing the email data.
+    output_file (str): The file path to save or load the cleaned email data.
+    df_name (str): The name of the DataFrame source.
+
+    Returns:
+    pandas.DataFrame: The cleaned email data.
+    """
     if os.path.exists(output_file):
         logging.info(f"Output file {output_file} already exists. Loading data from {output_file}...\n")
         df_cleaned = pd.read_csv(output_file)
@@ -1270,6 +1853,15 @@ def load_or_save_emails(df, output_file, df_name = 'CEAS_08'):
 
 
 class RareCategoryRemover(BaseEstimator, TransformerMixin):
+    """
+    A custom transformer to remove rare categories from categorical features.
+
+    Parameters:
+    threshold (float): The frequency threshold below which categories are considered rare. Default is 0.05.
+
+    Attributes:
+    replacements_ (dict): A dictionary mapping each column to another dictionary of rare categories and their replacements.
+    """
     def __init__(self, threshold=0.05):
         self.threshold = threshold
         self.replacements_ = {}
@@ -1277,6 +1869,16 @@ class RareCategoryRemover(BaseEstimator, TransformerMixin):
 
 
     def fit(self, X, y=None):
+        """
+        Fit the transformer to the data by identifying rare categories.
+
+        Parameters:
+        X (pandas.DataFrame): The input data with categorical features.
+        y (ignored): Not used, present for API consistency by convention.
+
+        Returns:
+        self: Returns the instance itself.
+        """
         logging.info(f"Removing rare categories with threshold: {self.threshold}")
         for column in X.columns:
             frequency = X[column].value_counts(normalize=True)
@@ -1288,6 +1890,15 @@ class RareCategoryRemover(BaseEstimator, TransformerMixin):
 
 
     def transform(self, X):
+        """
+        Transform the data by replacing rare categories with 'Other'.
+
+        Parameters:
+        X (pandas.DataFrame): The input data with categorical features.
+
+        Returns:
+        pandas.DataFrame: The transformed data with rare categories replaced.
+        """
         for column, replacements in self.replacements_.items():
             X.loc[:, column] = X[column].replace(replacements)
         assert X.shape[0] == X.shape[0], "Row count changed during rare category removal."
@@ -1297,11 +1908,38 @@ class RareCategoryRemover(BaseEstimator, TransformerMixin):
 
 # Main processing function
 def main():
-    # Use relative paths to access the datasets and save the extracted data
+    """
+    Load configuration settings from a JSON file and set up file paths for various data processing stages.
+
+    This code snippet performs the following tasks:
+    1. Loads configuration settings from 'config.json'.
+    2. Sets up base directory and file paths for different stages of data processing, including:
+    - Dataset file
+    - Preprocessed files
+    - Extracted email header files
+    - Merged files
+    - Cleaned files
+
+    Attributes:
+        config (dict): Configuration settings loaded from 'config.json'.
+        base_dir (str): Base directory for data files.
+        dataset (str): Path to the CEAS_08 dataset file.
+        PreprocessedSpamAssassinFile (str): Path to the preprocessed SpamAssassin file.
+        PreprocessedCEASFile (str): Path to the preprocessed CEAS_08 file.
+        ExtractedSpamAssassinEmailHeaderFile (str): Path to the extracted SpamAssassin email header file.
+        ExtractedCEASEmailHeaderFile (str): Path to the extracted CEAS email header file.
+        MergedSpamAssassinFile (str): Path to the merged SpamAssassin file.
+        MergedCEASFile (str): Path to the merged CEAS_08 file.
+        MergedDataFrame (str): Path to the merged DataFrame file.
+        CleanedDataFrame (str): Path to the cleaned DataFrame file.
+        CleanedCEASHeaders (str): Path to the cleaned CEAS headers file.
+        MergedCleanedCEASHeaders (str): Path to the merged cleaned CEAS headers file.
+        MergedCleanedDataFrame (str): Path to the merged cleaned DataFrame file.
+    """
     with open('config.json', 'r') as config_file:
         config = json.load(config_file)
     base_dir = config['base_dir']
-    dataset = os.path.join(base_dir, 'CEAS_08.csv')
+    CEAS_08_Dataset = os.path.join(base_dir, 'CEAS_08.csv')
     PreprocessedSpamAssassinFile = os.path.join(base_dir, 'Data Preprocessing', 'PreprocessedSpamAssassin.csv')
     PreprocessedCEASFile = os.path.join(base_dir, 'Data Preprocessing', 'PreprocessedCEAS_08.csv')
     ExtractedSpamAssassinEmailHeaderFile = os.path.join(base_dir, 'Feature Engineering', 'SpamAssassinExtractedEmailHeader.csv')
@@ -1316,7 +1954,7 @@ def main():
 
 
     # Load the datasets
-    df_ceas = pd.read_csv(dataset)
+    df_ceas = pd.read_csv(CEAS_08_Dataset, sep=',', encoding='utf-8')
     dataset = load_dataset('talby/spamassassin',split='train', trust_remote_code=True)
     df_spamassassin = dataset.to_pandas()
 
@@ -1326,6 +1964,27 @@ def main():
         # ****************************** #
         #       Data Preprocessing       #
         # ****************************** #
+        """
+        Perform data preprocessing for the SpamAssassin and CEAS_08 datasets.
+
+        This code snippet performs the following tasks:
+        1. Logs the beginning of the data preprocessing stage.
+        2. Changes label values in the SpamAssassin dataset to match the labeling scheme.
+        3. Removes duplicates and missing values from both datasets using the DatasetProcessor class.
+        4. Combines the processed SpamAssassin and CEAS_08 datasets into a single DataFrame.
+        5. Logs label percentages for the individual and combined datasets.
+        6. Checks for missing values in the combined DataFrame.
+        7. Logs the completion of the data preprocessing stage.
+
+        Attributes:
+            df_spamassassin (pandas.DataFrame): The SpamAssassin dataset.
+            df_ceas (pandas.DataFrame): The CEAS_08 dataset.
+            processor_spamassassin (DatasetProcessor): Processor for the SpamAssassin dataset.
+            df_processed_spamassassin (pandas.DataFrame): Processed SpamAssassin dataset.
+            processor_ceas (DatasetProcessor): Processor for the CEAS_08 dataset.
+            df_processed_ceas (pandas.DataFrame): Processed CEAS_08 dataset.
+            combined_percentage_df (pandas.DataFrame): Combined DataFrame of processed SpamAssassin and CEAS_08 datasets.
+        """
 
         logging.info(f"Beginning Data Preprocessing...")
 
@@ -1358,6 +2017,23 @@ def main():
         # ****************************** #
         #       Feature Engineering      #
         # ****************************** #
+        """
+        Perform feature engineering on the processed datasets.
+
+        This code snippet performs the following tasks:
+        1. Logs the beginning of the feature engineering stage.
+        2. Extracts email headers from the SpamAssassin dataset using the EmailHeaderExtractor.
+        3. Logs the completion of email header extraction and saving for the SpamAssassin dataset.
+        4. Converts text URLs to numerical counts in the SpamAssassin dataset.
+        5. Drops unnecessary columns ('mailto' and 'texturls') from the SpamAssassin dataset.
+        6. Extracts email headers from the CEAS_08 dataset using the EmailHeaderExtractor.
+        7. Logs the completion of email header extraction and saving for the CEAS_08 dataset.
+        8. Logs the completion of the feature engineering stage.
+
+        Attributes:
+            spamassassin_headers_df (pandas.DataFrame): DataFrame containing extracted email headers from the SpamAssassin dataset.
+            ceas_headers_df (pandas.DataFrame): DataFrame containing extracted email headers from the CEAS_08 dataset.
+        """
 
         logging.info(f"Beginning Feature Engineering...")
 
@@ -1381,6 +2057,27 @@ def main():
         # ************************* #
         #       Data Cleaning       #
         # ************************* #
+        """
+        Perform data cleaning on the CEAS_08 dataset, specifically focusing on the 'sender' and 'receiver' columns.
+
+        This code snippet performs the following tasks:
+        1. Logs the beginning of the data cleaning stage for the 'sender' and 'receiver' columns in the CEAS_08 dataset.
+        2. Loads or saves the cleaned email headers from the CEAS_08 dataset.
+        3. Logs the beginning of the merging process for the cleaned headers with the processed CEAS_08 dataset.
+        4. Checks if the number of rows in the cleaned headers matches the number of rows in the processed CEAS_08 dataset.
+        5. Drops the 'sender' and 'receiver' columns from the processed CEAS_08 dataset.
+        6. Merges the cleaned headers with the processed CEAS_08 dataset.
+        7. Logs the number of missing rows in the merged DataFrame.
+        8. Logs the total number of rows in the processed CEAS_08 dataset and the merged DataFrame.
+        9. Checks if the number of rows in the merged DataFrame matches the number of rows in the processed CEAS_08 dataset.
+        10. Saves the merged DataFrame to a CSV file if the row counts match.
+        11. Logs the completion of the data cleaning stage for the 'sender' and 'receiver' columns in the CEAS_08 dataset.
+
+        Attributes:
+            df_cleaned_ceas_headers (pandas.DataFrame): DataFrame containing cleaned email headers from the CEAS_08 dataset.
+            df_cleaned_ceas_headers_merge (pandas.DataFrame): DataFrame containing the merged cleaned headers and processed CEAS_08 dataset.
+            missing_in_cleaned_ceas_header_merged (pandas.DataFrame): DataFrame containing rows with missing 'sender' or 'receiver' values in the merged DataFrame.
+        """
         
         logging.info(f"Beginning Data Cleaning of CEAS_08 ['sender', 'receiver']...")
         df_cleaned_ceas_headers = load_or_save_emails(df_processed_ceas, CleanedCEASHeaders)
@@ -1416,6 +2113,31 @@ def main():
         # ****************************** #
         #       Data Integration         #
         # ****************************** #
+        """
+        Perform data integration by merging processed datasets and extracted information.
+
+        This code snippet performs the following tasks:
+        1. Logs the beginning of the data integration stage.
+        2. Merges the processed SpamAssassin dataset with the extracted email headers.
+        3. Verifies the merged SpamAssassin DataFrame.
+        4. Saves the merged SpamAssassin DataFrame to a CSV file.
+        5. Merges the processed CEAS_08 dataset with the extracted email headers.
+        6. Verifies the merged CEAS_08 DataFrame.
+        7. Saves the merged CEAS_08 DataFrame to a CSV file.
+        8. Merges the SpamAssassin and CEAS_08 datasets into a combined DataFrame.
+        9. Verifies the combined DataFrame for label consistency and row count.
+        10. Saves the combined DataFrame to a CSV file.
+
+        Attributes:
+            df_processed_spamassassin (pandas.DataFrame): Processed SpamAssassin dataset.
+            spamassassin_headers_df (pandas.DataFrame): Extracted email headers from the SpamAssassin dataset.
+            merged_spamassassin_df (pandas.DataFrame): Merged DataFrame of processed SpamAssassin dataset and extracted email headers.
+            df_cleaned_ceas_headers_merge (pandas.DataFrame): Merged cleaned headers and processed CEAS_08 dataset.
+            ceas_headers_df (pandas.DataFrame): Extracted email headers from the CEAS_08 dataset.
+            merged_ceas_df (pandas.DataFrame): Merged DataFrame of processed CEAS_08 dataset and extracted email headers.
+            combined_df (pandas.DataFrame): Combined DataFrame of merged SpamAssassin and CEAS_08 datasets.
+            combined_percentage_df (pandas.DataFrame): Combined DataFrame of processed SpamAssassin and CEAS_08 datasets without additional processing.
+        """
 
         logging.info(f"Beginning Data Integration...")
 
@@ -1523,6 +2245,26 @@ def main():
         # ************************* #
         #       Data Cleaning       #
         # ************************* #
+        """
+        Perform data cleaning on the 'body' column of the combined DataFrame and integrate the cleaned data.
+
+        This code snippet performs the following tasks:
+        1. Logs the beginning of the data cleaning stage for the 'body' column.
+        2. Loads or cleans the 'body' column data from the combined DataFrame.
+        3. Concatenates the cleaned DataFrame with the merged DataFrame.
+        4. Verifies the cleaned combined DataFrame for label consistency and row count.
+        5. Saves the cleaned combined DataFrame to a CSV file.
+
+        Attributes:
+            df_clean_body (pandas.DataFrame): DataFrame containing the cleaned 'body' column data.
+            combined_df_reset (pandas.DataFrame): Combined DataFrame with reset index.
+            df_clean_body_reset (pandas.DataFrame): Cleaned 'body' column DataFrame with reset index.
+            df_cleaned_combined (pandas.DataFrame): DataFrame containing the combined cleaned data.
+            combined_labels (numpy.ndarray): Unique labels in the combined DataFrame.
+            df_cleaned_combined_labels (numpy.ndarray): Unique labels in the cleaned combined DataFrame.
+            combined_label_counts (pandas.Series): Label counts in the combined DataFrame.
+            df_cleaned_combined_label_counts (pandas.Series): Label counts in the cleaned combined DataFrame.
+        """
 
         logging.info(f"Beginning Data Cleaning ['body']...")
         df_clean_body = load_or_clean_data('Merged Dataframe', combined_df, 'body', CleanedDataFrame, data_cleaning)
@@ -1570,6 +2312,21 @@ def main():
         # ************************* #
         #       Data Splitting      #
         # ************************* #
+        """
+        Perform data splitting using stratified k-fold cross-validation and initialize lists for storing accuracies and learning curve data.
+
+        This code snippet performs the following tasks:
+        1. Logs the beginning of the data splitting stage.
+        2. Splits the cleaned combined DataFrame into stratified k-folds.
+        3. Logs the completion of the data splitting stage.
+        4. Initializes lists to store training accuracies, test accuracies, and learning curve data for each fold.
+
+        Attributes:
+            folds (list): List of stratified k-fold splits of the cleaned combined DataFrame.
+            fold_train_accuracies (list): List to store training accuracies for each fold.
+            fold_test_accuracies (list): List to store test accuracies for each fold.
+            learning_curve_data (list): List to store learning curve data for each fold.
+        """
 
         logging.info(f"Beginning Data Splitting...")
         folds = stratified_k_fold_split(df_cleaned_combined)
@@ -1587,6 +2344,31 @@ def main():
             # ************************************************************ #
             #       Feature Extraction and Data Imbalance Handling         #
             # ************************************************************ #
+            """
+            Perform feature extraction for a specific fold in a stratified k-fold cross-validation.
+
+            This code snippet performs the following tasks:
+            1. Logs the beginning of the feature extraction stage for the specified fold.
+            2. Defines columns for categorical, numerical, and text data.
+            3. Initializes BERT feature extractor and transformer.
+            4. Defines a preprocessor for categorical and numerical columns.
+            5. Defines a pipeline with preprocessor, BERT, SMOTE, and PCA.
+            6. Runs the pipeline or loads preprocessed data for the specified fold.
+            7. Logs the successful processing or loading of data for the specified fold.
+
+            Attributes:
+                categorical_columns (list): List of categorical columns.
+                numerical_columns (list): List of numerical columns.
+                text_column (str): Name of the text column.
+                bert_extractor (BERTFeatureExtractor): BERT feature extractor instance.
+                bert_transformer (BERTFeatureTransformer): BERT feature transformer instance.
+                preprocessor (ColumnTransformer): Preprocessor for categorical and numerical columns.
+                pipeline (Pipeline): Pipeline with preprocessor, BERT, SMOTE, and PCA.
+                X_train_balanced (pandas.DataFrame): Balanced training data.
+                X_test_combined (pandas.DataFrame): Combined test data.
+                y_train_balanced (pandas.Series): Balanced training labels.
+                y_test (pandas.Series): Test labels.
+            """
 
             logging.info(f"Beginning Feature Extraction for Fold {fold_idx}...")
 
@@ -1642,6 +2424,25 @@ def main():
             # ***************************************** #
             #       Model Training and Evaluation       #
             # ***************************************** #
+            """
+            Train the model and evaluate its performance for each fold in a stratified k-fold cross-validation.
+
+            This code snippet performs the following tasks:
+            1. Logs the beginning of the model training and evaluation stage for the specified fold.
+            2. Defines the file paths for saving the trained model and best parameters.
+            3. Trains the model and evaluates its performance for the specified fold.
+            4. Appends the test accuracy for the fold to the list of fold test accuracies.
+            5. Logs the successful processing, training, and evaluation of the model for the specified fold.
+            6. Stores learning curve data for later plotting.
+
+            Attributes:
+                model_path (str): File path to save the trained model.
+                params_path (str): File path to save the best parameters.
+                ensemble_model (sklearn.base.BaseEstimator): Trained ensemble model.
+                test_accuracy (float): Test accuracy for the current fold.
+                fold_test_accuracies (list): List to store test accuracies for each fold.
+                learning_curve_data (list): List to store learning curve data for each fold.
+            """
 
             logging.info(f"Beginning Model Training and Evaluation for Fold {fold_idx}...")
             # Train the model and evaluate the performance for each fold
@@ -1666,6 +2467,22 @@ def main():
             # ********************************* #
             #       Plot Learning Curves        #
             # ********************************* #
+            """
+            Plot learning curves for each fold in the stratified k-fold cross-validation.
+
+            This code snippet performs the following tasks:
+            1. Iterates over the learning curve data for each fold.
+            2. Plots the learning curve for the specified fold using the provided estimator, training data, and labels.
+            3. Sets the title of the plot to indicate the fold number.
+            4. Defines the training sizes and cross-validation splits for the learning curve plot.
+
+            Attributes:
+                learning_curve_data (list): List containing tuples of training data, training labels, trained model, and fold index.
+                X_train (pandas.DataFrame): Training data for the current fold.
+                y_train (pandas.Series): Training labels for the current fold.
+                ensemble_model (sklearn.base.BaseEstimator): Trained ensemble model for the current fold.
+                fold_idx (int): Index of the current fold.
+            """
 
             for X_train, y_train, ensemble_model, fold_idx in learning_curve_data:
                 plot_learning_curve(
@@ -1676,6 +2493,9 @@ def main():
                     train_sizes=np.linspace(0.1, 1.0, 6),
                     cv=6
                 )
+        
+        
+        
         logging.info(f"Training and evaluation completed for all folds.\n")
         # Calculate and log the overall test accuracy
         mean_test_accuracy = np.mean(fold_test_accuracies)
