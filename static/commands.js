@@ -29,18 +29,62 @@ function action(event) {
 }
 
 function checkPhishing(event) {
-  const message = {
-    type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
-    message: "This email is safe.",
-    icon: "Icon.80x80",
-    persistent: true,
-  };
 
-  // Show a notification message
-  Office.context.mailbox.item.notificationMessages.replaceAsync("action", message);
+  Office.context.mailbox.getCallbackTokenAsync({isRest: true}, async function(result){
+    if (result.status === "succeeded") {
+      const accessToken = result.value;
+  
+      // Use the access token.
+      // subject = getCurrentItem(accessToken)
 
-  // Be sure to indicate when the add-in command function is complete
-  event.completed();
+      // Get the item's REST ID.
+      const itemId = getItemRestId();
+
+      // Construct the REST URL to the current item.
+      // Details for formatting the URL can be found at
+      // https://learn.microsoft.com/previous-versions/office/office-365-api/api/version-2.0/mail-rest-operations#get-messages.
+      const getMessageUrl = Office.context.mailbox.restUrl + '/v2.0/me/messages/' + itemId; // Email URL
+      const eml = Office.context.mailbox.restUrl + '/v2.0/me/messages/' + itemId + '$value'; // EML file
+      console.log(getMessageUrl)
+      console.log(accessToken)
+
+      const response = await fetch(getMessageUrl, {
+        headers: {
+          'Authorization': 'Bearer ' + accessToken
+        }
+      })
+      const json = await response.json()
+      const subject = json.Subject;
+      const message = {
+        type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
+        message: subject,
+        icon: "Icon.80x80",
+        persistent: true,
+      };
+  
+      // Show a notification message
+      Office.context.mailbox.item.notificationMessages.replaceAsync("action", message);
+  
+      // Be sure to indicate when the add-in command function is complete
+      event.completed();
+      
+    } else {
+      // Handle the error.
+    }
+  });
+}
+
+function getItemRestId() {
+  if (Office.context.mailbox.diagnostics.hostName === 'OutlookIOS') {
+    // itemId is already REST-formatted.
+    return Office.context.mailbox.item.itemId;
+  } else {
+    // Convert to an item ID for API v2.0.
+    return Office.context.mailbox.convertToRestId(
+      Office.context.mailbox.item.itemId,
+      Office.MailboxEnums.RestVersion.v2_0
+    );
+  }
 }
 
 function getGlobal() {
