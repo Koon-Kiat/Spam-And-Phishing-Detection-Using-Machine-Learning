@@ -2089,16 +2089,15 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
     2. Checks if the preprocessed data files already exist.
     3. If the files do not exist:
         a. Logs the beginning of the pipeline for the fold.
-        b. Applies data augmentation to the training data.
-        c. Processes non-text features.
-        d. Fits the preprocessor and transforms the non-text features.
-        e. Saves the preprocessor.
-        f. Extracts BERT features for the text data.
-        g. Combines the processed non-text and text features.
-        h. Applies SMOTE to balance the training data.
-        i. Applies PCA for dimensionality reduction.
-        j. Logs the number of features after PCA.
-        k. Saves the preprocessed data.
+        b. Processes non-text features.
+        c. Fits the preprocessor and transforms the non-text features.
+        d. Saves the preprocessor.
+        e. Extracts BERT features for the text data.
+        f. Combines the processed non-text and text features.
+        g. Applies SMOTE to balance the training data.
+        h. Applies PCA for dimensionality reduction.
+        i. Logs the number of features after PCA.
+        j. Saves the preprocessed data.
     4. If the files exist, loads the preprocessor and preprocessed data.
     5. Returns the balanced training data, combined test data, and their respective labels.
 
@@ -2131,19 +2130,11 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         logging.info(f"Running pipeline for fold {fold_idx}...")
         logging.info(f"Initial shape of X_train: {X_train.shape}")
 
-        # Apply Data Augmentation before processing non-text features and BERT
-        logging.info(f"Applying data augmentation for fold {fold_idx}...")
-        augment_step = pipeline.named_steps['augment']
-        
-        # Pass both features and labels to the augment function
-        X_train_augmented, y_train_augmented = augment_step.transform(X_train, y_train)  # Assuming augment_step handles y as well
-        
-        logging.info(f"Data augmentation applied for fold {fold_idx}. Shape after augmentation: {X_train_augmented.shape}\n")
-
-        # Processing non-text features
+        # Fit and transform the pipeline
         logging.info(f"Processing non-text features for fold {fold_idx}...")
-        X_train_non_text = X_train_augmented.drop(columns=['cleaned_text'])
+        X_train_non_text = X_train.drop(columns=['cleaned_text'])
         X_test_non_text = X_test.drop(columns=['cleaned_text'])
+
 
         # Fit the preprocessor
         logging.info(f"Fitting the preprocessor for fold {fold_idx}...")
@@ -2153,22 +2144,25 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         feature_names = preprocessor.named_transformers_['cat'].named_steps['encoder'].get_feature_names_out()
         logging.info(f"Columns in X_train after processing non-text features: {X_train_non_text_processed.shape}")
         logging.info(f"Feature names: {feature_names}")
-        if X_train_non_text_processed.shape[0] != y_train_augmented.shape[0]:
-            logging.error(f"Row mismatch: {X_train_non_text_processed.shape[0]} vs {y_train_augmented.shape[0]}")
-        logging.info(f"Non-text features processed for fold {fold_idx}.\n")
+        if X_train_non_text_processed.shape[0] != y_train.shape[0]:
+            logging.error(f"Row mismatch: {X_train_non_text_processed.shape[0]} vs {y_train.shape[0]}")
+        logging.info(f"Non text features processed for fold {fold_idx}.\n")
+
 
         # Save the preprocessor
         logging.info(f"Saving preprocessor for fold {fold_idx}...")
         joblib.dump(preprocessor, preprocessor_path)
         logging.info(f"Saved preprocessor to {preprocessor_path}\n")
 
+
         # Transform the text features
         logging.info(f"Extracting BERT features for X_train for {fold_idx}...")
-        X_train_text_processed = pipeline.named_steps['bert_features'].transform(X_train_augmented['cleaned_text'].tolist())
+        X_train_text_processed = pipeline.named_steps['bert_features'].transform(X_train['cleaned_text'].tolist())
         logging.info(f"Extracting BERT features for X_test for {fold_idx}...")
         X_test_text_processed = pipeline.named_steps['bert_features'].transform(X_test['cleaned_text'].tolist())
         logging.info(f"Number of features extracted from BERT for fold {fold_idx}: {X_train_text_processed.shape}")
-        logging.info(f"BERT features extracted for fold {fold_idx}.\n")
+        logging.info(f"Bert features extracted for fold {fold_idx}.\n")
+
 
         # Combine processed features
         logging.info(f"Combining processed features for fold {fold_idx}...")
@@ -2177,22 +2171,26 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         logging.info(f"Total number of combined features for fold {fold_idx}: {X_train_combined.shape}")
         logging.info(f"Combined processed features for fold {fold_idx}.\n")
 
-        # SMOTE to balance the training data
-        logging.info(f"Class distribution before SMOTE for fold {fold_idx}: {Counter(y_train_augmented)}")
+
+
+        logging.info(f"Class distribution before SMOTE for fold {fold_idx}: {Counter(y_train)}")
         logging.info(f"Applying SMOTE to balance the training data for fold {fold_idx}...")
-        X_train_balanced, y_train_balanced = pipeline.named_steps['smote'].fit_resample(X_train_combined, y_train_augmented)
+        X_train_balanced, y_train_balanced = pipeline.named_steps['smote'].fit_resample(X_train_combined, y_train)
         logging.info(f"Class distribution after SMOTE for fold {fold_idx}: {Counter(y_train_balanced)}")
         logging.info(f"SMOTE applied for fold {fold_idx}.\n")
 
-        # Apply PCA for dimensionality reduction
+
+
         logging.info(f"Applying PCA for dimensionality reduction for fold {fold_idx}...")
         X_train_balanced = pipeline.named_steps['pca'].fit_transform(X_train_balanced)
         X_test_combined = pipeline.named_steps['pca'].transform(X_test_combined)
+
 
         # Log the number of features after PCA
         n_components = pipeline.named_steps['pca'].n_components_
         logging.info(f"Number of components after PCA: {n_components}")
         logging.info(f"Shape of X_train after PCA: {X_train_balanced.shape}")
+
 
         # Save the preprocessed data
         logging.info(f"Saving processed data for fold {fold_idx}...")
@@ -2202,6 +2200,7 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
         # Load the preprocessor
         logging.info(f"Loading preprocessor from {preprocessor_path}...")
         preprocessor = joblib.load(preprocessor_path)
+
 
         # Load the preprocessed data
         logging.info(f"Loading preprocessed data for fold {fold_idx}...")
@@ -2365,150 +2364,6 @@ def generate_noisy_dataframe(data, file_path, noise_level=0.1):
 
     return data
 
-
-
-def synonym_replacement(text):
-    words = text.split()
-    new_words = words.copy()
-
-    for i, word in enumerate(words):
-        try:
-            token = nlp(word)[0]
-            # Get similar words based on vector similarity
-            similar_words = [w.text for w in nlp.vocab if w.has_vector and w.is_lower and w.text != word]
-            if similar_words:
-                synonym = random.choice(similar_words)  # Choose a random similar word
-                new_words[i] = synonym  # Replace word with its similar word
-                logging.debug(f"Replaced '{word}' with synonym '{synonym}'")
-        except Exception as e:
-            logging.error(f"Error finding synonyms for '{word}': {e}")
-    logging.debug(f"Final synonym replacement result: {new_words}")  # Log the result
-    return ' '.join(new_words)
-
-# Define your back translation function
-def back_translation(text):
-    try:
-        # Load models for translation
-        model_name = "Helsinki-NLP/opus-mt-en-de"
-        tokenizer = MarianTokenizer.from_pretrained(model_name)
-        model = MarianMTModel.from_pretrained(model_name)
-        
-        # Translate to German
-        logging.debug(f"Translating to German: {text}")
-        translated = model.generate(**tokenizer(text, return_tensors="pt", padding=True))
-        german_text = tokenizer.batch_decode(translated, skip_special_tokens=True)[0]
-        logging.debug(f"Translated to German: {german_text}")
-        
-        # Translate back to English
-        model_name_back = "Helsinki-NLP/opus-mt-de-en"
-        tokenizer_back = MarianTokenizer.from_pretrained(model_name_back)
-        model_back = MarianMTModel.from_pretrained(model_name_back)
-        
-        logging.debug(f"Translating back to English: {german_text}")
-        back_translated = model_back.generate(**tokenizer_back(german_text, return_tensors="pt", padding=True))
-        english_text = tokenizer_back.batch_decode(back_translated, skip_special_tokens=True)[0]
-        logging.debug(f"Back translated to English: {english_text}")
-        return english_text
-
-    except IndexError as e:
-        logging.error(f"IndexError in back_translation: {e}")
-        raise
-    except Exception as e:
-        logging.error(f"Error in back_translation: {e}")
-        raise
-
-def random_sampling(df, categorical_columns):
-    for col in categorical_columns:
-        df[col] = df[col].sample(frac=1, replace=True).values
-    return df
-
-def mixup_data(X, y, alpha=0.2):
-    n_samples = X.shape[0]
-    index = np.random.permutation(n_samples)
-    logging.debug(f"Index array: {index}")
-    
-    lambda_val = np.random.beta(alpha, alpha)  # Mixup coefficient
-    mixed_X = lambda_val * X + (1 - lambda_val) * X[index]
-    mixed_y = lambda_val * y + (1 - lambda_val) * y[index]
-    
-    logging.debug(f"mixed_X shape: {mixed_X.shape}, mixed_y shape: {mixed_y.shape}")
-    logging.debug(f"mixed_X type: {type(mixed_X)}, mixed_y type: {type(mixed_y)}")
-    
-    return mixed_X, mixed_y
-
-def process_rows(rows):
-    augmented_rows = []
-    for _, data in rows.iterrows():
-        # Original entry
-        augmented_rows.append(data.to_dict())  # Convert to dictionary
-        logging.debug(f"Processing original row: {data.to_dict()}")
-
-        # Extract the cleaned_text for augmentation
-        text = data['cleaned_text']
-        
-        # Synonym Replacement
-        try:
-            synonym_text = synonym_replacement(text)
-            augmented_row = data.to_dict()  # Use a dictionary
-            augmented_row['cleaned_text'] = synonym_text
-            augmented_rows.append(augmented_row)
-        except Exception as e:
-            logging.error(f"Error in synonym replacement: {e}")
-
-        # Back Translation
-        try:
-            back_translated_text = back_translation(text)
-            augmented_row = data.to_dict()  # Use a dictionary
-            augmented_row['cleaned_text'] = back_translated_text
-            augmented_rows.append(augmented_row)
-        except Exception as e:
-            logging.error(f"Error in back translation: {e}")
-
-    return augmented_rows
-
-def augment_data(X, y, categorical_columns, numerical_columns, max_workers=4):
-    # Ensure X is a DataFrame
-    if isinstance(X, np.ndarray):
-        X = pd.DataFrame(X, columns=categorical_columns + numerical_columns + ['cleaned_text'])
-    
-    logging.debug(f"Initial DataFrame shape: {X.shape}")
-    augmented_data = []
-
-    # Split DataFrame into chunks
-    chunk_size = len(X) // max_workers
-    chunks = [X.iloc[i:i + chunk_size] for i in range(0, len(X), chunk_size)]
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(process_rows, chunk) for chunk in chunks]
-        for future in tqdm(as_completed(futures), total=len(futures), desc="Processing chunks"):
-            augmented_data.extend(future.result())
-
-    logging.debug(f"Total augmented rows: {len(augmented_data)}")
-    return pd.DataFrame(augmented_data)
-
-
-class DataAugmentationTransformer(BaseEstimator, TransformerMixin):
-    def __init__(self, categorical_columns, numerical_columns):
-        self.categorical_columns = categorical_columns
-        self.numerical_columns = numerical_columns
-
-    def fit(self, X, y=None):
-        return self  # No fitting required
-
-    def transform(self, X, y=None):
-        if y is None:
-            raise ValueError("Labels y must be provided for data augmentation.")
-        
-        # Ensure X is a DataFrame
-        if isinstance(X, np.ndarray):
-            X = pd.DataFrame(X, columns=self.categorical_columns + self.numerical_columns + ['cleaned_text'])
-        
-        # Call the augment_data function
-        augmented_data = augment_data(X, y, self.categorical_columns, self.numerical_columns)
-        
-        # Return the augmented data
-        return augmented_data
-    
 
 
 # Main processing function
@@ -3028,7 +2883,7 @@ def main():
             
             # Define pipeline with preprocessor, BERT, and SMOTE
             pipeline = Pipeline(steps=[
-                ('augment', DataAugmentationTransformer(categorical_columns=categorical_columns, numerical_columns=numerical_columns)),
+                #('augment', DataAugmentationTransformer(categorical_columns=categorical_columns, numerical_columns=numerical_columns)),
                 ('preprocessor', preprocessor),
                 ('bert_features', bert_transformer),  # Custom transformer for BERT
                 ('smote', SMOTE(random_state=42)),  # Apply SMOTE after augmentation
