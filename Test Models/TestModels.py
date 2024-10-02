@@ -2887,7 +2887,7 @@ def main():
 
             logging.info(f"Beginning Model Training and Evaluation for Fold {fold_idx}...")
             # Train the model and evaluate the performance for each fold
-            model_path = os.path.join(base_dir, 'Test Models', 'Saved Test Models')          
+            model_path = os.path.join(base_dir, 'Test Models', 'Saved Base Models (No Optuna)')          
             models = {
                 "Logistic Regression": LogisticRegression(max_iter=2000),
                 "XGBoost": XGBClassifier(eval_metric='mlogloss'),
