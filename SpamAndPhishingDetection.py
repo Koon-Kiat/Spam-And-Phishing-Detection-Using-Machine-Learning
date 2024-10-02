@@ -2080,7 +2080,7 @@ def load_data_pipeline(data_path, labels_path):
 
 
 
-def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
+def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, dir):
     """
     Run the data processing pipeline for a specific fold in a stratified k-fold cross-validation.
 
@@ -2121,9 +2121,7 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
     tuple
         The balanced training data, combined test data, and their respective labels.
     """
-    base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Feature Extraction')
-    os.makedirs(base_dir, exist_ok=True)
-    train_data_path, test_data_path, train_labels_path, test_labels_path, preprocessor_path = get_fold_paths(fold_idx, base_dir)
+    train_data_path, test_data_path, train_labels_path, test_labels_path, preprocessor_path = get_fold_paths(fold_idx, dir)
 
     # Check if the files already exist
     if not all([os.path.exists(train_data_path), os.path.exists(test_data_path), os.path.exists(train_labels_path), os.path.exists(test_labels_path), os.path.exists(preprocessor_path)]):
@@ -2412,6 +2410,7 @@ def main():
     MergedCleanedCEASHeaders = os.path.join(base_dir, 'Data Cleaning', 'MergedCleanedCEASHeaders.csv')
     MergedCleanedDataFrame = os.path.join(base_dir, 'Data Cleaning', 'MergedCleanedDataFrame.csv')
     NoisyDataFrame = os.path.join(base_dir, 'Noise Injection', 'NoisyDataFrame.csv')
+    pipeline_path = os.path.join(base_dir, 'Feature Extraction')
 
 
     # Load the datasets
@@ -2899,6 +2898,7 @@ def main():
                 y_train=y_train,
                 y_test=y_test,
                 pipeline=pipeline,
+                dir=pipeline_path
             )
             logging.info(f"Data for Fold {fold_idx} has been processed or loaded successfully.\n")
 
