@@ -551,7 +551,7 @@ def main():
     source_path = os.path.join(
         base_dir, "Models & Parameters", "ensemble_model_fold_1.pkl"
     )
-    TestModel = os.path.join(base_dir, "Test Models", "Saved Base Models (No Optuna)")
+    TestModel = os.path.join(base_dir, "Test Models", "Saved Stacked Models")
     shutil.copy(source_path, SavedModel)
 
     # Extract features from the email

@@ -1495,10 +1495,10 @@ def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='Data Sp
         logging.info(f"Fold {fold_idx} - Total Combined: {len(y_test)+len(y_train)}")
 
 
-        X_test_file = os.path.join(output_dir, f'X_test_fold{fold_idx}.csv')
-        y_test_file = os.path.join(output_dir, f'y_test_fold{fold_idx}.csv')
-        X_train_file = os.path.join(output_dir, f'X_train_fold{fold_idx}.csv')
-        y_train_file = os.path.join(output_dir, f'y_train_fold{fold_idx}.csv')
+        X_test_file = os.path.join(output_dir, f'X_Test_Fold{fold_idx}.csv')
+        y_test_file = os.path.join(output_dir, f'y_Test_Fold{fold_idx}.csv')
+        X_train_file = os.path.join(output_dir, f'X_Train_Fold{fold_idx}.csv')
+        y_train_file = os.path.join(output_dir, f'y_Train_Fold{fold_idx}.csv')
         X_test.to_csv(X_test_file, index=False)
         y_test.to_csv(y_test_file, index=False)
         X_train.to_csv(X_train_file, index=False)
@@ -2026,11 +2026,11 @@ def get_fold_paths(fold_idx, base_dir='Processed Data'):
     tuple
         The file paths for the train data, test data, train labels, test labels, and preprocessor.
     """
-    train_data_path = os.path.join(base_dir, f"fold_{fold_idx}_train_data.npz")
-    test_data_path = os.path.join(base_dir, f"fold_{fold_idx}_test_data.npz")
-    train_labels_path = os.path.join(base_dir, f"fold_{fold_idx}_train_labels.pkl")
-    test_labels_path = os.path.join(base_dir, f"fold_{fold_idx}_test_labels.pkl")
-    preprocessor_path = os.path.join(base_dir, f"fold_{fold_idx}_preprocessor.pkl")
+    train_data_path = os.path.join(base_dir, f"Fold_{fold_idx}_Train_Data.npz")
+    test_data_path = os.path.join(base_dir, f"Fold_{fold_idx}_Test_Data.npz")
+    train_labels_path = os.path.join(base_dir, f"Fold_{fold_idx}_Train_Labels.pkl")
+    test_labels_path = os.path.join(base_dir, f"Fold_{fold_idx}_Test_Labels.pkl")
+    preprocessor_path = os.path.join(base_dir, f"Fold_{fold_idx}_Preprocessor.pkl")
     
     return train_data_path, test_data_path, train_labels_path, test_labels_path, preprocessor_path
 
@@ -2326,9 +2326,10 @@ def generate_noisy_dataframe(data, file_path, noise_level=0.1):
         for i in range(len(data)):
             if random.random() < noise_level:  # With a probability of noise_level
                 text_list = list(data[text_column][i])
-                pos = random.randint(0, len(text_list) - 1)  # Choose a random position
-                text_list[pos] = random.choice('abcdefghijklmnopqrstuvwxyz')  # Replace with a random letter
-                data.at[i, text_column] = ''.join(text_list)
+                if len(text_list) > 0:  # Ensure text_list is not empty
+                    pos = random.randint(0, len(text_list) - 1)  # Choose a random position
+                    text_list[pos] = random.choice('abcdefghijklmnopqrstuvwxyz')  # Replace with a random letter
+                    data.at[i, text_column] = ''.join(text_list)
         return data
 
     # Function to inject noise into categorical columns
@@ -2398,18 +2399,18 @@ def main():
         config = json.load(config_file)
     base_dir = config['base_dir']
     CEAS_08_Dataset = os.path.join(base_dir, 'CEAS_08.csv')
-    PreprocessedSpamAssassinFile = os.path.join(base_dir, 'Data Preprocessing', 'PreprocessedSpamAssassin.csv')
-    PreprocessedCEASFile = os.path.join(base_dir, 'Data Preprocessing', 'PreprocessedCEAS_08.csv')
-    ExtractedSpamAssassinEmailHeaderFile = os.path.join(base_dir, 'Feature Engineering', 'SpamAssassinExtractedEmailHeader.csv')
-    ExtractedCEASEmailHeaderFile = os.path.join(base_dir, 'Feature Engineering', 'CEASExtractedEmailHeader.csv')
-    MergedSpamAssassinFile = os.path.join(base_dir, 'Data Integration', 'MergedSpamAssassin.csv')
-    MergedCEASFile = os.path.join(base_dir, 'Data Integration', 'MergedCEAS_08.csv')
-    MergedDataFrame = os.path.join(base_dir, 'Data Integration', 'MergedDataFrame.csv')
-    CleanedDataFrame = os.path.join(base_dir, 'Data Cleaning', 'CleanedDataFrame.csv')
-    CleanedCEASHeaders = os.path.join(base_dir, 'Data Cleaning', 'CleanedCEASHeaders.csv')
-    MergedCleanedCEASHeaders = os.path.join(base_dir, 'Data Cleaning', 'MergedCleanedCEASHeaders.csv')
-    MergedCleanedDataFrame = os.path.join(base_dir, 'Data Cleaning', 'MergedCleanedDataFrame.csv')
-    NoisyDataFrame = os.path.join(base_dir, 'Noise Injection', 'NoisyDataFrame.csv')
+    PreprocessedSpamAssassinFile = os.path.join(base_dir, 'Data Preprocessing', 'Preprocessed_SpamAssassin.csv')
+    PreprocessedCEASFile = os.path.join(base_dir, 'Data Preprocessing', 'Preprocessed_CEAS_08.csv')
+    ExtractedSpamAssassinEmailHeaderFile = os.path.join(base_dir, 'Feature Engineering', 'Spam_Assassin_Extracted_EmailHeader.csv')
+    ExtractedCEASEmailHeaderFile = os.path.join(base_dir, 'Feature Engineering', 'CEAS_Extracted_EmailHeader.csv')
+    MergedSpamAssassinFile = os.path.join(base_dir, 'Data Integration', 'Merged_SpamAssassin.csv')
+    MergedCEASFile = os.path.join(base_dir, 'Data Integration', 'Merged_CEAS_08.csv')
+    MergedDataFrame = os.path.join(base_dir, 'Data Integration', 'Merged_DataFrame.csv')
+    CleanedDataFrame = os.path.join(base_dir, 'Data Cleaning', 'Cleaned_DataFrame.csv')
+    CleanedCEASHeaders = os.path.join(base_dir, 'Data Cleaning', 'Cleaned_CEASHeaders.csv')
+    MergedCleanedCEASHeaders = os.path.join(base_dir, 'Data Cleaning', 'Merged_Cleaned_CEAS_Headers.csv')
+    MergedCleanedDataFrame = os.path.join(base_dir, 'Data Cleaning', 'Merged_Cleaned_DataFrame.csv')
+    NoisyDataFrame = os.path.join(base_dir, 'Noise Injection', 'Noisy_DataFrame.csv')
     pipeline_path = os.path.join(base_dir, 'Feature Extraction')
 
 
@@ -2927,8 +2928,8 @@ def main():
 
             logging.info(f"Beginning Model Training and Evaluation for Fold {fold_idx}...")
             # Train the model and evaluate the performance for each fold
-            model_path = os.path.join(base_dir, 'Models & Parameters', f'ensemble_model_fold_{fold_idx}.pkl')
-            params_path = os.path.join(base_dir, 'Models & Parameters', f'best_params_fold_{fold_idx}.json')
+            model_path = os.path.join(base_dir, 'Models & Parameters', f'Ensemble_Model_Fold_{fold_idx}.pkl')
+            params_path = os.path.join(base_dir, 'Models & Parameters', f'Best_Parameter_Fold_{fold_idx}.json')
             ensemble_model, test_accuracy = model_training(
                 X_train_balanced,
                 y_train_balanced,
