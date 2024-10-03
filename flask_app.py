@@ -8,7 +8,6 @@ app = Flask(__name__)
 
 @app.route("/")
 def index():
-    # return SingleEvaluation.SingleEvaluation.main()
     return render_template("index.html")
 
 @app.route("/taskpane.html")
