@@ -1,38 +1,109 @@
-import os
-import re
-import logging
-import pickle
-import joblib
-import numpy as np  # Numerical operations
-import pandas as pd
-from typing import Optional, List, Dict, Union, Tuple
-from collections import Counter
-from concurrent.futures import ThreadPoolExecutor, as_completed  # Multithreading
-from functools import lru_cache  # Least Recently Used (LRU) cache
-from tqdm import tqdm  # Progress bar
+import os  # Interact with the operating system
+import json  # JSON parsing and manipulation
+import codecs  # Codec registry and base classes
+import re  # Regular expressions
+import time  # Time-related functions
+import logging  # Logging library
+import warnings  # Warning control
+import pickle  # Pickle (de)serialization
+import string  # String operations
+import random  # Random number generation
 
+
+# Data Manipulation and Analysis
+import numpy as np  # Numerical operations
+import pandas as pd  # Data manipulation and analysis
+import csv  # CSV file handling
+
+# Data Visualization
+import matplotlib.pyplot as plt  # Plotting library
+import seaborn as sns  # Statistical data visualization
+from wordcloud import WordCloud  # Generate word clouds
+
+# Text Processing
+import nltk  # Natural language processing
+from nltk.corpus import stopwords  # Stop words
+from nltk.corpus import wordnet  # WordNet corpus
+from nltk.stem import WordNetLemmatizer  # Lemmatization
+from nltk.tokenize import word_tokenize  # Tokenization
+from nltk.data import find # Find NLTK resources
+import contractions  # Expand contractions in text
+import spacy  # NLP library
+
+
+# Machine Learning Libraries
+from sklearn.base import BaseEstimator, TransformerMixin  # Scikit-learn base classes
+from sklearn.compose import ColumnTransformer
+from sklearn.decomposition import PCA, IncrementalPCA  # Principal Component Analysis
+from sklearn.ensemble import (RandomForestClassifier, VotingClassifier, 
+                              GradientBoostingClassifier, StackingClassifier, BaggingClassifier)
+from sklearn.feature_extraction.text import (ENGLISH_STOP_WORDS, 
+                                             TfidfVectorizer, CountVectorizer)  # Text feature extraction
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression  # Logistic Regression
+from sklearn.metrics import (accuracy_score, classification_report, 
+                             confusion_matrix, f1_score, precision_score, recall_score)  # Metrics
+from sklearn.model_selection import (GridSearchCV, train_test_split, 
+                                       StratifiedKFold, cross_val_score, learning_curve)  # Model selection
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import (OneHotEncoder, StandardScaler, 
+                                   LabelEncoder, OrdinalEncoder, FunctionTransformer)  # Preprocessing
+from sklearn.utils import resample  # Resampling utilities
+from xgboost import XGBClassifier  # XGBoost Classifier
+from sklearn.svm import SVC  # Support Vector Classifier
+
+# Text Parsing and Email Handling
+import email  # Email handling
+import email.policy  # Email policies
 from email import policy
 from email.message import EmailMessage
 from email.parser import BytesParser
-from email.utils import parseaddr, getaddresses, formataddr
-from email.headerregistry import Address
-from email.policy import default
+from email.utils import getaddresses
 
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-from sklearn.model_selection import StratifiedKFold
-from sklearn.decomposition import PCA
+# Data Augmentation
+from imblearn.over_sampling import SMOTE  # Handling imbalanced data
+from transformers import MarianMTModel, MarianTokenizer  # Machine translation models
 
-from imblearn.over_sampling import SMOTE
+# Profiling and Job Management
+import cProfile  # Profiling
+from tqdm import tqdm  # Progress bar for loops
+import joblib  # Job management
+from joblib import Parallel, delayed  # Parallel processing
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed  # Concurrent processing
 
-from transformers import BertTokenizer, BertModel
 
-import torch
-from torch.utils.data import Dataset
+# Natural Language Toolkit (NLTK)
+from collections import Counter  # Counter class for counting occurrences
+
+# TensorFlow and PyTorch
+import tensorflow as tf  # TensorFlow library
+import torch  # PyTorch library
+from torch.utils.data import DataLoader, Dataset  # Data handling in PyTorch
+
+# Hyperparameter Optimization
+import optuna  # Hyperparameter optimization
+from optuna.samplers import TPESampler
+
+# HTML and XML Parsing
+from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning  # HTML and XML parsing
+
+# Spell Checking
+from spellchecker import SpellChecker  # Spell checking
+
+# Transformers Library
+from transformers import (AdamW, BertForSequenceClassification, BertModel, 
+                          BertTokenizer, Trainer, TrainingArguments)  # BERT models and training utilities
+from transformers.utils import logging as transformers_logging
+
+# Sparse Matrices
+from scipy.sparse import csr_matrix, hstack  # Sparse matrix operations
+
+# Typing Support
+from typing import Dict, List, Union, Optional, Tuple  # Type hints
+from tabulate import tabulate  # Pretty-print tabular data
+
+# Datasets
+from datasets import load_dataset  # Load datasets
 
 from SpamAndPhishingDetection import (
     DatasetProcessor,
@@ -44,6 +115,38 @@ from SpamAndPhishingDetection import (
     TextProcessor,
     RareCategoryRemover
 )
+
+# Download necessary NLTK resources
+nltk.download('punkt', quiet=True)
+nltk.download('stopwords', quiet=True)
+nltk.download('wordnet', quiet=True)
+nltk.download('omw-1.4', quiet=True)
+nlp = spacy.load('en_core_web_sm')  # Load the spaCy English model
+
+# Configure logging
+logging.basicConfig(format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s ', level=logging.INFO)
+
+
+# Suppress TensorFlow logs
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow logs
+tf.get_logger().setLevel('CRITICAL')  # Set TensorFlow logger to suppress warnings
+logging.getLogger('tensorflow').setLevel(logging.ERROR)  # Configure the logging library to suppress TensorFlow logs
+
+# Suppress warnings globally
+warnings.simplefilter("ignore")  # Ignore all warnings
+
+# Suppress specific warnings
+warnings.filterwarnings("ignore", category=UserWarning, module='transformers')
+warnings.filterwarnings("ignore", category=FutureWarning, module='transformers.tokenization_utils_base')
+warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
+warnings.filterwarnings("ignore", category=UserWarning, module='tensorflow.keras')
+
+# Optionally, configure transformers logging
+transformers_logging.set_verbosity_error()
+
+# Define loss function using the recommended method
+loss_fn = tf.compat.v1.losses.sparse_softmax_cross_entropy
+
 
 
 def load_or_extract_headers(df: pd.DataFrame, file_path: str, extractor_class, dataset_type: str) -> pd.DataFrame:
@@ -69,12 +172,35 @@ def load_or_extract_headers(df: pd.DataFrame, file_path: str, extractor_class, d
 
 
 class EmailHeaderExtractor:
+    """
+    A class to extract email headers and other relevant information from email data.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The DataFrame containing the email data.
+    """
     def __init__(self, df: pd.DataFrame):
         self.df = df
         self.headers_df = pd.DataFrame()
         logging.info("Initializing EmailHeaderExtractor...")
 
+
+
     def clean_links(self, links: List[str]) -> List[str]:
+        """
+        Clean the extracted links by removing unwanted characters and spaces.
+
+        Parameters
+        ----------
+        links : List[str]
+            The list of links to be cleaned.
+
+        Returns
+        -------
+        List[str]
+            The cleaned list of links.
+        """
         cleaned_links = []
         for link in links:
             link = re.sub(r'[\'\[\]\s]+', '', link)
@@ -82,9 +208,25 @@ class EmailHeaderExtractor:
             link = link.strip()  # Trim leading and trailing spaces
             if link:  # Avoid appending empty links
                 cleaned_links.append(link)
+
         return cleaned_links
 
-    def extract_inline_headers(self, email_text: str) -> Dict[str, Optional[str]]:
+
+
+    def extract_inline_headers(self, email_text: str) -> Dict[str, Union[str, None]]:
+        """
+        Extract inline headers (From, To, Mail-To) from the email text.
+
+        Parameters
+        ----------
+        email_text : str
+            The email text to extract headers from.
+
+        Returns
+        -------
+        Dict[str, Union[str, None]]
+            A dictionary containing the extracted headers.
+        """
         from_match = re.search(r'From:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
         to_match = re.search(r'To:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
         mail_to_match = re.search(r'mailto:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
@@ -94,7 +236,22 @@ class EmailHeaderExtractor:
 
         return {'From': from_header, 'To': to_header, 'Mail-To': mail_to_header}
 
-    def extract_body_content(self, email_message) -> str:
+
+
+    def extract_body_content(self, email_message: EmailMessage) -> str:
+        """
+        Extract the body content from an email message.
+
+        Parameters
+        ----------
+        email_message : EmailMessage
+            The email message to extract the body content from.
+
+        Returns
+        -------
+        str
+            The extracted body content.
+        """
         body_content = ""
         if email_message.is_multipart():
             for part in email_message.iter_parts():
@@ -104,32 +261,80 @@ class EmailHeaderExtractor:
                     body_content += part.get_payload(decode=True).decode(errors='ignore')
         else:
             body_content = email_message.get_payload(decode=True).decode(errors='ignore')
+
         return body_content
 
+
+
     def count_https_http(self, text: str) -> Dict[str, int]:
+        """
+        Count the occurrences of 'https' and 'http' in the text.
+
+        Parameters
+        ----------
+        text : str
+            The text to count the occurrences in.
+
+        Returns
+        -------
+        Dict[str, int]
+            A dictionary containing the counts of 'https' and 'http'.
+        """
         https_count = len(re.findall(r'https://', text))
         http_count = len(re.findall(r'http://', text))
+
         return {'https_count': https_count, 'http_count': http_count}
 
+
+
     def contains_blacklisted_keywords(self, text: str) -> int:
+        """
+        Count the occurrences of blacklisted keywords in the text.
+
+        Parameters
+        ----------
+        text : str
+            The text to count the occurrences in.
+
+        Returns
+        -------
+        int
+            The count of blacklisted keywords in the text.
+        """
         blacklisted_keywords = [
-            'click now', 'verify now', 'urgent', 'free', 'winner',
-            'limited time', 'act now', 'your account', 'risk', 'account update',
-            'important update', 'security alert', 'confirm your identity',
-            'password reset', 'access your account', 'log in', 'claim your prize',
-            'congratulations', 'update required', 'you have been selected',
-            'validate your account', 'final notice', 'click here', 'confirm now',
-            'take action', 'unauthorized activity', 'sign in', 'redeem now',
-            'you are a winner', 'download now', 'urgent action required',
-            'reset password', 'limited offer', 'exclusive deal', 'verify account',
-            'bank account', 'payment declined', 'upgrade required', 'respond immediately'
+        'click now', 'verify now', 'urgent', 'free', 'winner',
+        'limited time', 'act now', 'your account', 'risk', 'account update',
+        'important update', 'security alert', 'confirm your identity',
+        'password reset', 'access your account', 'log in', 'claim your prize',
+        'congratulations', 'update required', 'you have been selected',
+        'validate your account', 'final notice', 'click here', 'confirm now',
+        'take action', 'unauthorized activity', 'sign in', 'redeem now',
+        'you are a winner', 'download now', 'urgent action required',
+        'reset password', 'limited offer', 'exclusive deal', 'verify account',
+        'bank account', 'payment declined', 'upgrade required', 'respond immediately'
         ]
         keyword_count = 0
         for keyword in blacklisted_keywords:
             keyword_count += len(re.findall(re.escape(keyword), text, re.IGNORECASE))
+
         return keyword_count
 
+
+
     def detect_url_shorteners(self, links: List[str]) -> int:
+        """
+        Detect the number of URL shorteners in the list of links.
+
+        Parameters
+        ----------
+        links : List[str]
+            The list of links to check for URL shorteners.
+
+        Returns
+        -------
+        int
+            The count of URL shorteners in the list of links.
+        """
         shortener_domains = [
             'bit.ly', 'tinyurl.com', 'goo.gl', 'ow.ly', 't.co', 'is.gd', 'buff.ly', 
             'adf.ly', 'bl.ink', 'lnkd.in', 'shorte.st', 'mcaf.ee', 'q.gs', 'po.st', 
@@ -139,133 +344,113 @@ class EmailHeaderExtractor:
         short_urls = [link for link in links if any(domain in link for domain in shortener_domains)]
         return len(short_urls)
 
-    def contains_ip_address(self, text: str) -> bool:
+
+
+    def count_ip_addresses(self, text: str) -> int:
+        """
+        Count the occurrences of IP addresses in the text.
+
+        Parameters
+        ----------
+        text : str
+            The text to count the occurrences in.
+
+        Returns
+        -------
+        int
+            The count of IP addresses in the text.
+        """
         ip_pattern = r'https?://(\d{1,3}\.){3}\d{1,3}'
 
         return len(re.findall(ip_pattern, text))
-
     
 
-    def extract_header_evaluation(self) -> pd.DataFrame:
-        headers_list: List[Dict[str, Union[str, List[str], int]]] = []
 
+    def extract_header_evaluation(self) -> pd.DataFrame:
+        """
+        Extract headers and other relevant information from the email data for SpamAssassin dataset.
+
+        Returns
+        -------
+        pandas.DataFrame
+            A DataFrame containing the extracted headers and information.
+        """
+        headers_list: List[Dict[str, Union[str, List[str], int]]] = []
         for email_text in tqdm(self.df['text'], desc="Extracting headers"):
             try:
                 email_message = BytesParser(policy=policy.default).parsebytes(email_text.encode('utf-8'))
+                from_header = email_message['From'] if 'From' in email_message else None
+                to_header = email_message['To'] if 'To' in email_message else None
+                mail_to_header = email_message.get('Mail-To') if email_message.get('Mail-To') else None
 
-                # Extract headers
-                from_header = email_message.get('From', '')
-                to_header = email_message.get('To', '')
-                mail_to_header = email_message.get('Mail-To', '')
+                if not from_header or not to_header:
+                    inline_headers = self.extract_inline_headers(email_text)
+                    from_header = inline_headers['From'] or from_header
+                    to_header = inline_headers['To'] or to_header
+                    mail_to_header = inline_headers['Mail-To'] or mail_to_header
 
-                # Extract 'From' and 'To' headers with proper handling for groups
-                from_header = self.extract_single_address(from_header)
-                to_header = self.extract_single_address(to_header)
-
+                from_header = from_header if from_header else None
+                to_header = to_header if to_header else None
                 mail_to_header = mail_to_header if mail_to_header else None
                 body_content = self.extract_body_content(email_message)
                 logging.debug(f"Email body content: {body_content}")
+
 
                 # Extract URLs from body content
                 url_pattern = r'https?:\/\/[^\s\'"()<>]+'
                 links = re.findall(url_pattern, body_content)
                 links = self.clean_links(links)
 
+
                 # Count blacklisted keywords, http/https, short URLs, and IP addresses in the email body
                 https_http_counts = self.count_https_http(body_content)
                 blacklisted_keyword_count = self.contains_blacklisted_keywords(body_content)
                 short_urls = self.detect_url_shorteners(links)
-                has_ip_address = self.contains_ip_address(body_content)
+                has_ip_address = self.count_ip_addresses(body_content)
+
+
 
                 headers_list.append({
-                    'sender': from_header,
-                    'receiver': to_header,
-                    'mailto': mail_to_header,
-                    'texturls': links,
-                    'https_count': https_http_counts['https_count'],
-                    'http_count': https_http_counts['http_count'],
-                    'blacklisted_keywords_count': blacklisted_keyword_count,
-                    'short_urls': short_urls,
-                    'has_ip_address': has_ip_address
-                })
-
+                'sender': from_header,
+                'receiver': to_header,
+                'mailto': mail_to_header,
+                'texturls': links,
+                'https_count': https_http_counts['https_count'],
+                'http_count': https_http_counts['http_count'],
+                'blacklisted_keywords_count': blacklisted_keyword_count,
+                'short_urls': short_urls,
+                'has_ip_address': has_ip_address
+            })
             except Exception as e:
                 logging.error(f"Error parsing email: {e}")
-                logging.debug(f"Email text: {email_text}")
-                headers_list.append({
-                    'sender': None,
-                    'receiver': None,
-                    'mailto': None,
-                    'texturls': [],
-                    'https_count': 0,
-                    'http_count': 0,
-                    'blacklisted_keywords_count': 0,
-                    'short_urls': [],
-                    'has_ip_address': 0
-                })
-
+                headers_list.append(
+                    {'sender': None, 'receiver': None, 'mailto': None, 'texturls': [], 'blacklisted_keywords_count': 0, 'short_urls': [], 'has_ip_address': 0})
         self.headers_df = pd.DataFrame(headers_list)
+
         return self.headers_df
     
 
-    def extract_single_address(self, header_value: Optional[Union[str, List[str], Tuple[str, str]]]) -> Optional[str]:
-        """
-        Extracts a single email address from the header value.
-        Handles cases where the header value may be a string, list, tuple, or Group object.
-        """
-        logging.debug(f"Processing header value: {header_value}")
-        
-        # Handle string header value
-        if isinstance(header_value, str):
-            addresses = getaddresses([header_value])
-            for _, email in addresses:
-                if email:
-                    return email
-        
-        # Handle list or tuple of header values
-        elif isinstance(header_value, (list, tuple)):
-            for item in header_value:
-                if isinstance(item, str):
-                    addresses = getaddresses([item])
-                    for _, email in addresses:
-                        if email:
-                            return email
-                elif isinstance(item, tuple):
-                    # Handle cases where item might be a tuple of (name, email)
-                    if len(item) == 2 and isinstance(item[1], str):
-                        return item[1]
-        
-        # Handle Group object (or other complex structures)
-        elif hasattr(header_value, 'addresses'):
-            addresses = getaddresses([str(header_value)])
-            for _, email in addresses:
-                if email:
-                    return email
-        else:
-            logging.error(f"Unexpected type for header_value: {type(header_value)}")
-            logging.debug(f"Value: {header_value}")
-
-        return None
-
-
 
     def save_to_csv(self, file_path: str):
+        """
+        Save the extracted headers DataFrame to a CSV file.
+
+        Parameters
+        ----------
+        file_path : str
+            The path to save the CSV file.
+
+        Raises
+        ------
+        ValueError
+            If no header information has been extracted.
+        """
         if not self.headers_df.empty:
             self.headers_df.to_csv(file_path, index=False)
             logging.info(f"Data successfully saved to: {file_path}")
         else:
-            raise ValueError("No header information extracted. Please run extract_header_evaluation() first.")
-
-
-
-def get_fold_paths(fold_idx, base_dir='Evaluation'):
-    train_data_path = os.path.join(base_dir, f"fold_{fold_idx}_train_data.npz")
-    test_data_path = os.path.join(base_dir, f"fold_{fold_idx}_test_data.npz")
-    train_labels_path = os.path.join(base_dir, f"fold_{fold_idx}_train_labels.pkl")
-    test_labels_path = os.path.join(base_dir, f"fold_{fold_idx}_test_labels.pkl")
-    preprocessor_path = os.path.join(base_dir, f"fold_{fold_idx}_preprocessor.pkl")
-    
-    return train_data_path, test_data_path, train_labels_path, test_labels_path, preprocessor_path
+            raise ValueError(
+                "No header information extracted. Please run extract_headers() first.")
 
 
 
@@ -283,97 +468,67 @@ def load_data_pipeline(data_path, labels_path):
     return data, labels
 
 
-
-def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline):
-    base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Evaluation')
-    os.makedirs(base_dir, exist_ok=True)
-    train_data_path, test_data_path, train_labels_path, test_labels_path, preprocessor_path = get_fold_paths(fold_idx, base_dir)
-
+def run_pipeline_or_load(data, labels, pipeline, dir):
+    data_path = os.path.join(dir, 'processed_data.npz')
+    labels_path = os.path.join(dir, 'processed_labels.pkl')
+    preprocessor_path = os.path.join(dir, 'preprocessor.pkl')
 
     # Check if the files already exist
-    if not all([os.path.exists(train_data_path), os.path.exists(test_data_path), os.path.exists(train_labels_path), os.path.exists(test_labels_path), os.path.exists(preprocessor_path)]):
-        logging.info(f"Running pipeline for fold {fold_idx}...")
-        logging.info(f"Initial shape of X_train: {X_train.shape}")
+    if not all([os.path.exists(data_path), os.path.exists(labels_path), os.path.exists(preprocessor_path)]):
+        logging.info("Running pipeline for the dataset...")
 
-        # Fit and transform the pipeline
-        logging.info(f"Processing non-text features for fold {fold_idx}...")
-        X_train_non_text = X_train.drop(columns=['cleaned_text'])
-        X_test_non_text = X_test.drop(columns=['cleaned_text'])
-
+        # Process non-text features
+        logging.info("Processing non-text features...")
+        data_non_text = data.drop(columns=['cleaned_text'])
 
         # Fit the preprocessor
-        logging.info(f"Fitting the preprocessor for fold {fold_idx}...")
+        logging.info("Fitting the preprocessor...")
         preprocessor = pipeline.named_steps['preprocessor']
-        X_train_non_text_processed = preprocessor.fit_transform(X_train_non_text)
-        X_test_non_text_processed = preprocessor.transform(X_test_non_text)
+        data_non_text_processed = preprocessor.fit_transform(data_non_text)
         feature_names = preprocessor.named_transformers_['cat'].named_steps['encoder'].get_feature_names_out()
-        logging.info(f"Columns in X_train after processing non-text features: {X_train_non_text_processed.shape}")
-        logging.info(f"Feature names: {feature_names}")
-        if X_train_non_text_processed.shape[0] != y_train.shape[0]:
-            logging.error(f"Row mismatch: {X_train_non_text_processed.shape[0]} vs {y_train.shape[0]}")
-        logging.info(f"Non text features processed for fold {fold_idx}.\n")
-
+        logging.info(f"Columns in data after processing non-text features: {data_non_text_processed.shape}")
+        if data_non_text_processed.shape[0] != labels.shape[0]:
+            logging.error(f"Row mismatch: {data_non_text_processed.shape[0]} vs {labels.shape[0]}")
+        logging.info("Non-text features processed.\n")
 
         # Save the preprocessor
-        logging.info(f"Saving preprocessor for fold {fold_idx}...")
+        logging.info("Saving preprocessor...")
         joblib.dump(preprocessor, preprocessor_path)
         logging.info(f"Saved preprocessor to {preprocessor_path}\n")
 
-
         # Transform the text features
-        logging.info(f"Extracting BERT features for X_train for {fold_idx}...")
-        X_train_text_processed = pipeline.named_steps['bert_features'].transform(X_train['cleaned_text'].tolist())
-        logging.info(f"Extracting BERT features for X_test for {fold_idx}...")
-        X_test_text_processed = pipeline.named_steps['bert_features'].transform(X_test['cleaned_text'].tolist())
-        logging.info(f"Number of features extracted from BERT for fold {fold_idx}: {X_train_text_processed.shape}")
-        logging.info(f"Bert features extracted for fold {fold_idx}.\n")
-
-
+        logging.info("Extracting BERT features for the dataset...")
+        data_text_processed = pipeline.named_steps['bert_features'].transform(data['cleaned_text'].tolist())
+        logging.info(f"Number of features extracted from BERT: {data_text_processed.shape}")
+        logging.info("BERT features extracted.\n")
 
         # Combine processed features
-        logging.info(f"Combining processed features for fold {fold_idx}...")
-        X_train_combined = np.hstack([X_train_non_text_processed, X_train_text_processed])
-        X_test_combined = np.hstack([X_test_non_text_processed, X_test_text_processed])
-        logging.info(f"Total number of combined features for fold {fold_idx}: {X_train_combined.shape}")
-        logging.info(f"Combined processed features for fold {fold_idx}.\n")
+        logging.info("Combining processed features...")
+        data_combined = np.hstack([data_non_text_processed, data_text_processed])
+        logging.info(f"Total number of combined features: {data_combined.shape}")
+        logging.info("Combined processed features.\n")
 
-
-
-        logging.info(f"Class distribution before SMOTE for fold {fold_idx}: {Counter(y_train)}")
-        logging.info(f"Applying SMOTE to balance the training data for fold {fold_idx}...")
-        X_train_balanced, y_train_balanced = pipeline.named_steps['smote'].fit_resample(X_train_combined, y_train)
-        logging.info(f"Class distribution after SMOTE for fold {fold_idx}: {Counter(y_train_balanced)}")
-        logging.info(f"SMOTE applied for fold {fold_idx}.\n")
-
-
-
-        logging.info(f"Applying PCA for dimensionality reduction for fold {fold_idx}...")
-        X_train_balanced = pipeline.named_steps['pca'].fit_transform(X_train_balanced)
-        X_test_combined = pipeline.named_steps['pca'].transform(X_test_combined)
-
+        logging.info("Applying PCA for dimensionality reduction...")
+        data_combined = pipeline.named_steps['pca'].fit_transform(data_combined)
 
         # Log the number of features after PCA
         n_components = pipeline.named_steps['pca'].n_components_
         logging.info(f"Number of components after PCA: {n_components}")
-        logging.info(f"Shape of X_train after PCA: {X_train_balanced.shape}")
-
+        logging.info(f"Shape of data after PCA: {data_combined.shape}")
 
         # Save the preprocessed data
-        logging.info(f"Saving processed data for fold {fold_idx}...")
-        save_data_pipeline(X_train_balanced, y_train_balanced, train_data_path, train_labels_path)
-        save_data_pipeline(X_test_combined, y_test, test_data_path, test_labels_path)
+        logging.info("Saving processed data...")
+        save_data_pipeline(data_combined, labels, data_path, labels_path)
     else:
         # Load the preprocessor
         logging.info(f"Loading preprocessor from {preprocessor_path}...")
         preprocessor = joblib.load(preprocessor_path)
 
-
         # Load the preprocessed data
-        logging.info(f"Loading preprocessed data for fold {fold_idx}...")
-        X_train_balanced, y_train_balanced = load_data_pipeline(train_data_path, train_labels_path)
-        X_test_combined, y_test = load_data_pipeline(test_data_path, test_labels_path)
+        logging.info("Loading preprocessed data...")
+        data_combined, labels = load_data_pipeline(data_path, labels_path)
 
-    return X_train_balanced, X_test_combined, y_train_balanced, y_test
+    return data_combined, labels
 
 
 
@@ -454,7 +609,7 @@ class BERTFeatureExtractor:
     
 
 
-def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='Evaluation'):
+def stratified_k_fold_split(df, output_dir, n_splits=3, random_state=42):
     logging.info("Performing Stratified K-Fold splitting...")
     
 
@@ -489,10 +644,14 @@ def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='Evaluat
         logging.info(f"Fold {fold_idx} - Total Combined: {len(y_test)+len(y_train)}")
 
 
-        X_test_file = os.path.join(output_dir, f'X_test_fold{fold_idx}.csv')
-        y_test_file = os.path.join(output_dir, f'y_test_fold{fold_idx}.csv')
+        X_test_file = os.path.join(output_dir, f'X_Test_Fold{fold_idx}.csv')
+        y_test_file = os.path.join(output_dir, f'y_Test_Fold{fold_idx}.csv')
+        X_train_file = os.path.join(output_dir, f'X_Train_Fold{fold_idx}.csv')
+        y_train_file = os.path.join(output_dir, f'y_Train_Fold{fold_idx}.csv')
         X_test.to_csv(X_test_file, index=False)
         y_test.to_csv(y_test_file, index=False)
+        X_train.to_csv(X_train_file, index=False)
+        y_train.to_csv(y_train_file, index=False)
         folds.append((X_train, X_test, y_train, y_test))
     logging.info("Completed Stratified K-Fold splitting.")
 
@@ -504,21 +663,21 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno
 
 
 def main():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    dataset = os.path.join(base_dir, 'Datasets', 'Phishing_Email.csv')
+    PreprocessedEvaluationDataset = os.path.join(base_dir, 'Evaluation', 'Data Preprocessing', 'Preprocessed_Evaluation_Dataset.csv')
+    ExtractedEvaluationHeaderFile = os.path.join(base_dir, 'Evaluation', 'Feature Engineering', 'Extracted_Evaluation_HeaderFile.csv')
+    CleanedEvaluationDataFrame = os.path.join(base_dir, 'Evaluation', 'Data Cleaning', 'Cleaned_Evaluation_DataFrame.csv')
+    MergedEvaluationFile = os.path.join(base_dir, 'Evaluation', 'Data Integration', 'Merged_Evaluation.csv')
+    MergedCleanedDataFrame = os.path.join(base_dir, 'Evaluation', 'Data Cleaning', 'Merged_Cleaned_DataFrame.csv')
+
+
+    df_evaluation = pd.read_csv(dataset)
+
     # ****************************** #
     #       Data Preprocessing       #
     # ****************************** #
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    dataset = os.path.join(base_dir, 'Datasets', 'Phishing_Email.csv')
-    PreprocessedEvaluationDataset = os.path.join(base_dir, 'Evaluation', 'PreprocessedEvaluationDataset.csv')
-    ExtractedEvaluationHeaderFile = os.path.join(base_dir, 'Evaluation', 'ExtractedEvaluationHeaderFile.csv')
-    CleanedEvaluationDataFrame = os.path.join(base_dir, 'Evaluation', 'CleanedEvaluationDataFrame.csv')
-    MergedEvaluationFile = os.path.join(base_dir, 'Evaluation', 'MergedEvaluation.csv')
-    MergedCleanedDataFrame = os.path.join(base_dir, 'Evaluation', 'MergedCleanedDataFrame.csv')
-    SavedModel = os.path.join(base_dir, 'Models & Parameters', 'ensemble_model_fold_1.pkl')
-    SavedPreprocessor = os.path.join(base_dir, 'Models & Parameters', 'fold_1_preprocessor.pkl')
-    SavedBertTransformer = os.path.join(base_dir, 'Models & Parameters', 'fold_1_bert_transformer.pkl')
-
-    df_evaluation = pd.read_csv(dataset)  
+    logging.info("Beginning Data Preprocessing...")
 
     # Rename 'Email Type' column to 'Label' and map the values
     df_evaluation['label'] = df_evaluation['Email Type'].map({'Safe Email': 0, 'Phishing Email': 1})
@@ -531,22 +690,26 @@ def main():
     df_processed_evaluation = processor_evaluation.process_dataset()
 
     log_label_percentages(df_processed_evaluation, 'Evaluation Dataset')
+    logging.info("Data Preprocessing completed.\n")
 
 
     # ****************************** #
     #       Feature Engineering      #
     # ****************************** #
+    logging.info("Beginning Feature Engineering...")
     evaluation_email_headers = load_or_extract_headers(df_processed_evaluation, ExtractedEvaluationHeaderFile, EmailHeaderExtractor, 'Evaluation')
-    logging.info("Email header extraction and saving from Spam Assassin completed.\n")
+    logging.info("Email header extraction and saving from Evaluation completed.")
     evaluation_email_headers['urls'] = evaluation_email_headers['texturls'].apply(count_urls)
     evaluation_email_headers.drop(columns=['mailto'], inplace=True) # Drop the 'mailto' column
     evaluation_email_headers.drop(columns=['texturls'], inplace=True) # Drop the 'texturls' column
+    logging.info("Feature Engineering completed.\n")
    
 
 
     # ****************************** #
     #       Data Integration         #
     # ****************************** #
+    logging.info("Beginning Data Integration...")
     df_processed_evaluation.reset_index(inplace=True)
     evaluation_email_headers.reset_index(inplace=True)
     #evaluation_email_headers.fillna({'sender': 'unknown', 'receiver': 'unknown'}, inplace=True)
@@ -576,11 +739,13 @@ def main():
         logging.info("The number of rows in the Merge Evaluation Dataframe matches the Processed Evaluation Dataframe.")
         merged_evaluation.to_csv(MergedEvaluationFile, index=False)
         logging.info(f"Data successfully saved to: {MergedEvaluationFile}")
+    logging.info("Data Integration completed.\n")
         
 
     # ************************* #
     #       Data Cleaning       #
     # ************************* #
+    logging.info("Beginning Data Cleaning...")
     df_evaluation_clean = load_or_clean_data("Evaluation", merged_evaluation, 'body', CleanedEvaluationDataFrame, data_cleaning)
     logging.info (f"Data Cleaning completed.\n")
 
@@ -621,79 +786,117 @@ def main():
         for col in numerical_columns:
             df_evaluation_clean_combined[col] = pd.to_numeric(df_evaluation_clean_combined[col], errors='coerce').fillna(0)
     
-    # ************************* #
-    #       Data Splitting      #
-    # ************************* #
-
-    logging.info(f"Beginning Data Splitting...")
-    folds = stratified_k_fold_split(df_evaluation_clean_combined)
-    logging.info(f"Data Splitting completed.\n")
-
-    # Initialize lists to store accuracies for each fold
-    fold_train_accuracies = []
-    fold_test_accuracies = []
-
-    for fold_idx, (X_train, X_test, y_train, y_test) in enumerate(folds, start=1):
-        categorical_columns = ['sender', 'receiver']
-        numerical_columns = ['https_count', 'http_count', 'blacklisted_keywords_count', 'urls', 'short_urls', 'has_ip_address']
-        text_column = 'cleaned_text'
 
 
-        # Initialize BERT feature extractor and transformer
-        bert_extractor = BERTFeatureExtractor()
-        bert_transformer = BERTFeatureTransformer(feature_extractor=bert_extractor)
+    # ***************************** #
+    #       Model Prediction        #
+    # ***************************** #
+    categorical_columns = ['sender', 'receiver']
+    numerical_columns = ['https_count', 'http_count', 'blacklisted_keywords_count', 'urls', 'short_urls', 'has_ip_address']
+    text_column = 'cleaned_text'
+
+    for col in numerical_columns:
+        df_evaluation_clean_combined[col] = pd.to_numeric(df_evaluation_clean_combined[col], errors='coerce').fillna(0)
 
 
-        # Define preprocessor for categorical and numerical columns
-        preprocessor = ColumnTransformer(
-            transformers=[
-                ('cat', Pipeline([
-                    ('rare_cat_remover', RareCategoryRemover(threshold=0.05)),  # Remove rare categories
-                    ('imputer', SimpleImputer(strategy='most_frequent')),  # Fill missing categorical values
-                    ('encoder', OneHotEncoder(sparse_output=False, handle_unknown='ignore'))
-                ]), categorical_columns),
-                ('num', Pipeline([
-                    ('imputer', SimpleImputer(strategy='mean')),  # Fill missing numerical values
-                    ('scaler', StandardScaler())
-                ]), numerical_columns)
-            ],
-            remainder='passthrough'  # Keep other columns unchanged, like 'cleaned_text' and 'label'
-        )
+    # Initialize BERT feature extractor and transformer
+    bert_extractor = BERTFeatureExtractor()
+    bert_transformer = BERTFeatureTransformer(feature_extractor=bert_extractor)
 
-        # Define pipeline with preprocessor, BERT, SMOTE, and PCA
-        pipeline = Pipeline(steps=[
-            ('preprocessor', preprocessor),
-            ('bert_features', bert_transformer),  # Custom transformer for BERT
-            ('smote', SMOTE(random_state=42)),  # Apply SMOTE after feature extraction
-            ('pca', PCA(n_components=10))
-        ])
 
-        # Call the function to either run the pipeline or load preprocessed data
-        X_train_balanced, X_test_combined, y_train_balanced, y_test = run_pipeline_or_load(
-            fold_idx=fold_idx,
-            X_train=X_train,
-            X_test=X_test,
-            y_train=y_train,
-            y_test=y_test,
-            pipeline=pipeline
-        )
-        logging.info(f"Data for Fold {fold_idx} has been processed or loaded successfully.")
+    # Define preprocessor for categorical and numerical columns
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('cat', Pipeline([
+                #('rare_cat_remover', RareCategoryRemover(threshold=0.05)),  # Remove rare categories
+                ('imputer', SimpleImputer(strategy='most_frequent')),  # Fill missing categorical values
+                ('encoder', OneHotEncoder(sparse_output=False, handle_unknown='ignore'))
+            ]), categorical_columns),
+            ('num', Pipeline([
+                ('imputer', SimpleImputer(strategy='mean')),  # Fill missing numerical values
+                ('scaler', StandardScaler())
+            ]), numerical_columns)
+        ],
+        remainder='passthrough'  # Keep other columns unchanged, like 'cleaned_text' and 'label'
+    )
 
-        # Load the saved model
-        saved_model = joblib.load(SavedModel)
+    # Define pipeline with preprocessor, BERT, SMOTE, and PCA
+    pipeline = Pipeline(steps=[
+        ('preprocessor', preprocessor),
+        ('bert_features', bert_transformer),  # Custom transformer for BERT
+        #('smote', SMOTE(random_state=42)),  # Apply SMOTE after feature extraction
+        ('pca', PCA(n_components=10))
+    ])
 
-        # Make predictions on the test data
-        y_pred = saved_model.predict(X_test_combined)
+    data_dir = os.path.join(base_dir, 'Evaluation', 'Feature Extraction')  # Directory where you want to save the processed data
 
-        # Evaluate the model
-        test_accuracy = accuracy_score(y_test, y_pred)
-        target_names = ['Safe', 'Phishing', 'Spam']
+    # Assuming df_evaluation_clean_combined is the DataFrame you are working with
+    X = df_evaluation_clean_combined.drop(columns=['label'])
+    y = df_evaluation_clean_combined['label']
 
-        # Print the performance metrics
-        print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
-        print(f"Confusion Matrix:\n{confusion_matrix(y_test, y_pred)}")
-        print(f"\nClassification Report for Test Data:\n{classification_report(y_test, y_pred, target_names=target_names, zero_division=1)}")
+    # Run the pipeline or load processed data
+    processed_data, processed_labels = run_pipeline_or_load(X, y, pipeline, data_dir)
+    
 
+
+    # Load the saved model
+    Main_Model = os.path.join(base_dir, 'Models & Parameters')
+    Base_Model_No_Optuna = os.path.join(base_dir, 'Test Models', 'Base Models (No Optuna)')
+    Base_Model_Optuna = os.path.join(base_dir, 'Test Models', 'Base Models (Optuna)')
+    Stacked_Model_Optuna = os.path.join(base_dir, 'Test Models', 'Stacked Models (Optuna)')
+
+    # List of folders containing models
+    model_folders = [Main_Model, Base_Model_No_Optuna, Base_Model_Optuna, Stacked_Model_Optuna]
+
+    # Define the model name mapping
+    model_name_mapping = {
+        'knn': 'K-Nearest Neighbour',
+        'svm': 'Support Vector Machine',
+        'rf': 'Random Forest',
+        'lr': 'Logistic Regression',
+        'nb': 'Naive Bayes',
+        'XGB_ADA_LG_Fold_1': 'XGBoost + Random Forest + Logistic Regression',
+        'XGB_KNN_LG_Fold_1': 'XGBoost + LightGBM + Logistic Regression',
+        'XGB_LightGB_LG_Fold_1': 'XGBoost + KNN + Logistic Regression',
+        'XGB_RF_LG_Fold_1': 'XGBoost + ADA + Logistic Regression',
+    }
+
+    # Placeholder for results
+    results = []
+
+    for folder in model_folders:
+        folder_name = os.path.basename(folder)
+        for model_file in os.listdir(folder):
+            model_path = os.path.join(folder, model_file)
+            if os.path.isfile(model_path):
+                try:
+                    saved_model = joblib.load(model_path)
+                    model_name_key = model_file.split('.')[0]
+                    model_name = model_name_mapping.get(model_name_key, model_file.replace('.pkl', ''))
+                    print(f"Evaluating model: {model_name}")
+                    y_pred = saved_model.predict(processed_data)
+                    test_accuracy = accuracy_score(processed_labels, y_pred)
+                    confusion = confusion_matrix(processed_labels, y_pred)
+                    classification = classification_report(processed_labels, y_pred, target_names=['Safe', 'Not Safe'], zero_division=1)
+                    results.append({
+                        'Model': model_name,
+                        'Folder': folder_name,
+                        'Accuracy': f"{test_accuracy * 100:.2f}%",
+                        'Confusion Matrix': confusion,
+                        'Classification Report': classification
+                    })
+                except Exception as e:
+                    logging.error(f"Error loading or evaluating model {model_file}: {e}")
+            else:
+                print(f"Skipping invalid path: {model_path}")
+    # Convert results to a DataFrame for better formatting
+    results_df = pd.DataFrame(results)
+
+    # Save results to a CSV file
+    results_df[['Model', 'Folder', 'Accuracy']].to_csv('Model_Evaluation_Result.csv', index=False)
+
+    # Print the results in a table format
+    print(tabulate(results_df, headers='keys', tablefmt='pretty', showindex=False))
 
 
 if __name__ == '__main__':
