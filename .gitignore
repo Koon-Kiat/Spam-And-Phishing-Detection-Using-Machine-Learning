@@ -17,3 +17,6 @@
 .venv
 .DS_Store
 /Noise Injection
+*.pkl
+*.csv
+*.eml
