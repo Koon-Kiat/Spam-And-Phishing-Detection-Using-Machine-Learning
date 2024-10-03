@@ -2136,8 +2136,7 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, d
         logging.info(f"Class distribution after SMOTE for fold {fold_idx}: {Counter(y_train_balanced)}")
         logging.info(f"SMOTE applied for fold {fold_idx}.\n")
 
-
-
+        '''
         logging.info(f"Applying PCA for dimensionality reduction for fold {fold_idx}...")
         X_train_balanced = pipeline.named_steps['pca'].fit_transform(X_train_balanced)
         X_test_combined = pipeline.named_steps['pca'].transform(X_test_combined)
@@ -2147,6 +2146,8 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, d
         n_components = pipeline.named_steps['pca'].n_components_
         logging.info(f"Number of components after PCA: {n_components}")
         logging.info(f"Shape of X_train after PCA: {X_train_balanced.shape}")
+        '''
+        logging.info(f"Shape of X_train: {X_train_balanced.shape}")
 
 
         # Save the preprocessed data
@@ -2845,8 +2846,8 @@ def main():
                 #('augment', DataAugmentationTransformer(categorical_columns=categorical_columns, numerical_columns=numerical_columns)),
                 ('preprocessor', preprocessor),
                 ('bert_features', bert_transformer),  # Custom transformer for BERT
-                ('smote', SMOTE(random_state=42)),  # Apply SMOTE after augmentation
-                ('pca', PCA(n_components=10))
+                ('smote', SMOTE(random_state=42))  # Apply SMOTE after augmentation
+                #('pca', PCA(n_components=10))
             ])
 
 
@@ -2891,7 +2892,7 @@ def main():
             models = {
                 "Logistic Regression": LogisticRegression(max_iter=2000),
                 "XGBoost": XGBClassifier(eval_metric='mlogloss'),
-                "SVM": SVC(probability=True),
+                #"SVM": SVC(probability=True),
                 "Random Forest": RandomForestClassifier(),
                 "KNN": KNeighborsClassifier(),
                 "LightGBM": LGBMClassifier()
