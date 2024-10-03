@@ -1,0 +1,17 @@
+Content-Type: multipart/mixed; boundary="===============3305010004231878795=="
+MIME-Version: 1.0
+Subject: Payment Confirmation Needed!
+From: billing@online-payments.com
+To: customer@domain.com
+
+--===============3305010004231878795==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+
+Dear customer,
+
+Your recent payment was not processed. Please confirm your billing details by clicking the following link to complete your transaction.
+
+[Fake Payment Link]
+--===============3305010004231878795==--

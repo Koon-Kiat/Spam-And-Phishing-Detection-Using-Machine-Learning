@@ -1,0 +1,17 @@
+Content-Type: multipart/mixed; boundary="===============2728621295408867191=="
+MIME-Version: 1.0
+Subject: Delivery Failed: Update Your Address
+From: shipping@deliveryservice.com
+To: user@domain.com
+
+--===============2728621295408867191==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+
+Dear customer,
+
+Your package could not be delivered due to an incorrect address. Please update your delivery details by following the link below.
+
+[Fake Delivery Link]
+--===============2728621295408867191==--

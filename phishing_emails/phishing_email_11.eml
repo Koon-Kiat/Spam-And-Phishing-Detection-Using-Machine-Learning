@@ -1,0 +1,17 @@
+Content-Type: multipart/mixed; boundary="===============4410942679449694260=="
+MIME-Version: 1.0
+Subject: Important: Your Invoice is Overdue
+From: invoices@fakebusiness.com
+To: customer@domain.com
+
+--===============4410942679449694260==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+
+Dear customer,
+
+Your invoice is overdue. Please make payment by clicking the link below to avoid late fees.
+
+[Fake Payment Link]
+--===============4410942679449694260==--
