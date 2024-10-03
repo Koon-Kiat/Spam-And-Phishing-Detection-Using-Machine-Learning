@@ -1,0 +1,70 @@
+Received: by 2002:a05:6a10:83cb:b0:583:5884:455f with SMTP id o11csp2223422pxh;
+        Mon, 2 Sep 2024 18:39:02 -0700 (PDT)
+Received: from mail4.guaruja.sp.gov.br (mail4.guaruja.sp.gov.br. [190.83.84.108])
+        by mx.google.com with ESMTPS id d2e1a72fcca58-715e5735328si8544087b3a.238.2024.09.02.18.39.00
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Mon, 02 Sep 2024 18:39:01 -0700 (PDT)
+Received: from mail4.guaruja.sp.gov.br (localhost.localdomain [127.0.0.1])
+	by mail4.guaruja.sp.gov.br (Proxmox) with ESMTP id 7333F64B2F;
+	Mon,  2 Sep 2024 22:34:44 -0300 (-03)
+From: Maria-Elisabeth_Schaeffler <denise.martorelli@guaruja.sp.gov.br>
+Subject: donation
+Thread-Topic: donation
+Thread-Index: BtiNY+qcgSCrIf0wbYuQLd9bedjwlA==
+X-MS-Exchange-MessageSentRepresentingType: 1
+Date: Tue, 3 Sep 2024 01:33:48 +0000
+Message-ID:
+	<1296634399.1070257.1725327228804.JavaMail.zimbra@guaruja.sp.gov.br>
+Reply-To: Maria-Elisabeth_Schaeffler <mariaelisabethschaeffler63@gmail.com>
+Content-Language: en-GB
+X-MS-Has-Attach:
+X-MS-Exchange-Organization-SCL: -1
+X-MS-TNEF-Correlator:
+X-MS-Exchange-Organization-RecordReviewCfmType: 0
+received-spf: pass (google.com: domain of denise.martorelli@guaruja.sp.gov.br
+ designates 190.83.84.108 as permitted sender) client-ip=190.83.84.108;
+Content-Type: multipart/alternative;
+	boundary="_000_129663439910702571725327228804JavaMailzimbraguarujaspgo_"
+MIME-Version: 1.0
+
+--_000_129663439910702571725327228804JavaMailzimbraguarujaspgo_
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+
+DQoNCkhlbGxvLA0KDQpJJ20gTXMuIE1hcmlhIEVsaXNhYmV0aCBTY2hhZWZmbGVyLCBhIEdlcm1h
+biBidXNpbmVzcyBtYWduYXRlLEludmVzdG9yIGFuZCBwaGlsYW50aHJvcGlzdC4gSSBhbSB0aGUg
+Y2hhaXJtYW4gb2YgV2lwcm8gTGltaXRlZC4gMjUgcGVyY2VudCBvZiBteSBwZXJzb25hbCB3ZWFs
+dGggaXMgc3BlbnQgb24gY2hhcml0eS4gQW5kIEkgYWxzbyBwcm9taXNlZCB0byBnaXZlIHRoZSBy
+ZXN0IG9mIDI1JSBhd2F5IHRvIGluZGl2aWR1YWxzIHRoaXMgeWVhciAyMDI0LiBJIGhhdmUgZGVj
+aWRlZCB0byBkb25hdGUgMSw1MDAsMDAwLjAwIGV1cm9zIHRvIHlvdS4gSWYgeW91IGFyZSBpbnRl
+cmVzdGVkIGluIG15IGRvbmF0aW9uLCBjb250YWN0IG1lIGZvciBtb3JlIGluZm9ybWF0aW9uLg0K
+DQpZb3UgY2FuIGFsc28gcmVhZCBtb3JlIGFib3V0IG1lIHVzaW5nIHRoZSBsaW5rIGJlbG93DQoN
+Cmh0dHBzOi8vZW4ud2lraXBlZGlhLm9yZy93aWtpL01hcmlhLUVsaXNhYmV0aF9TY2hhZWZmbGVy
+DQoNCkdyZWV0aW5ncw0KTWFuYWdpbmcgRGlyZWN0b3IgV2lwcm8gTGltaXRlZA0KTWFyaWEtRWxp
+c2FiZXRoX1NjaGFlZmZsZXINCkVtYWlsOiBtYXJpYWVsaXNhYmV0aHNjaGFlZmZsZXI2M0BnbWFp
+bC5jb20NCg==
+
+--_000_129663439910702571725327228804JavaMailzimbraguarujaspgo_
+Content-Type: text/html; charset="utf-8"
+Content-ID: <30E0361314128F4AAC8CD57398A87A61@1>
+Content-Transfer-Encoding: base64
+
+PGh0bWw+DQo8aGVhZD4NCjxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0i
+dGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ij4NCjwvaGVhZD4NCjxib2R5Pg0KPGRpdiBzdHlsZT0i
+Zm9udC1mYW1pbHk6IGFyaWFsLCBoZWx2ZXRpY2EsIHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMTJw
+dDsgY29sb3I6ICMwMDAwMDAiPg0KPGRpdj48YnI+DQo8L2Rpdj4NCjxkaXY+PGJyPg0KPC9kaXY+
+DQo8ZGl2IGRhdGEtbWFya2VyPSJfX1NJR19QUkVfXyI+SGVsbG8sPGJyPg0KPGJyPg0KSSdtIE1z
+LiBNYXJpYSBFbGlzYWJldGggU2NoYWVmZmxlciwgYSBHZXJtYW4gYnVzaW5lc3MgbWFnbmF0ZSxJ
+bnZlc3RvciBhbmQgcGhpbGFudGhyb3Bpc3QuIEkgYW0gdGhlIGNoYWlybWFuIG9mIFdpcHJvIExp
+bWl0ZWQuIDI1IHBlcmNlbnQgb2YgbXkgcGVyc29uYWwgd2VhbHRoIGlzIHNwZW50IG9uIGNoYXJp
+dHkuIEFuZCBJIGFsc28gcHJvbWlzZWQgdG8gZ2l2ZSB0aGUgcmVzdCBvZiAyNSUgYXdheSB0byBp
+bmRpdmlkdWFscyB0aGlzIHllYXIgMjAyNC4NCiBJIGhhdmUgZGVjaWRlZCB0byBkb25hdGUgMSw1
+MDAsMDAwLjAwIGV1cm9zIHRvIHlvdS4gSWYgeW91IGFyZSBpbnRlcmVzdGVkIGluIG15IGRvbmF0
+aW9uLCBjb250YWN0IG1lIGZvciBtb3JlIGluZm9ybWF0aW9uLjxicj4NCjxicj4NCllvdSBjYW4g
+YWxzbyByZWFkIG1vcmUgYWJvdXQgbWUgdXNpbmcgdGhlIGxpbmsgYmVsb3c8YnI+DQo8YnI+DQpo
+dHRwczovL2VuLndpa2lwZWRpYS5vcmcvd2lraS9NYXJpYS1FbGlzYWJldGhfU2NoYWVmZmxlcjxi
+cj4NCjxicj4NCkdyZWV0aW5nczxicj4NCk1hbmFnaW5nIERpcmVjdG9yIFdpcHJvIExpbWl0ZWQ8
+YnI+DQpNYXJpYS1FbGlzYWJldGhfU2NoYWVmZmxlcjxicj4NCkVtYWlsOiBtYXJpYWVsaXNhYmV0
+aHNjaGFlZmZsZXI2M0BnbWFpbC5jb208L2Rpdj4NCjwvZGl2Pg0KPC9ib2R5Pg0KPC9odG1sPg0K
+
+--_000_129663439910702571725327228804JavaMailzimbraguarujaspgo_--

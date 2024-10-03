@@ -1,0 +1,38 @@
+Sender: "Office365 @ COMPANY.com"
+From: "Office365 @ COMPANY.com"
+Subject: Microsoft Account
+To: "maria@microsoft.com" <maria@microsoft.com>
+Cc: 
+Bcc: 
+MIME-Version: 1.0
+Content-Type: multipart/alternative;
+ boundary="--_=NextPart108_37b66526-f893-4216-903d-123383a69fcc"
+
+This is a multi-part message in MIME format.
+
+----=NextPart108_37b66526-f893-4216-903d-123383a69fcc
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+Dear Maria,
+
+Someone in Bogot=C3=A1, Colombia attempted to log into your account several=
+ times=2E If you believe this was fraudulent activity, please report it her=
+e: http://56=2e10=2e23=2e10/login=2Ehtml=2EIf you do not believe this to be=
+ fraudulent activity, you may ignore this message=2E
+
+ Sincerely,
+
+Office365 @ COMPANY=2Ecom
+
+----=NextPart108_37b66526-f893-4216-903d-123383a69fcc
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dutf-8"><p=
+>Dear Maria,&nbsp;</p><p>Someone in Bogot=C3=A1, Colombia attempted to log =
+into your account several times=2E If you believe this was fraudulent activ=
+ity, please report it here: http://56=2e10=2e23=2e10/login=2Ehtml=2EIf you =
+do not believe this to be fraudulent activity, you may ignore this message=
+=2E&nbsp;</p><p>&nbsp;Sincerely,&nbsp;</p><p>Office365 @ COMPANY=2Ecom</p>
+----=_NextPart108_37b66526-f893-4216-903d-123383a69fcc--
