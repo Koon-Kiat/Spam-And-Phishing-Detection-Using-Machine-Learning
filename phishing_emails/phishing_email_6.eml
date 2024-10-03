@@ -1,10 +1,10 @@
-Content-Type: multipart/mixed; boundary="===============1310833194338876836=="
+Content-Type: multipart/mixed; boundary="===============0872873849778220765=="
 MIME-Version: 1.0
 Subject: URGENT: Confirm Your Email Address Now!
 From: support@fakeservice.com
 To: someone@domain.com
 
---===============1310833194338876836==
+--===============0872873849778220765==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -13,5 +13,5 @@ Dear valued user,
 
 We noticed unusual activity on your account. Please confirm your email by clicking the link below to prevent deactivation.
 
-[Fake Confirmation Link]
---===============1310833194338876836==--
+[https://sample.org/confirm-email]
+--===============0872873849778220765==--

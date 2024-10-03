@@ -1,10 +1,10 @@
-Content-Type: multipart/mixed; boundary="===============0279077310557501486=="
+Content-Type: multipart/mixed; boundary="===============8338526624164055074=="
 MIME-Version: 1.0
 Subject: Congratulations! You Won a Free iPhone!
 From: prize@promotions.com
 To: winner@domain.com
 
---===============0279077310557501486==
+--===============8338526624164055074==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -13,5 +13,5 @@ Dear user,
 
 You have won a brand new iPhone! Click the link below to claim your prize.
 
-[Fake Prize Link]
---===============0279077310557501486==--
+[http://sample.org/#winprize]
+--===============8338526624164055074==--

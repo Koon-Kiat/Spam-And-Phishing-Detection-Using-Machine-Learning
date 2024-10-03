@@ -1,10 +1,10 @@
-Content-Type: multipart/mixed; boundary="===============2838617061478711248=="
+Content-Type: multipart/mixed; boundary="===============5351345715130486328=="
 MIME-Version: 1.0
 Subject: Your Account Has Been Compromised!
 From: alert@secureaccess.com
 To: user@domain.com
 
---===============2838617061478711248==
+--===============5351345715130486328==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -13,5 +13,5 @@ Dear user,
 
 Your account has been compromised. Please reset your password immediately by following the link below.
 
-[Fake Password Reset Link]
---===============2838617061478711248==--
+[https://sample.net/#reset-password]
+--===============5351345715130486328==--

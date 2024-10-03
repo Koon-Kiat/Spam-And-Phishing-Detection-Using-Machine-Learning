@@ -1,10 +1,10 @@
-Content-Type: multipart/mixed; boundary="===============4588150809646929330=="
+Content-Type: multipart/mixed; boundary="===============7001057124198606259=="
 MIME-Version: 1.0
 Subject: Verify Your Account Immediately!
 From: no-reply@bank-secure.com
 To: user123@domain.com
 
---===============4588150809646929330==
+--===============7001057124198606259==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -13,5 +13,5 @@ Dear user,
 
 We've detected suspicious activity in your account. Please verify your account by clicking the link below to avoid suspension.
 
-[Fake Verification Link]
---===============4588150809646929330==--
+[https://www.neck.sample.org/]
+--===============7001057124198606259==--

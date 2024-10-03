@@ -1,10 +1,10 @@
-Content-Type: multipart/mixed; boundary="===============2574785185084428558=="
+Content-Type: multipart/mixed; boundary="===============7726743459930504006=="
 MIME-Version: 1.0
 Subject: Action Required: Account Verification
 From: verification@fakeservice.com
 To: user@domain.com
 
---===============2574785185084428558==
+--===============7726743459930504006==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -13,5 +13,5 @@ Dear user,
 
 Your account requires verification. Please click the link below to complete the verification process.
 
-[Fake Verification Link]
---===============2574785185084428558==--
+[http://www.example.com/?badge=boot]
+--===============7726743459930504006==--

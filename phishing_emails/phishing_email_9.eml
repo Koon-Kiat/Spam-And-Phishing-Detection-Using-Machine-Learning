@@ -1,10 +1,10 @@
-Content-Type: multipart/mixed; boundary="===============6733233000201781488=="
+Content-Type: multipart/mixed; boundary="===============8266153708759080108=="
 MIME-Version: 1.0
 Subject: Your Subscription is About to Expire
 From: subscriptions@streamingservice.com
 To: user@domain.com
 
---===============6733233000201781488==
+--===============8266153708759080108==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -13,5 +13,5 @@ Dear user,
 
 Your subscription to our service is about to expire. Renew your subscription now by clicking the link below to continue enjoying our services.
 
-[Fake Subscription Link]
---===============6733233000201781488==--
+[http://sample.info/?insect=fireman&porter=attraction#cave]
+--===============8266153708759080108==--
