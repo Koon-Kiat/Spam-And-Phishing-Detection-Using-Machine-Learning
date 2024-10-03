@@ -1,0 +1,1 @@
+{"xgb": {"n_estimators_xgb": 74, "max_depth_xgb": 9, "learning_rate_xgb": 0.1346992071630056, "reg_alpha": 9.933144771094952, "reg_lambda": 0.7503054140567533}, "rf": {"n_estimators_rf": 124, "max_depth_rf": 17, "min_samples_split_rf": 10, "min_samples_leaf_rf": 2}, "logreg": {"C_logreg": 0.9232045442997973, "penalty": "l2"}}

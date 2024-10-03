@@ -1,0 +1,1 @@
+{"xgb": {"n_estimators_xgb": 68, "max_depth_xgb": 7, "learning_rate_xgb": 0.17277633622815994, "reg_alpha": 3.0865865404648343, "reg_lambda": 0.14286095061898707}, "knn": {"n_neighbors_knn": 16, "weights_knn": "distance", "algorithm_knn": "ball_tree", "p_knn": 2}, "logreg": {"C_logreg": 0.5132501085136734, "penalty": "l2"}}
