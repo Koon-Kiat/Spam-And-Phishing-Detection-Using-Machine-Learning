@@ -893,7 +893,8 @@ def main():
     results_df = pd.DataFrame(results)
 
     # Save results to a CSV file
-    results_df[['Model', 'Folder', 'Accuracy']].to_csv('Model_Evaluation_Result.csv', index=False)
+    output_path = os.path.join('Evaluation', 'Model_Evaluation_Result.csv')
+    results_df[['Model', 'Folder', 'Accuracy']].to_csv(output_path, index=False)
 
     # Print the results in a table format
     print(tabulate(results_df, headers='keys', tablefmt='pretty', showindex=False))
