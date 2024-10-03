@@ -539,20 +539,20 @@ def main():
     with open("config.json", "r") as config_file:
         config = json.load(config_file)
     base_dir = config["base_dir"]
-    TestEmail = os.path.join(base_dir, "Multi Model Evaluation", "Test Emails", "Bursary.eml")
+    TestEmail = os.path.join(base_dir, "Multi Model Evaluation", "Test Emails", "phishing_email_2.eml")
     SavedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Formated_Test.csv")
     CleanedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Cleaned_Test.csv")
     MergedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Merged_Test.csv")
     SavedModel = os.path.join(
         base_dir, "Multi Model Evaluation", "Ensemble_Model_Fold_1.pkl"
     )
-    source_path = os.path.join(
-        base_dir, "Models & Parameters", "Ensemble_Model_Fold_1.pkl"
-    )
+    #source_path = os.path.join(
+    #    base_dir, "Models & Parameters", "Ensemble_Model_Fold_1.pkl"
+    #)
     Base_Model_Optuna = os.path.join(base_dir, "Test Models", "Base Models (Optuna)")
     Base_Model_No_Optuna = os.path.join(base_dir, "Test Models", "Base Models (No Optuna)")
     Stacked_Model = os.path.join(base_dir, "Test Models", "Stacked Models (Optuna)")
-    shutil.copy(source_path, SavedModel)
+    #shutil.copy(source_path, SavedModel)
 
     # Extract features from the email
     extractor = EmailHeaderExtractor()
@@ -650,17 +650,8 @@ def main():
         (email_df_non_text_transformed, email_df_text_processed)
     )
 
-    # Apply PCA only if more than one sample
-    if email_df_combined.shape[0] > 1:
-        pca = PCA(n_components=10)
-        email_pca = pca.fit_transform(email_df_combined)
-    else:
-        # Set email_pca to an empty array with shape (1, 10) to match model expectations
-        email_pca = np.zeros((1, 10))  # Placeholder for a single prediction
-
-
     # Define the folder paths using the variables
-    folders = [Base_Model_Optuna, Base_Model_No_Optuna, Stacked_Model]
+    folders = [Base_Model_No_Optuna, Stacked_Model]
     results = []
 
     # Model name mapping function (based on file name)
@@ -695,7 +686,7 @@ def main():
                     model = joblib.load(model_path)
                     
                     # Make predictions on the PCA-transformed or placeholder data
-                    predictions = model.predict(email_pca)
+                    predictions = model.predict(email_df_combined)
 
                     # Map predictions to labels
                     label_map = {0: "Safe", 1: "Not Safe"}
