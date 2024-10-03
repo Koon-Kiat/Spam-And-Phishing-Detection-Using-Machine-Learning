@@ -27,6 +27,7 @@ from transformers import BertTokenizer, BertModel
 from torch.utils.data import Dataset
 import numpy as np
 import joblib
+from tabulate import tabulate
 
 # Machine Learning Libraries
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -538,7 +539,7 @@ def main():
     with open("config.json", "r") as config_file:
         config = json.load(config_file)
     base_dir = config["base_dir"]
-    TestEmail = os.path.join(base_dir, "Multi Model Evaluation", "Test Emails", "Donation.eml")
+    TestEmail = os.path.join(base_dir, "Multi Model Evaluation", "Test Emails", "Bursary.eml")
     SavedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Formated_Test.csv")
     CleanedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Cleaned_Test.csv")
     MergedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Merged_Test.csv")
@@ -658,34 +659,62 @@ def main():
         email_pca = np.zeros((1, 10))  # Placeholder for a single prediction
 
 
+    # Define the folder paths using the variables
+    folders = [Base_Model_Optuna, Base_Model_No_Optuna, Stacked_Model]
     results = []
-    for model_file in os.listdir(Base_Model_Optuna):
-        model_path = os.path.join(Base_Model_Optuna, model_file)
+
+    # Model name mapping function (based on file name)
+    def get_model_name(file_name):
+        model_name_map = {
+            "KNN.pkl": "K-Nearest Neighbors",
+            "LightGBM.pkl": "LightGBM",
+            "Logistic Regression.pkl": "Logistic Regression",
+            "Random Forest.pkl": "Random Forest",
+            "SVM.pkl": "Support Vector Machine",
+            "XGBoost.pkl": "XGBoost",
+            "XGB_ADA_LG_Fold_1.pkl": "XGBoost + AdaBoost",
+            "XGB_KNN_LG_Fold_1.pkl": "XGBoost + KNN",
+            "XGB_LightGB_LG_Fold_1.pkl": "XGBoost + LightGBM",
+            "XGB_RF_LG_Fold_1.pkl": "XGBoost + Random Forest"
+        }
+        return model_name_map.get(file_name, file_name)  # Default to file name if not found
+
+    # Iterate over each folder
+    for folder in folders:
+        # Extract only the folder name (last part of the path)
+        folder_name = os.path.basename(folder)
         
-        # Check if the path is a file
-        if os.path.isfile(model_path):
-            try:
-                # Load the model
-                model = joblib.load(model_path)
-                
-                # Print the model file name
-                print(f"Evaluating model: {model_file}")
+        # Iterate over each model file in the folder
+        for model_file in os.listdir(folder):
+            model_path = os.path.join(folder, model_file)
+            
+            # Check if the path is a file
+            if os.path.isfile(model_path):
+                try:
+                    # Load the model
+                    model = joblib.load(model_path)
+                    
+                    # Make predictions on the PCA-transformed or placeholder data
+                    predictions = model.predict(email_pca)
 
-                # Make predictions on the PCA-transformed or placeholder data
-                predictions = model.predict(email_pca)
+                    # Map predictions to labels
+                    label_map = {0: "Safe", 1: "Not Safe"}
+                    
+                    for pred in predictions:
+                        result = [folder_name, get_model_name(model_file), label_map[pred]]
+                        results.append(result)
 
-                # Map predictions to labels
-                label_map = {0: "safe", 1: "not safe"}
-                for pred in predictions:
-                    result = f"The email is {label_map[pred]}."
-                    print(result)
-                    results.append(result)
-            except KeyError as e:
-                logging.error(f"KeyError loading model {model_file}: {e}")
-            except Exception as e:
-                logging.error(f"Error loading model {model_file}: {e}")
-        else:
-            print(f"Skipping invalid path: {model_path}")
+                except KeyError as e:
+                    logging.error(f"KeyError loading model {model_file}: {e}")
+                except Exception as e:
+                    logging.error(f"Error loading model {model_file}: {e}")
+            else:
+                print(f"Skipping invalid path: {model_path}")
+
+    # Print results in table format
+    email_name = os.path.basename(TestEmail)
+    print (f"Results for email: {email_name}")
+    print(tabulate(results, headers=["Models", "Models Used", "Prediction"], tablefmt="pretty"))
 
 if __name__ == "__main__":
     main()
