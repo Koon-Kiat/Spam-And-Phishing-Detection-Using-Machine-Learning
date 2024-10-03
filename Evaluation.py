@@ -665,11 +665,11 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno
 def main():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dataset = os.path.join(base_dir, 'Datasets', 'Phishing_Email.csv')
-    PreprocessedEvaluationDataset = os.path.join(base_dir, 'Evaluation', 'Data Preprocessing', 'Preprocessed_Evaluation_Dataset.csv')
-    ExtractedEvaluationHeaderFile = os.path.join(base_dir, 'Evaluation', 'Feature Engineering', 'Extracted_Evaluation_HeaderFile.csv')
-    CleanedEvaluationDataFrame = os.path.join(base_dir, 'Evaluation', 'Data Cleaning', 'Cleaned_Evaluation_DataFrame.csv')
-    MergedEvaluationFile = os.path.join(base_dir, 'Evaluation', 'Data Integration', 'Merged_Evaluation.csv')
-    MergedCleanedDataFrame = os.path.join(base_dir, 'Evaluation', 'Data Cleaning', 'Merged_Cleaned_DataFrame.csv')
+    PreprocessedEvaluationDataset = os.path.join(base_dir, 'Dataset Evaluation', 'Data Preprocessing', 'Preprocessed_Evaluation_Dataset.csv')
+    ExtractedEvaluationHeaderFile = os.path.join(base_dir, 'Dataset Evaluation', 'Feature Engineering', 'Extracted_Evaluation_HeaderFile.csv')
+    CleanedEvaluationDataFrame = os.path.join(base_dir, 'Dataset Evaluation', 'Data Cleaning', 'Cleaned_Evaluation_DataFrame.csv')
+    MergedEvaluationFile = os.path.join(base_dir, 'Dataset Evaluation', 'Data Integration', 'Merged_Evaluation.csv')
+    MergedCleanedDataFrame = os.path.join(base_dir, 'Dataset Evaluation', 'Data Cleaning', 'Merged_Cleaned_DataFrame.csv')
 
 
     df_evaluation = pd.read_csv(dataset)
@@ -825,10 +825,10 @@ def main():
         ('preprocessor', preprocessor),
         ('bert_features', bert_transformer),  # Custom transformer for BERT
         #('smote', SMOTE(random_state=42)),  # Apply SMOTE after feature extraction
-        ('pca', PCA(n_components=10))
+        ('pca', PCA(n_components=777))
     ])
 
-    data_dir = os.path.join(base_dir, 'Evaluation', 'Feature Extraction')  # Directory where you want to save the processed data
+    data_dir = os.path.join(base_dir, 'Dataset Evaluation', 'Feature Extraction')  # Directory where you want to save the processed data
 
     # Assuming df_evaluation_clean_combined is the DataFrame you are working with
     X = df_evaluation_clean_combined.drop(columns=['label'])
@@ -893,7 +893,7 @@ def main():
     results_df = pd.DataFrame(results)
 
     # Save results to a CSV file
-    output_path = os.path.join('Evaluation', 'Model_Evaluation_Result.csv')
+    output_path = os.path.join('Dataset Evaluation', 'Model_Evaluation_Result.csv')
     results_df[['Model', 'Folder', 'Accuracy']].to_csv(output_path, index=False)
 
     # Print the results in a table format
