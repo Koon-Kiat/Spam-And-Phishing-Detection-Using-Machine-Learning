@@ -29,7 +29,7 @@ from nltk.stem import WordNetLemmatizer  # Lemmatization
 from nltk.tokenize import word_tokenize  # Tokenization
 from nltk.data import find # Find NLTK resources
 import contractions  # Expand contractions in text
-import spacy  # NLP library
+#import spacy  # NLP library
 
 
 # Machine Learning Libraries
@@ -123,7 +123,7 @@ nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
 nltk.download('wordnet', quiet=True)
 nltk.download('omw-1.4', quiet=True)
-nlp = spacy.load('en_core_web_sm')  # Load the spaCy English model
+#nlp = spacy.load('en_core_web_sm')  # Load the spaCy English model
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s ', level=logging.INFO)
@@ -2177,7 +2177,6 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, d
         logging.info(f"Class distribution after SMOTE for fold {fold_idx}: {Counter(y_train_balanced)}")
         logging.info(f"SMOTE applied for fold {fold_idx}.\n")
 
-
         '''
         logging.info(f"Applying PCA for dimensionality reduction for fold {fold_idx}...")
         X_train_balanced = pipeline.named_steps['pca'].fit_transform(X_train_balanced)
@@ -2190,6 +2189,7 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, d
         logging.info(f"Shape of X_train after PCA: {X_train_balanced.shape}")
         '''
         logging.info(f"Shape of X_train: {X_train_balanced.shape}")
+
 
         # Save the preprocessed data
         logging.info(f"Saving processed data for fold {fold_idx}...")
@@ -2365,7 +2365,6 @@ def generate_noisy_dataframe(data, file_path, noise_level=0.1):
     return data
 
 
-
 # Main processing function
 def main():
     """
@@ -2396,8 +2395,8 @@ def main():
         MergedCleanedCEASHeaders (str): Path to the merged cleaned CEAS headers file.
         MergedCleanedDataFrame (str): Path to the merged cleaned DataFrame file.
     """
-    with open('config.json', 'r') as config_file:
-        config = json.load(config_file)
+    with open("config.json", "r") as config_file:
+            config = json.load(config_file)
     base_dir = config['base_dir']
     CEAS_08_Dataset = os.path.join(base_dir, 'CEAS_08.csv')
     PreprocessedSpamAssassinFile = os.path.join(base_dir, 'Data Preprocessing', 'Preprocessed_SpamAssassin.csv')
@@ -2888,7 +2887,7 @@ def main():
                 ('preprocessor', preprocessor),
                 ('bert_features', bert_transformer),  # Custom transformer for BERT
                 ('smote', SMOTE(random_state=42)),  # Apply SMOTE after augmentation
-                #('pca', PCA(n_components=10))
+                #('pca', PCA(n_components=777))
             ])
 
 

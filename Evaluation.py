@@ -848,19 +848,6 @@ def main():
     # List of folders containing models
     model_folders = [Main_Model, Base_Model_No_Optuna, Base_Model_Optuna, Stacked_Model_Optuna]
 
-    # Define the model name mapping
-    model_name_mapping = {
-        'knn': 'K-Nearest Neighbour',
-        'svm': 'Support Vector Machine',
-        'rf': 'Random Forest',
-        'lr': 'Logistic Regression',
-        'nb': 'Naive Bayes',
-        'XGB_ADA_LG_Fold_1': 'XGBoost + Random Forest + Logistic Regression',
-        'XGB_KNN_LG_Fold_1': 'XGBoost + LightGBM + Logistic Regression',
-        'XGB_LightGB_LG_Fold_1': 'XGBoost + KNN + Logistic Regression',
-        'XGB_RF_LG_Fold_1': 'XGBoost + ADA + Logistic Regression',
-    }
-
     # Placeholder for results
     results = []
 
@@ -871,8 +858,7 @@ def main():
             if os.path.isfile(model_path):
                 try:
                     saved_model = joblib.load(model_path)
-                    model_name_key = model_file.split('.')[0]
-                    model_name = model_name_mapping.get(model_name_key, model_file.replace('.pkl', ''))
+                    model_name = model_file.replace('.pkl', '')
                     print(f"Evaluating model: {model_name}")
                     y_pred = saved_model.predict(processed_data)
                     test_accuracy = accuracy_score(processed_labels, y_pred)
@@ -889,6 +875,7 @@ def main():
                     logging.error(f"Error loading or evaluating model {model_file}: {e}")
             else:
                 print(f"Skipping invalid path: {model_path}")
+
     # Convert results to a DataFrame for better formatting
     results_df = pd.DataFrame(results)
 
