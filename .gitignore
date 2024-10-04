@@ -20,3 +20,4 @@
 *.pkl
 *.csv
 *.eml
+*.npz
