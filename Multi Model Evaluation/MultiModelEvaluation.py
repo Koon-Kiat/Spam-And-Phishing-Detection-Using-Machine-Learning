@@ -802,16 +802,16 @@ def main():
     with open("config.json", "r") as config_file:
         config = json.load(config_file)
     base_dir = config["base_dir"]
-    TestEmail = os.path.join(base_dir, "Multi Model Evaluation", "Test Emails", "Redelivery.eml")
+    TestEmail = os.path.join(base_dir, "Multi Model Evaluation", "Test Emails", "phishing_email_1.eml")
     SavedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Formated_Test.csv")
     CleanedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Cleaned_Test.csv")
     MergedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Merged_Test.csv")
-    #SavedModel = os.path.join(base_dir, "Multi Model Evaluation", "Ensemble_Model_Fold_1.pkl")
-    #source_path = os.path.join(base_dir, "Models & Parameters", "Ensemble_Model_Fold_1.pkl")
+    SavedModel = os.path.join(base_dir, "Multi Model Evaluation", "Ensemble_Model_Fold_1.pkl")
+    source_path = os.path.join(base_dir, "Models & Parameters", "Ensemble_Model_Fold_1.pkl")
     Base_Model_Optuna = os.path.join(base_dir, "Test Models", "Base Models (Optuna)")
     Base_Model_No_Optuna = os.path.join(base_dir, "Test Models", "Base Models (No Optuna)")
     Stacked_Model = os.path.join(base_dir, "Test Models", "Stacked Models (Optuna)")
-    #shutil.copy(source_path, SavedModel)
+    shutil.copy(source_path, SavedModel)
     Ensemble_Model = os.path.join(base_dir, "Multi Model Evaluation")
     Ensemble_Model_Backup = os.path.join(base_dir, "Models & Parameters Backup")
 

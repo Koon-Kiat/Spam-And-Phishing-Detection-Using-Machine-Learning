@@ -29,7 +29,7 @@ from nltk.stem import WordNetLemmatizer  # Lemmatization
 from nltk.tokenize import word_tokenize  # Tokenization
 from nltk.data import find # Find NLTK resources
 import contractions  # Expand contractions in text
-#import spacy  # NLP library
+import spacy  # NLP library
 
 
 # Machine Learning Libraries
@@ -67,6 +67,7 @@ from transformers import MarianMTModel, MarianTokenizer  # Machine translation m
 # Profiling and Job Management
 import cProfile  # Profiling
 from tqdm import tqdm  # Progress bar for loops
+from tqdm.contrib.concurrent import process_map  # Parallel processing with a progress bar
 import joblib  # Job management
 from joblib import Parallel, delayed  # Parallel processing
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed  # Concurrent processing
@@ -123,7 +124,7 @@ nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
 nltk.download('wordnet', quiet=True)
 nltk.download('omw-1.4', quiet=True)
-#nlp = spacy.load('en_core_web_sm')  # Load the spaCy English model
+nlp = spacy.load('en_core_web_sm')  # Load the spaCy English model
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s ', level=logging.INFO)
@@ -1268,12 +1269,13 @@ class RareCategoryRemover(BaseEstimator, TransformerMixin):
     ----------
     replacements_ : dict
         A dictionary mapping each column to another dictionary of rare categories and their replacements.
+    all_categories_ : dict
+        A dictionary storing all categories for each column before transformation.
     """
     def __init__(self, threshold=0.05):
         self.threshold = threshold
         self.replacements_ = {}
-
-
+        self.all_categories_ = {}
 
     def fit(self, X, y=None):
         """
@@ -1291,19 +1293,18 @@ class RareCategoryRemover(BaseEstimator, TransformerMixin):
         self : object
             Returns the instance itself.
         """
-        logging.info(f"Removing rare categories with threshold: {self.threshold}")
+        # Ensure columns are categorical
         for column in X.columns:
+            X[column] = X[column].astype('category')
             frequency = X[column].value_counts(normalize=True)
             rare_categories = frequency[frequency < self.threshold].index
             self.replacements_[column] = {cat: 'Other' for cat in rare_categories}
-
+            self.all_categories_[column] = X[column].unique()
         return self
-
-
 
     def transform(self, X):
         """
-        Transform the data by replacing rare categories with 'Other'.
+        Replace rare categories in the data using the mappings from the fit step.
 
         Parameters
         ----------
@@ -1312,15 +1313,20 @@ class RareCategoryRemover(BaseEstimator, TransformerMixin):
 
         Returns
         -------
-        pandas.DataFrame
-            The transformed data with rare categories replaced.
+        X_transformed : pandas.DataFrame
+            The transformed data with rare categories replaced by 'Other'.
         """
-        for column, replacements in self.replacements_.items():
-            X.loc[:, column] = X[column].replace(replacements)
-        assert X.shape[0] == X.shape[0], "Row count changed during rare category removal."
+        X_transformed = X.copy()
+        for column in X.columns:
+            X_transformed[column] = X[column].astype('category')  # Ensure category dtype
+            X_transformed[column] = X_transformed[column].replace(self.replacements_[column])
 
-        return X
-
+            # Ensure consistency by adding back any missing categories as 'Other'
+            missing_categories = set(self.all_categories_[column]) - set(X_transformed[column].unique())
+            if missing_categories:
+                X_transformed[column] = X_transformed[column].cat.add_categories(list(missing_categories))
+                
+        return X_transformed
 
 
 def data_cleaning(dataset_name, df_processed, text_column, clean_file):
@@ -2139,9 +2145,16 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, d
         preprocessor = pipeline.named_steps['preprocessor']
         X_train_non_text_processed = preprocessor.fit_transform(X_train_non_text)
         X_test_non_text_processed = preprocessor.transform(X_test_non_text)
+
+        # Log feature names
         feature_names = preprocessor.named_transformers_['cat'].named_steps['encoder'].get_feature_names_out()
         logging.info(f"Columns in X_train after processing non-text features: {X_train_non_text_processed.shape}")
         logging.info(f"Feature names: {feature_names}")
+
+        # Check for consistent number of features
+        if X_train_non_text_processed.shape[1] != X_test_non_text_processed.shape[1]:
+            logging.error(f"Feature mismatch: {X_train_non_text_processed.shape[1]} vs {X_test_non_text_processed.shape[1]}")
+
         if X_train_non_text_processed.shape[0] != y_train.shape[0]:
             logging.error(f"Row mismatch: {X_train_non_text_processed.shape[0]} vs {y_train.shape[0]}")
         logging.info(f"Non text features processed for fold {fold_idx}.\n")
