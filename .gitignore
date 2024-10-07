@@ -22,3 +22,4 @@
 *.eml
 *.npz
 /Backup
+/SingleEvaluation/__pycache__

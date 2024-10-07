@@ -44,9 +44,24 @@ function checkPhishing(event) {
       // Details for formatting the URL can be found at
       // https://learn.microsoft.com/previous-versions/office/office-365-api/api/version-2.0/mail-rest-operations#get-messages.
       const getMessageUrl = Office.context.mailbox.restUrl + '/v2.0/me/messages/' + itemId; // Email URL
-      const eml = Office.context.mailbox.restUrl + '/v2.0/me/messages/' + itemId + '$value'; // EML file
+      const eml = Office.context.mailbox.restUrl + '/v2.0/me/messages/' + itemId + '/$value'; // EML file
+      const evaluateEmailURL = "https://trisapple.pythonanywhere.com/evaluateEmail"
       console.log(getMessageUrl)
       console.log(accessToken)
+
+      const emlRequest = await fetch(eml, {
+        headers: {
+          'Authorization': 'Bearer ' + accessToken
+        }
+      })
+      const emlResponse = await emlRequest.text()
+
+      const parseEML = await fetch(evaluateEmailURL, {
+        method: "POST",
+        body: emlResponse
+      })
+      const parseEMLResponse = await parseEML.text()
+      console.log(parseEMLResponse)
 
       const response = await fetch(getMessageUrl, {
         headers: {
@@ -57,7 +72,7 @@ function checkPhishing(event) {
       const subject = json.Subject;
       const message = {
         type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
-        message: subject,
+        message: parseEMLResponse,
         icon: "Icon.80x80",
         persistent: true,
       };
