@@ -802,7 +802,7 @@ def main():
     with open("config.json", "r") as config_file:
         config = json.load(config_file)
     base_dir = config["base_dir"]
-    TestEmail = os.path.join(base_dir, "Multi Model Evaluation", "Test Emails", "phishing_email_1.eml")
+    TestEmail = os.path.join(base_dir, "Multi Model Evaluation", "Test Emails", "submitted.eml")
     SavedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Formated_Test.csv")
     CleanedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Cleaned_Test.csv")
     MergedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Merged_Test.csv")

@@ -221,11 +221,24 @@ class DatasetProcessor:
             The DataFrame with duplicates removed.
         """
         logging.info(f"Removing duplicate data....")
+        
+        # Log the initial number of rows
+        initial_row_count = self.df.shape[0]
+        logging.info(f"Initial number of rows: {initial_row_count}")
+        
+        # Identify duplicates
         num_duplicates_before = self.df.duplicated(subset=[self.column_name], keep=False).sum()
-        self.df = self.df.drop_duplicates(subset=[self.column_name], keep='first')
-        num_duplicates_after = self.df.duplicated(subset=[self.column_name], keep=False).sum()
-        duplicates_removed = num_duplicates_before - num_duplicates_after
         logging.info(f"Total number of rows identified as duplicates based on '{self.column_name}': {num_duplicates_before}")
+        
+        # Remove duplicates
+        self.df = self.df.drop_duplicates(subset=[self.column_name], keep='first')
+        
+        # Log the number of rows after removing duplicates
+        final_row_count = self.df.shape[0]
+        logging.info(f"Number of rows after removing duplicates: {final_row_count}")
+        
+        # Calculate the number of duplicates removed
+        duplicates_removed = initial_row_count - final_row_count
         logging.info(f"Number of rows removed due to duplication: {duplicates_removed}")
 
         return self.df
