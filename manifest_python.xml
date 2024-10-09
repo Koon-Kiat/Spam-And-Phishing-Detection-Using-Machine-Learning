@@ -11,7 +11,7 @@
   <Description DefaultValue="Check if an email is safe or phishing."/>
   <IconUrl DefaultValue="https://trisapple.pythonanywhere.com/assets/icon-64.png"/>
   <HighResolutionIconUrl DefaultValue="https://trisapple.pythonanywhere.com/assets/icon-128.png"/>
-  <SupportUrl DefaultValue="https://www.pythonicit.com"/>
+  <SupportUrl DefaultValue="https://www.trisapple.pythonanywhere.com"/>
   <AppDomains>
     <AppDomain>https://www.trisapple.pythonanywhere.com</AppDomain>
   </AppDomains>
@@ -65,21 +65,6 @@
                     <SourceLocation resid="Taskpane.Url" />
                   </Action>
                 </Control>
-                <Control xsi:type="Button" id="ActionButton">
-                  <Label resid="ActionButton.Label"/>
-                  <Supertip>
-                    <Title resid="ActionButton.Label"/>
-                    <Description resid="ActionButton.Tooltip"/>
-                  </Supertip>
-                  <Icon>
-                    <bt:Image size="16" resid="Icon.16x16"/>
-                    <bt:Image size="32" resid="Icon.32x32"/>
-                    <bt:Image size="80" resid="Icon.80x80"/>
-                  </Icon>
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>action</FunctionName>
-                  </Action>
-                </Control>
                 <Control xsi:type="Button" id="CheckPhishing">
                   <Label resid="CheckPhishing.Label"/>
                   <Supertip>
@@ -114,13 +99,11 @@
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="Phishing Email Detection"/>
         <bt:String id="TaskpaneButton.Label" DefaultValue="Show Taskpane"/>
-        <bt:String id="ActionButton.Label" DefaultValue="Perform an action"/>
         <bt:String id="CheckPhishing.Label" DefaultValue="Check Phishing"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a pane displaying all available properties."/>
-        <bt:String id="ActionButton.Tooltip" DefaultValue="Perform an action when clicked."/>
-        <bt:String id="CheckPhishing.Tooltip" DefaultValue="Check if the email is llikely phishing."/>
+        <bt:String id="CheckPhishing.Tooltip" DefaultValue="Check if the email is likely phishing."/>
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
