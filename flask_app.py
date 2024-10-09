@@ -14,8 +14,7 @@ def index():
 
 @app.route("/taskpane.html")
 def taskpane():
-    output = SingleEvaluation.SingleEvaluation.main()
-    return render_template("taskpane.html", output=output)
+    return render_template("taskpane.html")
 
 @app.route("/taskpanedev.html")
 def taskpanedev():

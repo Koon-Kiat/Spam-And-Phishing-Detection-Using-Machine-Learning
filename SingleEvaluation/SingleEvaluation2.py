@@ -609,7 +609,7 @@ class TextProcessor:
         for symbol in symbols:
             text = text.replace(symbol, '')
         return text
-    
+
     def correct_spelling(self, words_list):
         """
         Correct the spelling of words in the list.
@@ -625,10 +625,10 @@ class TextProcessor:
             The list of words with corrected spelling.
         """
         misspelled_words = self.spell_checker.unknown(words_list)
-        
+
         # Correct misspelled words
         corrected_words = [self.spell_checker.correction(word) if word in misspelled_words else word for word in words_list]
-        
+
         return corrected_words
 
     def clean_text(self, X, y=None):
@@ -650,7 +650,7 @@ class TextProcessor:
             try:
                 if body is None:
                     raise ValueError("Text body is None")
-                
+
                 text = self.remove_all_html_elements(body)
                 text = self.expand_contractions(text)
                 text = self.remove_email_headers(text)
@@ -674,14 +674,14 @@ class TextProcessor:
                 # Apply spell check if enabled
                 if self.enable_spell_check:
                     words_list = self.correct_spelling(words_list)
-                    
+
                 lemmatized_list = self.lemmatize(words_list)
                 cleaned_text_list.append(' '.join(lemmatized_list))
             except Exception as e:
                 logging.error(f"Error processing text: {e}")
                 cleaned_text_list.append('')
         return pd.DataFrame({'cleaned_text': cleaned_text_list})
-    
+
 
     def save_to_csv_cleaned(self, df, filename):
         """
@@ -794,28 +794,16 @@ class BERTFeatureExtractor:
 
 # EML file as parameter to determine if email is 'safe' or 'not safe'
 def main(eml):
-    # with open("config.json", "r") as config_file:
-    #     config = json.load(config_file)
-    # base_dir = config["base_dir"]
     base_dir = os.path.dirname(__file__)
-    # TestEmail = os.path.join(base_dir, "TestEmail.eml")
     SavedEmail = os.path.join(base_dir, "FormatedTest.csv")
     CleanedEmail = os.path.join(base_dir, "CleanedTest.csv")
     MergedEmail = os.path.join(base_dir, "MergedTest.csv")
     SavedModel = os.path.join(
-        base_dir, "Random Forest.pkl"
+        base_dir, "Ensemble_Model_Fold_1.pkl"
     )
-    # SavedModel = os.path.join(
-    #     base_dir, "SingleEvaluation", "ensemble_model_fold_1.pkl"
-    # )
-    # source_path = os.path.join(
-    #     base_dir, "Models & Parameters", "ensemble_model_fold_1.pkl"
-    # )
-    # shutil.copy(source_path, SavedModel)
 
     # Extract features from the email
     extractor = EmailHeaderExtractor()
-    # features = extractor.extract_email_features_from_file(TestEmail)
     features = extractor.extract_email_features_from_file(eml)
     extractor.save_to_csv(features, SavedEmail)
 
@@ -849,34 +837,14 @@ def main(eml):
         "has_ip_address",
         "url_count",
     ]
-    text_column = "cleaned_text"
 
     bert_extractor = BERTFeatureExtractor()
     bert_transformer = BERTFeatureTransformer(feature_extractor=bert_extractor)
 
     preprocessor = ColumnTransformer(
         transformers=[
-            (
-                "cat",
-                Pipeline(
-                    [
-                        (
-                            "encoder",
-                            OneHotEncoder(sparse_output=False, handle_unknown="ignore"),
-                        ),
-                    ]
-                ),
-                categorical_columns,
-            ),
-            (
-                "num",
-                Pipeline(
-                    [
-                        ("scaler", StandardScaler()),
-                    ]
-                ),
-                numerical_columns,
-            ),
+            ("cat", Pipeline([("encoder", OneHotEncoder(sparse_output=False, handle_unknown="ignore"),),]), categorical_columns,),
+            ("num", Pipeline([("scaler", StandardScaler()),]), numerical_columns,),
         ],
         remainder="passthrough",  # Keep other columns unchanged, like 'cleaned_text' and 'label'
     )
