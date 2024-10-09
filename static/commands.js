@@ -33,9 +33,6 @@ function checkPhishing(event) {
   Office.context.mailbox.getCallbackTokenAsync({isRest: true}, async function(result){
     if (result.status === "succeeded") {
       const accessToken = result.value;
-  
-      // Use the access token.
-      // subject = getCurrentItem(accessToken)
 
       // Get the item's REST ID.
       const itemId = getItemRestId();
@@ -43,33 +40,39 @@ function checkPhishing(event) {
       // Construct the REST URL to the current item.
       // Details for formatting the URL can be found at
       // https://learn.microsoft.com/previous-versions/office/office-365-api/api/version-2.0/mail-rest-operations#get-messages.
-      const getMessageUrl = Office.context.mailbox.restUrl + '/v2.0/me/messages/' + itemId; // Email URL
+      // const getMessageUrl = Office.context.mailbox.restUrl + '/v2.0/me/messages/' + itemId; // Email URL
       const eml = Office.context.mailbox.restUrl + '/v2.0/me/messages/' + itemId + '/$value'; // EML file
       const evaluateEmailURL = "https://trisapple.pythonanywhere.com/evaluateEmail"
-      console.log(getMessageUrl)
+      // console.log(getMessageUrl)
       console.log(accessToken)
 
+      // Get Email Data in EML
       const emlRequest = await fetch(eml, {
         headers: {
           'Authorization': 'Bearer ' + accessToken
         }
       })
-      const emlResponse = await emlRequest.text()
+      const emlResponse = await emlRequest.text() // Email in EML
 
+      // Send EML to our Python Anywhere Server in the request body
+      // Determine if email is 'safe' or 'not safe'
       const parseEML = await fetch(evaluateEmailURL, {
         method: "POST",
         body: emlResponse
       })
+      // Our server will return a response
+      // 'The email is safe' or 'The email is not safe'
       const parseEMLResponse = await parseEML.text()
       console.log(parseEMLResponse)
 
-      const response = await fetch(getMessageUrl, {
-        headers: {
-          'Authorization': 'Bearer ' + accessToken
-        }
-      })
-      const json = await response.json()
-      const subject = json.Subject;
+      // For Testing
+      // const response = await fetch(getMessageUrl, {
+      //   headers: {
+      //     'Authorization': 'Bearer ' + accessToken
+      //   }
+      // })
+      // const json = await response.json()
+      // const subject = json.Subject;
       const message = {
         type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
         message: parseEMLResponse,

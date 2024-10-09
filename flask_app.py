@@ -24,6 +24,7 @@ def taskpanedev():
 
 @app.route("/evaluateEmail", methods=['POST'])
 def evaluateEmail():
+    # request.get_data() gets the request body (it will be the email in EML)
     output = SingleEvaluation.SingleEvaluation2.main(request.get_data())
     return output
 
