@@ -3,7 +3,6 @@ from flask import render_template
 from flask.helpers import send_file
 from flask import request
 
-import SingleEvaluation.SingleEvaluation
 import SingleEvaluation.SingleEvaluation2
 
 app = Flask(__name__)
@@ -15,11 +14,6 @@ def index():
 @app.route("/taskpane.html")
 def taskpane():
     return render_template("taskpane.html")
-
-@app.route("/taskpanedev.html")
-def taskpanedev():
-    output = SingleEvaluation.SingleEvaluation.main()
-    return render_template("taskpanedev.html", output=output)
 
 @app.route("/evaluateEmail", methods=['POST'])
 def evaluateEmail():
