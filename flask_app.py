@@ -38,8 +38,12 @@ def icon64():
     return send_file("./static/assets/icon-64.png",mimetype='image/png')
 
 @app.route("/assets/icon-80.png")
-def icon128():
+def icon80():
     return send_file("./static/assets/icon-80.png",mimetype='image/png')
+
+@app.route("/assets/icon-128.png")
+def icon128():
+    return send_file("./static/assets/icon-128.png",mimetype='image/png')
 
 @app.route("/assets/logo-filled.png")
 def iconlogofilled():

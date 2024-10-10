@@ -98,12 +98,12 @@
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="Phishing Email Detection"/>
-        <bt:String id="TaskpaneButton.Label" DefaultValue="Show Taskpane"/>
-        <bt:String id="CheckPhishing.Label" DefaultValue="Check Phishing"/>
+        <bt:String id="TaskpaneButton.Label" DefaultValue="Check Phishing (Task Pane)"/>
+        <bt:String id="CheckPhishing.Label" DefaultValue="Check Phishing (Notification)"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a pane displaying all available properties."/>
-        <bt:String id="CheckPhishing.Tooltip" DefaultValue="Check if the email is likely phishing."/>
+        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Check if the email is likely phishing in a task pane."/>
+        <bt:String id="CheckPhishing.Tooltip" DefaultValue="Check if the email is likely phishing in a notification."/>
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
