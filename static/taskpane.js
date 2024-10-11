@@ -1,17 +1,4 @@
 Office.onReady((info) => {
-  function getItemRestId() {
-    if (Office.context.mailbox.diagnostics.hostName === 'OutlookIOS') {
-      // itemId is already REST-formatted.
-      return Office.context.mailbox.item.itemId;
-    } else {
-      // Convert to an item ID for API v2.0.
-      return Office.context.mailbox.convertToRestId(
-        Office.context.mailbox.item.itemId,
-        Office.MailboxEnums.RestVersion.v2_0
-      );
-    }
-  }
-
   if (info.host === Office.HostType.Outlook) {
     document.getElementById("sideload-msg").style.display = "none";
     document.getElementById("app-body").style.display = "flex";
@@ -58,3 +45,16 @@ Office.onReady((info) => {
     });
   }
 });
+
+function getItemRestId() {
+  if (Office.context.mailbox.diagnostics.hostName === 'OutlookIOS') {
+    // itemId is already REST-formatted.
+    return Office.context.mailbox.item.itemId;
+  } else {
+    // Convert to an item ID for API v2.0.
+    return Office.context.mailbox.convertToRestId(
+      Office.context.mailbox.item.itemId,
+      Office.MailboxEnums.RestVersion.v2_0
+    );
+  }
+}
