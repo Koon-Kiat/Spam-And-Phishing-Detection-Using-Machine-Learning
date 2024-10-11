@@ -43,6 +43,14 @@ Office.onReady((info) => {
         const parseEMLResponse = await parseEML.text()
   
         document.getElementById("output").innerHTML = parseEMLResponse;
+        if (parseEMLResponse == "The email is safe.") {
+          document.getElementById("output").style.color = 'green'
+          document.getElementById("output").style.fontWeight = 'bold'
+        }
+        if (parseEMLResponse == "The email is not safe.") {
+          document.getElementById("output").style.color = 'red'
+          document.getElementById("output").style.fontWeight = 'bold'
+        }
       } else {
         // Handle the error.
         document.getElementById("output").innerHTML = "Unable to get email data."
