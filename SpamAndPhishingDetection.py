@@ -1980,7 +1980,7 @@ def check_missing_values(df, df_name, num_rows=1):
 
 
 # Redundant function
-def plot_learning_curve(estimator, X, y, title="Learning Curve", ylim=None, cv=6, n_jobs=4, train_sizes=np.linspace(0.1, 1.0, 6)):
+def plot_learning_curve(estimator, X, y, title="Learning Curve", ylim=None, cv=6, n_jobs=3, train_sizes=np.linspace(0.1, 1.0, 6)):
     """
     Plots the learning curve for the provided estimator.
 
