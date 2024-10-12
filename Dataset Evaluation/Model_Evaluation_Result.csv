@@ -1,9 +1,11 @@
 Model,Folder,Accuracy
-KNN,Base Models (No Optuna),57.83%
-LightGBM,Base Models (No Optuna),44.03%
-Logistic Regression,Base Models (No Optuna),58.32%
-Random Forest,Base Models (No Optuna),37.01%
-XGBoost,Base Models (No Optuna),54.70%
-XGB_KNN_LG_Fold_1,Stacked Models (Optuna),57.21%
-XGB_LightGB_LG_Fold_1,Stacked Models (Optuna),38.43%
+Ensemble_Model_Fold_1,Models & Parameters,50.82%
+KNN,Base Models (No Optuna),57.81%
+LightGBM,Base Models (No Optuna),44.00%
+Logistic Regression,Base Models (No Optuna),58.31%
+Random Forest,Base Models (No Optuna),38.18%
+SVM,Base Models (No Optuna),60.10%
+XGBoost,Base Models (No Optuna),54.73%
+XGB_KNN_LG_Fold_1,Stacked Models (Optuna),57.20%
+XGB_LightGB_LG_Fold_1,Stacked Models (Optuna),38.44%
 XGB_RF_LG_Fold_1,Stacked Models (Optuna),37.40%

@@ -1,34 +1,6 @@
 sender,receiver,https_count,http_count,blacklisted_keywords_count,urls,short_urls,has_ip_address,url_count,body
-no-reply@gradescope.com,,1,0,0,1,0,0,1,"
+invoices@fakebusiness.com,customer@domain.com,0,1,0,1,0,0,1,"Dear customer,
 
+Your invoice is overdue. Please make payment by clicking the link below to avoid late fees.
 
-
-Hello CHNG CONG LOON TRISTAN .,
-
-
-
-You’ve successfully submitted Python Lab4, INF1002-Programming Fundamentals [2024/25 T1]. You may be able to resubmit until the due date (Oct 10, 2024 at 11:59:00 PM +08). You will be notified if your grades are made available.
-
-
-
-Submitted At:
-
-Oct 08, 2024 at 1:55:45 PM +08
-
-
-
-Due Date:
-
-Oct 10, 2024 at 11:59:00 PM +08
-
-
-
-Link to submission:
-
-https://www.gradescope.com/courses/836401/assignments/5036025/submissions/275608897
-
-
-
-- The Gradescope Team
-
-"
+[http://example.com/balance.html]"
