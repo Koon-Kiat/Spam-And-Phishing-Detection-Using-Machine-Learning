@@ -23,3 +23,5 @@
 *.npz
 /Backup
 /SingleEvaluation/__pycache__
+/createsamplephishingemails.py
+/ShapAnalysis
