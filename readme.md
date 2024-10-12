@@ -1,15 +1,21 @@
-# Phishing Detection Using Machine Learning
+# Detecting Spam and Phishing Emails Using Machine Learning
 
 ![GitHub issues](https://img.shields.io/github/issues/Koon-Kiat/Phishing-Email-Detection)
 ![GitHub repo size](https://img.shields.io/github/repo-size/Koon-Kiat/Phishing-Email-Detection)
-![Lines of code](https://img.shields.io/tokei/lines/github/Koon-Kiat/Phishing-Email-Detection)
+
 
 ## Overview
-The Phishing Email Detection project leverages advanced machine learning techniques to identify and classify phishing emails. By employing a comprehensive pipeline that includes data preprocessing, feature engineering, and model training, the project aims to build a highly accurate and robust classifier capable of distinguishing between legitimate emails and potential phishing threats.
+This project leverages advanced machine learning algorithms to detect and classify malicious emails, focusing on spam and phishing threats. As email threats grow more sophisticated, accurate detection is critical to ensuring the security and privacy of both individuals and organizations.
 
-This project utilizes state-of-the-art techniques such as BERT for feature extraction, ensemble learning methods including Logistic Regression, Random Forest, SVM, and XGBoost, and advanced hyperparameter tuning through Optuna. Additionally, it addresses challenges like imbalanced datasets using SMOTE and incorporates effective preprocessing strategies such as rare category removal and feature scaling. The goal is to enhance email security by providing reliable classification to help users identify phishing attempts.
+Our solution uses a machine learning pipeline incorporating data preprocessing, feature engineering, and model training to identify phishing and spam emails. With a focus on handling real-world challenges like imbalanced datasets, the project utilizes datasets from SpamAssassin and CEAS to train and evaluate the models, enhancing overall email filtering.
 
-The project also includes a Flask web application that serves as a user interface for the phishing detection model. Users can upload email content, which the application processes and evaluates using the trained model. The application provides real-time feedback on whether an email is safe or unsafe, making it accessible for non-technical users and enhancing overall user experience.
+Key Technologies:
+- BERT for Feature Extraction: We use Bidirectional Encoder Representations from Transformers (BERT) to enhance contextual understanding of email content.
+- Stacked Ensemble Learning: The model ensemble combines XGBoost, Bagged SVM, and Logistic Regression, providing a robust solution for detecting phishing emails.
+- Optuna for Hyperparameter Tuning: Optuna optimizes the model's performance by fine-tuning key parameters.
+- SMOTE for Imbalanced Data: The Synthetic Minority Over-sampling Technique (SMOTE) addresses the imbalance between "Safe" and "Not Safe" emails.
+
+The project also includes a Flask web application that serves as a user interface, enabling users to upload email content and receive real-time classifications on whether emails are "Safe" or "Not Safe."
 
 
 ## Installation
@@ -23,6 +29,16 @@ pip install -r requirements.txt
 ```
 
 ## Data
+The project utilizes merged datasets from SpamAssassin (Hugging Face) and CEAS (Kaggle) to enhance email threat detection:
+
+- SpamAssassin: Contains real-world spam and legitimate emails.
+- CEAS: Specially curated for anti-spam research, with a focus on phishing examples.
+### Preprocessing and Feature Engineering:
+- Label Standardization: Emails are labeled as "Safe" or "Not Safe."
+- Data Cleaning: HTML tags, punctuation, URLs, and special symbols are removed, while tokenization and stop-word removal are performed.
+- Feature Extraction: Includes sender and receiver addresses, blacklisted keywords, URL count, IP addresses, and BERT embeddings for deep textual understanding.
+
+
 The dataset consists of labeled emails, which are preprocessed and stored in the following structure:
 - Data Cleaning/
 - Data Integration/
@@ -34,7 +50,7 @@ The dataset consists of labeled emails, which are preprocessed and stored in the
 - Models & Parameters/
 
 ## Merging Datasets
-The project supports merging multiple datasets to create a more robust training set. Specifically, it combines the **[Spam Assassin](https://huggingface.co/datasets/talby/spamassassin)** dataset from Hugging Face and the **[CEAS_08](https://www.kaggle.com/datasets/naserabdullahalam/phishing-email-dataset?select=CEAS_08.csv)** dataset from Kaggle. This approach enhances model performance by providing a richer set of features and examples, leading to more reliable phishing detection.
+TThe project integrates the **[Spam Assassin](https://huggingface.co/datasets/talby/spamassassin)** and **[CEAS_08](https://www.kaggle.com/datasets/naserabdullahalam/phishing-email-dataset?select=CEAS_08.csv)** datasets, aligning them by columns and ensuring label consistency. This creates a robust, well-labeled dataset that improves phishing and spam detection accuracy.
 
 
 ## Model Training Methodologies
@@ -58,12 +74,9 @@ The following methodologies were employed to enhance the model's performance:
     - Standard Scaling: Normalizing numerical features for improved model performance.
 
 ## Evaluation
-The model's performance is evaluated using the following metrics:
-
-- Accuracy
-- Confusion Matrix
-- Classification Report
-- Learning Plot Curve
+- **Accuracy:** Measures overall prediction correctness.
+- **Precision, Recall, F1-Score:** Evaluates the balance between correct and incorrect classifications.
+- **Confusion Matrix:** Displays the performance of each model in predicting "Safe" vs. "Not Safe" emails.
 
 
 ### Example Output
@@ -80,13 +93,11 @@ Classification Report for Test Data:
 ```
 
 ## Flask Application
-The Phishing Detection project includes a Flask web application that serves as the user interface for interacting with the phishing detection model. The application provides a streamlined experience for users to upload email content and receive real-time feedback on whether the email is classified as safe, phishing, or spam.
+The accompanying Flask application provides a user-friendly interface where users can input email content for real-time phishing detection. The system returns an analysis of whether an email is "Safe" or "Not Safe."
 
-### Features
-- **User-Friendly Interface**: The web application features a clean and intuitive design, allowing users to easily navigate and input email data for analysis.
-
-- **Email Submission**: Users can paste or upload email content for detection. Once submitted, the content is processed by the model, which utilizes advanced machine learning techniques to analyze the email.
-
-- **Instant Feedback**: After processing, users receive immediate feedback on the status of the email, indicating whether it is safe, phishing, or spam, along with visual notifications.
-
-- **Integration with Machine Learning Model**: The Flask application seamlessly integrates with the trained phishing detection model, ensuring that users can leverage the model's capabilities in a practical setting.
+### Key Features:
+- User Interface: A simple email input form that allows users to upload or paste email content.
+- Instant Feedback: Provides immediate results, flagging malicious content.
+- Integration: The app communicates with the machine learning model backend for classification.
+### Future Enhancements
+The project will continue evolving with the goal of improving model scalability and enhancing integration with platforms like Microsoft Outlook for automatic phishing email detection and flagging.
