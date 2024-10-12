@@ -1623,6 +1623,15 @@ def model_training(X_train, y_train, X_test, y_test, model, model_path, model_na
     print(f"Confusion Matrix:\n{confusion_matrix(y_test, y_test_pred)}")
     print(f"Classification Report for Training Data:\n{classification_report(y_train, y_train_pred, target_names=target_names)}")
     print(f"\nClassification Report for Test Data:\n{classification_report(y_test, y_test_pred, target_names=target_names)}")
+    cm = confusion_matrix(y_test, y_test_pred)
+    plt.figure(figsize=(6, 4))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=target_names, yticklabels=target_names)
+
+    # Add labels, title, and other aesthetics
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.title('Confusion Matrix - Test Data')
+    plt.show()
 
     joblib.dump(model, os.path.join(model_path, f"{model_name}.pkl"))
     return model, test_accuracy
@@ -2892,7 +2901,7 @@ def main():
             models = {
                 "Logistic Regression": LogisticRegression(max_iter=2000),
                 "XGBoost": XGBClassifier(eval_metric='mlogloss'),
-                #"SVM": SVC(probability=True),
+                "SVM": SVC(probability=True),
                 "Random Forest": RandomForestClassifier(),
                 "KNN": KNeighborsClassifier(),
                 "LightGBM": LGBMClassifier()
