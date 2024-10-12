@@ -4,7 +4,7 @@ import csv
 import os
 import logging
 import string
-from email import message_from_file
+from email import message_from_file, message_from_string
 from email.utils import getaddresses
 from typing import Dict, List
 from collections import Counter
@@ -153,10 +153,12 @@ class EmailHeaderExtractor:
         links = re.findall(url_pattern, text)
         return links
 
-    def extract_email_features_from_file(self, file_path):
+    def extract_email_features_from_file(self, eml):
         # Read the .eml file and parse the email
-        with open(file_path, "r", encoding="utf-8") as f:
-            msg = message_from_file(f)
+        # with open(file_path, "r", encoding="utf-8") as f:
+        #     msg = message_from_file(f)
+
+        msg = message_from_string(eml.decode('utf-8'))
 
         # Extract sender and receiver
         sender = ", ".join([addr for name, addr in getaddresses([msg.get("From")])]) if msg.get("From") else "unknown"
@@ -216,9 +218,30 @@ def extract_email(text):
     return None
 
 
-class TextProcessor(BaseEstimator, TransformerMixin):
+class TextProcessor:
+    """
+    A class for processing text data with various cleaning and preprocessing steps.
+
+    Parameters
+    ----------
+    enable_spell_check : bool, optional
+        Whether to enable spell checking. Default is False.
+
+    Attributes
+    ----------
+    stop_words : set
+        A set of stop words to be removed from the text.
+    lemmatizer : WordNetLemmatizer
+        An instance of WordNetLemmatizer for lemmatizing words.
+    spell_checker : SpellChecker
+        An instance of SpellChecker for spell checking.
+    common_words : set
+        A set of common words from the spell checker's word frequency.
+    enable_spell_check : bool
+        Whether spell checking is enabled.
+    """
     def __init__(self, enable_spell_check=False):
-        self.stop_words = set(stopwords.words("english"))
+        self.stop_words = set(stopwords.words('english'))
         self.lemmatizer = WordNetLemmatizer()
         self.spell_checker = SpellChecker()
         self.common_words = set(self.spell_checker.word_frequency.keys())
@@ -226,187 +249,408 @@ class TextProcessor(BaseEstimator, TransformerMixin):
         logging.info("Initializing TextProcessor...")
 
     def expand_contractions(self, text):
+        """
+        Expand contractions in the text.
+
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text with contractions expanded.
+        """
         return contractions.fix(text)
 
     def remove_punctuation(self, text):
-        extra_punctuation = "“”‘’—–•·’"
+        """
+        Remove punctuation from the text.
+
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without punctuation.
+        """
+        extra_punctuation = '“”‘’—–•·’'
         all_punctuation = string.punctuation + extra_punctuation
-        return text.translate(str.maketrans("", "", all_punctuation))
+        return text.translate(str.maketrans('', '', all_punctuation))
 
     def tokenize(self, text):
+        """
+        Tokenize the text into words.
+
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        list
+            A list of words.
+        """
         return word_tokenize(text)
 
     def remove_stop_words(self, words_list):
+        """
+        Remove stop words from the list of words.
+
+        Parameters
+        ----------
+        words_list : list
+            The list of words.
+
+        Returns
+        -------
+        list
+            The list of words without stop words.
+        """
         return [w for w in words_list if w.lower() not in self.stop_words]
 
     def lemmatize(self, words_list):
+        """
+        Lemmatize the list of words.
+
+        Parameters
+        ----------
+        words_list : list
+            The list of words.
+
+        Returns
+        -------
+        list
+            The list of lemmatized words.
+        """
         return [self.lemmatizer.lemmatize(w) for w in words_list]
 
     def remove_urls(self, text):
-        return re.sub(
-            r"(http[s]?|ftp):\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+",
-            "",
-            text,
-        )  # Updated to remove non-standard URL formats (e.g., 'http ww newsisfree com')
+        """
+        Remove URLs from the text.
+
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without URLs.
+        """
+        return re.sub(r'(http[s]?|ftp):\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', '', text)
 
     def remove_custom_urls(self, text):
-        return re.sub(
-            r"\b(?:http|www)[^\s]*\b", "", text
-        )  # Catch patterns like 'http ww' or 'www.' that are incomplete
+        """
+        Remove custom URL patterns from the text.
+
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without custom URL patterns.
+        """
+        return re.sub(r'\b(?:http|www)[^\s]*\b', '', text)
 
     def remove_numbers(self, text):
-        return re.sub(r"\d+", "", text)
+        """
+        Remove numbers from the text.
+
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without numbers.
+        """
+        return re.sub(r'\d+', '', text)
 
     def remove_all_html_elements(self, text):
-        soup = BeautifulSoup(text, "html.parser")
+        """
+        Remove all HTML elements from the text.
+
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without HTML elements.
+        """
+        soup = BeautifulSoup(text, 'html.parser')
         for script_or_style in soup(["script", "style"]):
             script_or_style.decompose()
         for tag in soup.find_all(True):
             tag.attrs = {}
-
         return soup.get_text(separator=" ", strip=True)
 
     def remove_email_headers(self, text):
-        headers = [
-            "From:",
-            "To:",
-            "Subject:",
-            "Cc:",
-            "Bcc:",
-            "Date:",
-            "Reply-To:",
-            "Content-Type:",
-            "Return-Path:",
-            "Message-ID:",
-            "Received:",
-            "MIME-Version:",
-            "Delivered-To:",
-            "Authentication-Results:",
-            "DKIM-Signature:",
-            "X-",
-            "Mail-To:",
-        ]
-        for header in headers:
-            text = re.sub(rf"^{header}.*$", "", text, flags=re.MULTILINE)
+        """
+        Remove email headers from the text.
 
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without email headers.
+        """
+        headers = ['From:', 'To:', 'Subject:', 'Cc:', 'Bcc:', 'Date:', 'Reply-To:', 'Content-Type:', 'Return-Path:', 'Message-ID:',
+                   'Received:', 'MIME-Version:', 'Delivered-To:', 'Authentication-Results:', 'DKIM-Signature:', 'X-', 'Mail-To:']
+        for header in headers:
+            text = re.sub(rf'^{header}.*$', '', text, flags=re.MULTILINE)
         return text
 
     def remove_emails(self, text):
-        email_pattern_with_spaces = r"\b[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"  # Regex pattern to match emails with or without spaces around "@"
-        email_pattern_no_spaces = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"  # Regex pattern to match emails without spaces
-        combined_pattern = f"({email_pattern_with_spaces}|{email_pattern_no_spaces})"  # Combine both patterns using the OR operator
+        """
+        Remove email addresses from the text.
 
-        return re.sub(combined_pattern, "", text)
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without email addresses.
+        """
+        email_pattern_with_spaces = r'\b[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        email_pattern_no_spaces = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        combined_pattern = f"({email_pattern_with_spaces}|{email_pattern_no_spaces})"
+        return re.sub(combined_pattern, '', text)
 
     def remove_time(self, text):
-        time_pattern = r"\b(?:[01]?[0-9]|2[0-3]):[0-5][0-9](?: ?[APMapm]{2})?(?: [A-Z]{1,5})?\b"  # Regex to match various time patterns
+        """
+        Remove time patterns from the text.
 
-        return re.sub(time_pattern, "", text)
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without time patterns.
+        """
+        time_pattern = r'\b(?:[01]?[0-9]|2[0-3]):[0-5][0-9](?: ?[APMapm]{2})?(?: [A-Z]{1,5})?\b'
+        return re.sub(time_pattern, '', text)
 
     def remove_months(self, text):
-        months = [
-            "january",
-            "february",
-            "march",
-            "april",
-            "may",
-            "june",
-            "july",
-            "august",
-            "september",
-            "october",
-            "november",
-            "december",
-            "jan",
-            "feb",
-            "mar",
-            "apr",
-            "jun",
-            "jul",
-            "aug",
-            "sep",
-            "oct",
-            "nov",
-            "dec",
-        ]
-        months_regex = r"\b(?:" + "|".join(months) + r")\b"
+        """
+        Remove month names from the text.
 
-        return re.sub(months_regex, "", text, flags=re.IGNORECASE)
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without month names.
+        """
+        months = [
+            'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october',
+            'november', 'december', 'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+        ]
+        months_regex = r'\b(?:' + '|'.join(months) + r')\b'
+        return re.sub(months_regex, '', text, flags=re.IGNORECASE)
 
     def remove_dates(self, text):
-        date_pattern = (
-            r"\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s*,?\s*\d{1,2}\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{4}\b|"  # Example: Mon, 2 Sep 2002
-            r"\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|[A-Za-z]+\s\d{1,2},\s\d{4})\b|"  # Example: 20-09-2002, Sep 13 2002
-            r"\b(?:\d{1,2}\s[A-Za-z]+\s\d{4})\b|"  # Example: 01 September 2002
-            r"\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{4})\b"  # Example: 24/08/2002
-        )
+        """
+        Remove date patterns from the text.
 
-        return re.sub(date_pattern, "", text, flags=re.IGNORECASE)
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without date patterns.
+        """
+        date_pattern = (
+            r'\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s*,?\s*\d{1,2}\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{4}\b|'
+            r'\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|[A-Za-z]+\s\d{1,2},\s\d{4})\b|'
+            r'\b(?:\d{1,2}\s[A-Za-z]+\s\d{4})\b|'
+            r'\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{4})\b'
+        )
+        return re.sub(date_pattern, '', text, flags=re.IGNORECASE)
 
     def remove_timezones(self, text):
-        timezone_pattern = r"\b(?:[A-Z]{2,4}[+-]\d{2,4}|UTC|GMT|PST|EST|CST|MST)\b"  # Regex to match time zones (e.g., PST, EST, GMT, UTC)
+        """
+        Remove time zone patterns from the text.
 
-        return re.sub(timezone_pattern, "", text)
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without time zone patterns.
+        """
+        timezone_pattern = r'\b(?:[A-Z]{2,4}[+-]\d{2,4}|UTC|GMT|PST|EST|CST|MST)\b'
+        return re.sub(timezone_pattern, '', text)
 
     def remove_multiple_newlines(self, text):
-        return re.sub(
-            r"\n{2,}", "\n", text
-        )  # Replace multiple newlines with a single newline
+        """
+        Remove multiple newlines from the text.
+
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text with multiple newlines replaced by a single newline.
+        """
+        return re.sub(r'\n{2,}', '\n', text)
 
     def remove_words(self, text):
-        return re.sub(
-            r"\b(url|original message|submissionid|submission)\b",
-            "",
-            text,
-            flags=re.IGNORECASE,
-        )  # Combine all words using the | (OR) operator in regex
+        """
+        Remove specific words from the text.
+
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without specific words.
+        """
+        return re.sub(r'\b(url|original message|submissionid|submission)\b', '', text, flags=re.IGNORECASE)
 
     def remove_single_characters(self, text):
-        return re.sub(
-            r"\b\w\b", "", text
-        )  # Remove single characters that are not part of a word
+        """
+        Remove single characters from the text.
+
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without single characters.
+        """
+        return re.sub(r'\b\w\b', '', text)
 
     def remove_repetitive_patterns(self, text):
-        return re.sub(
-            r"\b(nt+ts?|n+|t+|nt+)\b", "", text
-        )  # Combine patterns for 'nt+ts?', repetitive 'n' or 'nt', and 't+', 'n+', 'nt+'
+        """
+        Remove repetitive patterns from the text.
+
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without repetitive patterns.
+        """
+        return re.sub(r'\b(nt+ts?|n+|t+|nt+)\b', '', text)
 
     def lowercase_text(self, text):
+        """
+        Convert the text to lowercase.
+
+        Parameters:
+        text (str): The input text.
+
+        Returns:
+        str: The text in lowercase.
+        """
         return text.lower()
 
     def remove_bullet_points_and_symbols(self, text):
-        symbols = [
-            "•",
-            "◦",
-            "◉",
-            "▪",
-            "▫",
-            "●",
-            "□",
-            "■",
-            "✦",
-            "✧",
-            "✪",
-            "✫",
-            "✬",
-            "✭",
-            "✮",
-            "✯",
-            "✰",
-        ]  # List of bullet points and similar symbols
-        for symbol in symbols:
-            text = text.replace(symbol, "")
+        """
+        Remove bullet points and similar symbols from the text.
 
+        Parameters
+        ----------
+        text : str
+            The input text.
+
+        Returns
+        -------
+        str
+            The text without bullet points and symbols.
+        """
+        symbols = ['•', '◦', '◉', '▪', '▫', '●', '□', '■', '✦', '✧', '✪', '✫', '✬', '✭', '✮', '✯', '✰']
+        for symbol in symbols:
+            text = text.replace(symbol, '')
         return text
 
-    def fit(self, X, y=None):
-        return self
+    def correct_spelling(self, words_list):
+        """
+        Correct the spelling of words in the list.
 
-    def transform(self, X, y=None):
+        Parameters
+        ----------
+        words_list : list
+            The list of words.
+
+        Returns
+        -------
+        list
+            The list of words with corrected spelling.
+        """
+        misspelled_words = self.spell_checker.unknown(words_list)
+
+        # Correct misspelled words
+        corrected_words = [self.spell_checker.correction(word) if word in misspelled_words else word for word in words_list]
+
+        return corrected_words
+
+    def clean_text(self, X, y=None):
+        """
+        Clean and preprocess a list of text data.
+
+        Parameters
+        ----------
+        X : list
+            A list of text data to be cleaned.
+
+        Returns
+        -------
+        pandas.DataFrame
+            A DataFrame containing the cleaned text data.
+        """
         cleaned_text_list = []
-
-        for body in tqdm(X, desc="Cleaning Text", unit="email"):
+        for body in tqdm(X, desc='Cleaning Text', unit='email'):
             try:
+                if body is None:
+                    raise ValueError("Text body is None")
+
                 text = self.remove_all_html_elements(body)
                 text = self.expand_contractions(text)
                 text = self.remove_email_headers(text)
@@ -427,21 +671,33 @@ class TextProcessor(BaseEstimator, TransformerMixin):
                 text = self.remove_bullet_points_and_symbols(text)
                 words_list = self.tokenize(text)
                 words_list = self.remove_stop_words(words_list)
+                # Apply spell check if enabled
+                if self.enable_spell_check:
+                    words_list = self.correct_spelling(words_list)
+
                 lemmatized_list = self.lemmatize(words_list)
-                cleaned_text_list.append(" ".join(lemmatized_list))
+                cleaned_text_list.append(' '.join(lemmatized_list))
             except Exception as e:
                 logging.error(f"Error processing text: {e}")
-                cleaned_text_list.append("")
-        if y is not None:
-            logging.info(f"Total amount of text processed: {len(cleaned_text_list)}")
+                cleaned_text_list.append('')
+        return pd.DataFrame({'cleaned_text': cleaned_text_list})
 
-            return pd.DataFrame({"cleaned_text": cleaned_text_list, "label": y})
-        else:
-            logging.info(f"Total amount of text processed: {len(cleaned_text_list)}")
-
-            return pd.DataFrame({"cleaned_text": cleaned_text_list})
 
     def save_to_csv_cleaned(self, df, filename):
+        """
+        Save the cleaned text data to a CSV file.
+
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            The DataFrame containing the cleaned text data.
+        filename : str
+            The file path to save the CSV file.
+
+        Returns
+        -------
+        None
+        """
         try:
             df.to_csv(filename, index=False)
             logging.info(f"Data successfully saved to {filename}")
@@ -536,26 +792,33 @@ class BERTFeatureExtractor:
 
         return features
 
-
-def main():
-    with open("config.json", "r") as config_file:
-        config = json.load(config_file)
-    base_dir = config["base_dir"]
-    TestEmail = os.path.join(base_dir, "SingleEvaluation", "TestEmail.eml")
-    SavedEmail = os.path.join(base_dir, "SingleEvaluation", "FormatedTest.csv")
-    CleanedEmail = os.path.join(base_dir, "SingleEvaluation", "CleanedTest.csv")
-    MergedEmail = os.path.join(base_dir, "SingleEvaluation", "MergedTest.csv")
+# EML file as parameter to get email
+def main(eml):
+    # with open("config.json", "r") as config_file:
+    #     config = json.load(config_file)
+    # base_dir = config["base_dir"]
+    base_dir = os.path.dirname(__file__)
+    # TestEmail = os.path.join(base_dir, "TestEmail.eml")
+    SavedEmail = os.path.join(base_dir, "FormatedTest.csv")
+    CleanedEmail = os.path.join(base_dir, "CleanedTest.csv")
+    MergedEmail = os.path.join(base_dir, "MergedTest.csv")
     SavedModel = os.path.join(
-        base_dir, "SingleEvaluation", "ensemble_model_fold_1.pkl"
+        base_dir, "Ensemble_Model_Fold_1.pkl"
+        # base_dir, "Random Forest.pkl"
+        # base_dir, "XGB_RF_LG_Fold_1.pkl"
     )
-    source_path = os.path.join(
-        base_dir, "Models & Parameters", "ensemble_model_fold_1.pkl"
-    )
-    shutil.copy(source_path, SavedModel)
+    # SavedModel = os.path.join(
+    #     base_dir, "SingleEvaluation", "ensemble_model_fold_1.pkl"
+    # )
+    # source_path = os.path.join(
+    #     base_dir, "Models & Parameters", "ensemble_model_fold_1.pkl"
+    # )
+    # shutil.copy(source_path, SavedModel)
 
     # Extract features from the email
     extractor = EmailHeaderExtractor()
-    features = extractor.extract_email_features_from_file(TestEmail)
+    # features = extractor.extract_email_features_from_file(TestEmail)
+    features = extractor.extract_email_features_from_file(eml)
     extractor.save_to_csv(features, SavedEmail)
 
     # Clean the column ['sender'] and ['receiver']
@@ -567,7 +830,7 @@ def main():
     # Clean the text
     processor = TextProcessor()
     df = pd.read_csv(SavedEmail, encoding="utf-8")
-    df_clean = processor.transform(df["body"])
+    df_clean = processor.clean_text(df["body"])
     processor.save_to_csv_cleaned(df_clean, CleanedEmail)
 
     # Combine cleaned text with the dataframe
@@ -624,11 +887,9 @@ def main():
         steps=[
             ("preprocessor", preprocessor),
             ("bert_features", bert_transformer),  # Custom transformer for BERT
-            ("pca", PCA(n_components=10)),
         ]
     )
 
-    # Load the cleaned email data
     # Load the cleaned email data
     email_df = pd.read_csv(MergedEmail)
 
@@ -639,6 +900,7 @@ def main():
     email_df_non_text_transformed = pipeline.named_steps["preprocessor"].transform(
         email_df
     )
+    logging.info (f"Non-text features shape: {email_df_non_text_transformed.shape}")
 
     # Transform the text features
     texts = email_df["cleaned_text"].tolist()
@@ -648,20 +910,13 @@ def main():
     email_df_combined = np.hstack(
         (email_df_non_text_transformed, email_df_text_processed)
     )
-
-    # Apply PCA only if more than one sample
-    if email_df_combined.shape[0] > 1:
-        pca = PCA(n_components=10)
-        email_pca = pca.fit_transform(email_df_combined)
-    else:
-        # Set email_pca to an empty array with shape (1, 10) to match model expectations
-        email_pca = np.zeros((1, 10))  # Placeholder for a single prediction
+    logging.info(f"Combined features shape: {email_df_combined.shape}")
 
     # Load the pre-trained model
     model = joblib.load(SavedModel)
 
     # Make predictions on the PCA-transformed or placeholder data
-    predictions = model.predict(email_pca)
+    predictions = model.predict(email_df_combined)
 
     # Map predictions to labels
     label_map = {0: "safe", 1: "not safe"}
