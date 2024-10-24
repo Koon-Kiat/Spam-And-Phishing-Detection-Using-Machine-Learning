@@ -35,3 +35,10 @@ def get_file_paths(config):
 
     return file_paths
 
+def get_model_path(config, fold_idx):
+    base_dir = config['base_dir']
+    return os.path.join(base_dir, 'models_and_parameters', f'Ensemble_Model_Fold_{fold_idx}.pkl')
+
+def get_params_path(config, fold_idx):
+    base_dir = config['base_dir']
+    return os.path.join(base_dir, 'models_and_parameters', f'Best_Parameter_Fold_{fold_idx}.json')
