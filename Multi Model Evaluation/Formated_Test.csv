@@ -1,6 +1,0 @@
-sender,receiver,https_count,http_count,blacklisted_keywords_count,urls,short_urls,has_ip_address,url_count,body
-invoices@fakebusiness.com,customer@domain.com,0,1,0,1,0,0,1,"Dear customer,
-
-Your invoice is overdue. Please make payment by clicking the link below to avoid late fees.
-
-[http://example.com/balance.html]"

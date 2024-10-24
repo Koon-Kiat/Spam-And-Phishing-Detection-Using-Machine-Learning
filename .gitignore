@@ -12,7 +12,8 @@
 /Data Preprocessing
 /__pycache__
 /config.json
-/Single Evaluation/ensemble_model_fold_1.pkl
+/single_evaluation/config.json
+/single_evaluation/ensemble_model_fold_1.pkl
 .venv
 .DS_Store
 /Noise Injection
@@ -22,6 +23,6 @@
 *.eml
 *.npz
 /Backup
-/SingleEvaluation/__pycache__
+/single_evaluation/__pycache__
 /email_generator.py
 /shap_analysis.py

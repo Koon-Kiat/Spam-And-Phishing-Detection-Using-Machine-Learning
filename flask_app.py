@@ -3,7 +3,7 @@ from flask import render_template
 from flask.helpers import send_file
 from flask import request
 
-import SingleEvaluation.SingleEvaluation
+import single_evaluation.single_evaluation
 
 app = Flask(__name__)
 
@@ -18,7 +18,7 @@ def taskpane():
 @app.route("/evaluateEmail", methods=['POST'])
 def evaluateEmail():
     # request.get_data() gets the request body (it will be the email in EML)
-    output = SingleEvaluation.SingleEvaluation.main(request.get_data())
+    output = single_evaluation.single_evaluation.main(request.get_data())
     return output
 
 @app.route("/commands.html")
