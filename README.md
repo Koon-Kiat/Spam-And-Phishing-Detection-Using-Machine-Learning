@@ -44,7 +44,7 @@ The project utilizes merged datasets from SpamAssassin (Hugging Face) and CEAS (
 
 TThe project integrates the **[Spam Assassin](https://huggingface.co/datasets/talby/spamassassin)** and **[CEAS 2008](https://www.kaggle.com/datasets/naserabdullahalam/phishing-email-dataset?select=CEAS_08.csv)** datasets, aligning them by columns and ensuring label consistency. This creates a robust, well-labeled dataset that improves phishing and spam detection accuracy.
 
-### File Structure for Storing Results
+## File Structure for Storing Results
 
 ```plaintext
 project_root/
