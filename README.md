@@ -23,7 +23,7 @@ To set up the project, clone the repository and install the necessary dependenci
 
 ```bash
 git clone https://github.com/Koon-Kiat/Detecting-Spam-and-Phishing-Emails-Using-Machine-Learning
-cd phishing-email-detection
+cd Detecting-Spam-and-Phishing-Emails-Using-Machine-Learning
 pip install -r requirements.txt
 ```
 
@@ -46,14 +46,25 @@ TThe project integrates the **[Spam Assassin](https://huggingface.co/datasets/ta
 
 ### File Structure for Storing Results
 
-- Data Cleaning/
-- Data Integration/
-- Data Preprocessing/
-- Noise Injection/
-- Data Splitting/
-- Feature Engineering/
-- Feature Extraction/
-- Models & Parameters/
+```plaintext
+project_root/
+│
+├── data_cleaning/
+│
+├── data_integration/
+│
+├── data_preprocessing/
+│
+├── noise_injection/
+│
+├── data_splitting/
+│
+├── feature_engineering/
+│
+├── feature_extraction/
+│
+└── models_and_parameters/
+```
 
 ## Model Training Methodologies
 
