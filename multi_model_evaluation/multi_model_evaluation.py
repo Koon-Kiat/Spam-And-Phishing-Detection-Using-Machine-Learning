@@ -50,8 +50,8 @@ warnings.filterwarnings(
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
 
-
-logging.basicConfig(format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s ', level=logging.INFO)
+logging.basicConfig(
+    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s ', level=logging.INFO)
 
 
 class EmailHeaderExtractor:
@@ -105,7 +105,8 @@ class EmailHeaderExtractor:
         ]
         keyword_count = 0
         for keyword in blacklisted_keywords:
-            keyword_count += len(re.findall(re.escape(keyword), text, re.IGNORECASE))
+            keyword_count += len(re.findall(re.escape(keyword),
+                                 text, re.IGNORECASE))
 
         return keyword_count
 
@@ -162,8 +163,10 @@ class EmailHeaderExtractor:
             msg = BytesParser(policy=policy.default).parse(f)
 
         # Extract sender and receiver
-        sender = ", ".join([addr for name, addr in getaddresses([msg.get("From")])]) if msg.get("From") else "unknown"
-        receiver = ", ".join([addr for name, addr in getaddresses([msg.get("To")])]) if msg.get("To") else "unknown"
+        sender = ", ".join([addr for name, addr in getaddresses(
+            [msg.get("From")])]) if msg.get("From") else "unknown"
+        receiver = ", ".join([addr for name, addr in getaddresses(
+            [msg.get("To")])]) if msg.get("To") else "unknown"
 
         # Extract body (handling both plain text and HTML)
         body = ""
@@ -171,11 +174,13 @@ class EmailHeaderExtractor:
             for part in msg.walk():
                 if part.get_content_type() == "text/plain":
                     charset = part.get_content_charset() or "utf-8"
-                    body = part.get_payload(decode=True).decode(charset, "ignore")
+                    body = part.get_payload(
+                        decode=True).decode(charset, "ignore")
                     break
                 elif part.get_content_type() == "text/html":
                     charset = part.get_content_charset() or "utf-8"
-                    body = part.get_payload(decode=True).decode(charset, "ignore")
+                    body = part.get_payload(
+                        decode=True).decode(charset, "ignore")
                     break
         else:
             charset = msg.get_content_charset() or "utf-8"
@@ -245,6 +250,7 @@ class TextProcessor:
     enable_spell_check : bool
         Whether spell checking is enabled.
     """
+
     def __init__(self, enable_spell_check=False):
         self.stop_words = set(stopwords.words('english'))
         self.lemmatizer = WordNetLemmatizer()
@@ -440,7 +446,8 @@ class TextProcessor:
         """
         email_pattern_with_spaces = r'\b[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         email_pattern_no_spaces = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        combined_pattern = f"({email_pattern_with_spaces}|{email_pattern_no_spaces})"
+        combined_pattern = f"({email_pattern_with_spaces}|{
+            email_pattern_no_spaces})"
         return re.sub(combined_pattern, '', text)
 
     def remove_time(self, text):
@@ -610,11 +617,12 @@ class TextProcessor:
         str
             The text without bullet points and symbols.
         """
-        symbols = ['•', '◦', '◉', '▪', '▫', '●', '□', '■', '✦', '✧', '✪', '✫', '✬', '✭', '✮', '✯', '✰']
+        symbols = ['•', '◦', '◉', '▪', '▫', '●', '□', '■',
+                   '✦', '✧', '✪', '✫', '✬', '✭', '✮', '✯', '✰']
         for symbol in symbols:
             text = text.replace(symbol, '')
         return text
-    
+
     def correct_spelling(self, words_list):
         """
         Correct the spelling of words in the list.
@@ -630,10 +638,11 @@ class TextProcessor:
             The list of words with corrected spelling.
         """
         misspelled_words = self.spell_checker.unknown(words_list)
-        
+
         # Correct misspelled words
-        corrected_words = [self.spell_checker.correction(word) if word in misspelled_words else word for word in words_list]
-        
+        corrected_words = [self.spell_checker.correction(
+            word) if word in misspelled_words else word for word in words_list]
+
         return corrected_words
 
     def clean_text(self, X, y=None):
@@ -655,7 +664,7 @@ class TextProcessor:
             try:
                 if body is None:
                     raise ValueError("Text body is None")
-                
+
                 text = self.remove_all_html_elements(body)
                 text = self.expand_contractions(text)
                 text = self.remove_email_headers(text)
@@ -679,14 +688,13 @@ class TextProcessor:
                 # Apply spell check if enabled
                 if self.enable_spell_check:
                     words_list = self.correct_spelling(words_list)
-                    
+
                 lemmatized_list = self.lemmatize(words_list)
                 cleaned_text_list.append(' '.join(lemmatized_list))
             except Exception as e:
                 logging.error(f"Error processing text: {e}")
                 cleaned_text_list.append('')
         return pd.DataFrame({'cleaned_text': cleaned_text_list})
-    
 
     def save_to_csv_cleaned(self, df, filename):
         """
@@ -802,18 +810,28 @@ def main():
     with open("config.json", "r") as config_file:
         config = json.load(config_file)
     base_dir = config["base_dir"]
-    TestEmail = os.path.join(base_dir, "Multi Model Evaluation", "Test Emails", "submitted.eml")
-    SavedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Formated_Test.csv")
-    CleanedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Cleaned_Test.csv")
-    MergedEmail = os.path.join(base_dir, "Multi Model Evaluation", "Merged_Test.csv")
-    SavedModel = os.path.join(base_dir, "Multi Model Evaluation", "Ensemble_Model_Fold_1.pkl")
-    source_path = os.path.join(base_dir, "Models & Parameters", "Ensemble_Model_Fold_1.pkl")
-    Base_Model_Optuna = os.path.join(base_dir, "Test Models", "Base Models (Optuna)")
-    Base_Model_No_Optuna = os.path.join(base_dir, "Test Models", "Base Models (No Optuna)")
-    Stacked_Model = os.path.join(base_dir, "Test Models", "Stacked Models (Optuna)")
+    TestEmail = os.path.join(
+        base_dir, "Multi Model Evaluation", "Test Emails", "submitted.eml")
+    SavedEmail = os.path.join(
+        base_dir, "Multi Model Evaluation", "Formated_Test.csv")
+    CleanedEmail = os.path.join(
+        base_dir, "Multi Model Evaluation", "Cleaned_Test.csv")
+    MergedEmail = os.path.join(
+        base_dir, "Multi Model Evaluation", "Merged_Test.csv")
+    SavedModel = os.path.join(
+        base_dir, "Multi Model Evaluation", "Ensemble_Model_Fold_1.pkl")
+    source_path = os.path.join(
+        base_dir, "Models & Parameters", "Ensemble_Model_Fold_1.pkl")
+    Base_Model_Optuna = os.path.join(
+        base_dir, "Test Models", "Base Models (Optuna)")
+    Base_Model_No_Optuna = os.path.join(
+        base_dir, "Test Models", "Base Models (No Optuna)")
+    Stacked_Model = os.path.join(
+        base_dir, "Test Models", "Stacked Models (Optuna)")
     shutil.copy(source_path, SavedModel)
     Ensemble_Model = os.path.join(base_dir, "Multi Model Evaluation")
-    Ensemble_Model_Backup = os.path.join(base_dir, "Models & Parameters Backup")
+    Ensemble_Model_Backup = os.path.join(
+        base_dir, "Models & Parameters Backup")
 
     # Extract features from the email
     extractor = EmailHeaderExtractor()
@@ -863,7 +881,8 @@ def main():
                     [
                         (
                             "encoder",
-                            OneHotEncoder(sparse_output=False, handle_unknown="ignore"),
+                            OneHotEncoder(sparse_output=False,
+                                          handle_unknown="ignore"),
                         ),
                     ]
                 ),
@@ -879,7 +898,8 @@ def main():
                 numerical_columns,
             ),
         ],
-        remainder="passthrough",  # Keep other columns unchanged, like 'cleaned_text' and 'label'
+        # Keep other columns unchanged, like 'cleaned_text' and 'label'
+        remainder="passthrough",
     )
 
     pipeline = Pipeline(
@@ -894,17 +914,20 @@ def main():
     email_df = pd.read_csv(MergedEmail)
 
     # Fit the non-text features
-    pipeline.named_steps["preprocessor"].fit(email_df.drop(columns="cleaned_text"))
+    pipeline.named_steps["preprocessor"].fit(
+        email_df.drop(columns="cleaned_text"))
 
     # Transform the non-text features
     email_df_non_text_transformed = pipeline.named_steps["preprocessor"].transform(
         email_df
     )
-    logging.info (f"Non-text features shape: {email_df_non_text_transformed.shape}")
+    logging.info(
+        f"Non-text features shape: {email_df_non_text_transformed.shape}")
 
     # Transform the text features
     texts = email_df["cleaned_text"].tolist()
-    email_df_text_processed = pipeline.named_steps["bert_features"].transform(texts)
+    email_df_text_processed = pipeline.named_steps["bert_features"].transform(
+        texts)
 
     # Combine the features
     email_df_combined = np.hstack(
@@ -930,37 +953,40 @@ def main():
             "XGB_LightGB_LG_Fold_1.pkl": "XGBoost + LightGBM",
             "XGB_RF_LG_Fold_1.pkl": "XGBoost + Random Forest"
         }
-        return model_name_map.get(file_name, file_name)  # Default to file name if not found
+        # Default to file name if not found
+        return model_name_map.get(file_name, file_name)
 
     # Iterate over each folder
     for folder in folders:
         # Extract only the folder name (last part of the path)
         folder_name = os.path.basename(folder)
-        
+
         # Iterate over each model file in the folder
         for model_file in os.listdir(folder):
             # Only process .pkl files
             if model_file.endswith('.pkl'):
                 model_path = os.path.join(folder, model_file)
-                
+
                 # Check if the path is a file
                 if os.path.isfile(model_path):
                     try:
                         # Load the model
                         model = joblib.load(model_path)
-                        
+
                         # Make predictions on the PCA-transformed or placeholder data
                         predictions = model.predict(email_df_combined)
 
                         # Map predictions to labels
                         label_map = {0: "Safe", 1: "Not Safe"}
-                        
+
                         for pred in predictions:
-                            result = [folder_name, get_model_name(model_file), label_map[pred]]
+                            result = [folder_name, get_model_name(
+                                model_file), label_map[pred]]
                             results.append(result)
 
                     except KeyError as e:
-                        logging.error(f"KeyError loading model {model_file}: {e}")
+                        logging.error(f"KeyError loading model {
+                                      model_file}: {e}")
                     except Exception as e:
                         logging.error(f"Error loading model {model_file}: {e}")
                 else:
@@ -968,8 +994,10 @@ def main():
 
     # Print results in table format
     email_name = os.path.basename(TestEmail)
-    print (f"Results for email: {email_name}")
-    print(tabulate(results, headers=["Models", "Models Used", "Prediction"], tablefmt="pretty"))
+    print(f"Results for email: {email_name}")
+    print(tabulate(results, headers=[
+          "Models", "Models Used", "Prediction"], tablefmt="pretty"))
+
 
 if __name__ == "__main__":
     main()
