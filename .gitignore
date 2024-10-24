@@ -23,5 +23,5 @@
 *.npz
 /Backup
 /SingleEvaluation/__pycache__
-/Sample Email Generator.py
-/ShapAnalysis.py
+/email_generator.py
+/shap_analysis.py
