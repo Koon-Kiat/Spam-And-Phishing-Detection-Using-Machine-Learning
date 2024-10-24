@@ -18,6 +18,7 @@
 /Noise Injection
 *.pkl
 *.csv
+!ceas_08.csv
 *.eml
 *.npz
 /Backup
