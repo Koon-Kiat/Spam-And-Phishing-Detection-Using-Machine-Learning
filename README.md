@@ -22,7 +22,7 @@ The project also includes a Flask web application that serves as a user interfac
 To set up the project, clone the repository and install the necessary dependencies:
 
 ```bash
-git clone https://github.com/yourusername/phishing-email-detection.git
+git clone https://github.com/Koon-Kiat/Detecting-Spam-and-Phishing-Emails-Using-Machine-Learning
 cd phishing-email-detection
 pip install -r requirements.txt
 ```
@@ -30,7 +30,7 @@ pip install -r requirements.txt
 Once the dependencies are installed, you can run the phishing email detection program using the following command:
 
 ```bash
-python SpamAndPhishingDetection.py
+python main.py
 ```
 
 ## Data
