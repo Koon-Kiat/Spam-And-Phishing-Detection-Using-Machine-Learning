@@ -388,3 +388,23 @@ def count_urls(urls_list):
         return len(urls_list)
     else:
         return 0
+
+
+def process_spamassassin_headers(df):
+    df['urls'] = df['texturls'].apply(count_urls)
+    df.drop(columns=['mailto', 'texturls'], inplace=True)
+    return df
+
+def feature_engineering(df_processed_spamassassin, df_processed_ceas, file_paths):
+    logging.info(f"Beginning Feature Engineering...")
+
+    # Extract email headers from the SpamAssassin dataset
+    spamassassin_headers_df = load_or_extract_headers(
+        df_processed_spamassassin, file_paths['extracted_spam_assassin_email_header_file'], EmailHeaderExtractor, 'Spam Assassin')
+    spamassassin_headers_df = process_spamassassin_headers(spamassassin_headers_df)
+
+    ceas_headers_df = load_or_extract_headers(
+        df_processed_ceas, file_paths['extracted_ceas_email_header_file'], EmailHeaderExtractor, 'CEAS_08')
+
+    logging.info(f"Feature Engineering completed.\n")
+    return spamassassin_headers_df, ceas_headers_df
