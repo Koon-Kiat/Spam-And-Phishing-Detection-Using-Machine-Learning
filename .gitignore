@@ -4,6 +4,7 @@
 *.eml
 *.npz
 *.env
+*.log
 __pycache__/
 backup/
 trash/
