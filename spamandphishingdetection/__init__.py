@@ -16,16 +16,16 @@ from .missing_values import check_missing_values
 from .feature_engineering import feature_engineering
 from .data_cleaning_headers import load_or_save_emails, process_and_save_emails
 from .data_integration import (
-    merge_dataframes, 
-    verify_merged_dataframe, 
-    combine_dataframes, 
-    verify_combined_dataframe, 
+    merge_dataframes,
+    verify_merged_dataframe,
+    combine_dataframes,
+    verify_combined_dataframe,
     save_combined_dataframe
 )
 from .data_cleaning import (
-    load_or_clean_data, 
-    data_cleaning, 
-    save_dataframe_to_csv, 
+    load_or_clean_data,
+    data_cleaning,
+    save_dataframe_to_csv,
     combine_columns_for_cleaning
 )
 from .noise_injection import generate_noisy_dataframe
@@ -39,5 +39,9 @@ from .learning_curve import plot_learning_curve
 from .modeltraining.base_model import model_training as base_model_training
 from .modeltraining.main_model import model_training as main_model_training
 from .modeltraining.base_model_optuna import model_training as base_model_training_optuna
+from .modeltraining.xgb_lightgb_lg_model import model_training as xgb_lightgb_lg_model_training
+from .modeltraining.xgb_rf_lg_model import model_training as xgb_rf_lg_model_training
+from .modeltraining.xgb_ada_lg_model import model_training as xgb_ada_lg_model_training
+from .modeltraining.xgb_knn_lg_model import model_training as xgb_knn_lg_model_training
 
 __version__ = "0.1.0"
