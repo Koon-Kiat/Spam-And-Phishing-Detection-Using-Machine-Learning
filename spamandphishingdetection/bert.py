@@ -5,7 +5,6 @@ import logging
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 
-
 class BERTFeatureExtractor:
     """
     A class to extract BERT features from text data.
@@ -28,8 +27,13 @@ class BERTFeatureExtractor:
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.model = BertModel.from_pretrained('bert-base-uncased')
         self.max_length = max_length
-        self.device = device if device else torch.device(
-            'cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Determine the device
+        self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Log the device being used
+        logging.info(f"Using device: {self.device}")
+
         self.model.to(self.device)  # Ensure model is on the right device
 
     def extract_features(self, texts, batch_size=16):
@@ -50,6 +54,7 @@ class BERTFeatureExtractor:
         """
         if not isinstance(texts, (list, tuple)) or not all(isinstance(text, str) for text in texts):
             raise ValueError("Input should be a list or tuple of strings.")
+        
         features = []
         self.model.eval()
         with torch.no_grad():
@@ -60,9 +65,9 @@ class BERTFeatureExtractor:
                     batch_texts, padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
                 input_ids = tokens['input_ids'].to(self.device)
                 attention_mask = tokens['attention_mask'].to(self.device)
+                
                 outputs = self.model(input_ids, attention_mask=attention_mask)
-                batch_features = outputs.last_hidden_state.mean(
-                    dim=1).cpu().numpy()  # Move back to CPU
+                batch_features = outputs.last_hidden_state.mean(dim=1).cpu().numpy()  # Move back to CPU
                 features.extend(batch_features)
 
         return features

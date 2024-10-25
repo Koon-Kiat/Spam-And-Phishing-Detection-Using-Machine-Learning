@@ -77,10 +77,10 @@ def model_training(X_train, y_train, X_test, y_test, model_path, params_path):
     print(f"Training Accuracy: {train_accuracy * 100:.2f}%")
     print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
     print(f"Confusion Matrix:\n{confusion_matrix(y_test, y_test_pred)}")
-    print(f"Classification Report for Training Data:\n{
-          classification_report(y_train, y_train_pred, target_names=target_names)}")
-    print(f"\nClassification Report for Test Data:\n{
-          classification_report(y_test, y_test_pred, target_names=target_names)}")
+    print(
+        f"Classification Report for Training Data: \n{classification_report(y_train, y_train_pred, target_names=target_names)}")
+    print(
+        f"\nClassification Report for Test Data: \n{classification_report(y_test, y_test_pred, target_names=target_names)}")
 
     return ensemble_model, test_accuracy
 
@@ -108,8 +108,8 @@ def load_or_save_model(model, model_path, action='load'):
             logging.info(f"Loading model from {model_path}")
             return joblib.load(model_path)
         else:
-            logging.info(f"No saved model found at {
-                         model_path}. Proceeding to train a new model.")
+            logging.info(
+                f"No saved model found at {model_path}. Proceeding to train a new model.")
             return None
     elif action == 'save':
         logging.info(f"Saving model to {model_path}")
@@ -140,8 +140,8 @@ def load_or_save_params(params, params_path, action='load'):
             with open(params_path, 'r') as f:
                 return json.load(f)
         else:
-            logging.info(f"No saved parameters found at {
-                         params_path}. Proceeding to conduct a study.")
+            logging.info(
+                f"No saved parameters found at {params_path}. Proceeding to conduct a study.")
             return None
     elif action == 'save':
         logging.info(f"Saving parameters to {params_path}")

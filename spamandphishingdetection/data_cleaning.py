@@ -230,8 +230,7 @@ class TextProcessor:
         """
         email_pattern_with_spaces = r'\b[A-Za-z0-9._%+-]+\s*@\s*[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         email_pattern_no_spaces = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        combined_pattern = f"({email_pattern_with_spaces}|{
-            email_pattern_no_spaces})"
+        combined_pattern = f"({email_pattern_with_spaces}|{email_pattern_no_spaces})"
         return re.sub(combined_pattern, '', text)
 
     def remove_time(self, text):
@@ -582,10 +581,10 @@ def verify_combined_dataframe(combined_df, df_cleaned_combined):
     if not combined_label_counts.equals(df_cleaned_combined_label_counts):
         logging.error(
             "Label distributions in Combined DataFrame do not match those in Cleaned Combined DataFrame.")
-        logging.error(f"Combined DataFrame distributions:\n{
-                      combined_label_counts}")
-        logging.error(f"Cleaned Combined DataFrame distributions:\n{
-                      df_cleaned_combined_label_counts}")
+        logging.error(
+            f"Combined DataFrame distributions: \n{combined_label_counts}")
+        logging.error(
+            f"Cleaned Combined DataFrame distributions: \n{df_cleaned_combined_label_counts}")
         raise ValueError(
             "Label distributions do not match between Combined DataFrame and Cleaned Combined DataFrame.")
     else:
@@ -605,8 +604,8 @@ def combine_columns_for_cleaning(combined_df, df_clean_body):
     combined_df_reset = combined_df.reset_index(drop=True)
     df_clean_body_reset = df_clean_body.reset_index(drop=True)
     df_cleaned_combined = pd.concat([
-        combined_df_reset[['sender', 'receiver', 'https_count', 'http_count', 'blacklisted_keywords_count',
-                           'short_urls', 'has_ip_address', 'urls', 'label']],
+        combined_df_reset[['sender', 'receiver', 'https_count', 'http_count',
+                           'blacklisted_keywords_count', 'short_urls', 'has_ip_address', 'urls', 'label']],
         df_clean_body_reset[['cleaned_text']]
     ], axis=1)
     logging.info(f"Dataframes combined successfully.\n")

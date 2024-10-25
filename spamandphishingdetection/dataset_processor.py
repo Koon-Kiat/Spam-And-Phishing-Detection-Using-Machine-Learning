@@ -36,8 +36,8 @@ class DatasetProcessor:
         """
         if 'Unnamed: 0' in self.df.columns:
             self.df = self.df.drop(columns=['Unnamed: 0'])
-            logging.info(f"Dropped 'Unnamed: 0' column from {
-                         self.dataset_name}.")
+            logging.info(
+                f"Dropped 'Unnamed: 0' column from {self.dataset_name}.")
 
         return self.df
 
@@ -55,8 +55,8 @@ class DatasetProcessor:
         logging.info(f"Total missing values: {total_missing_values}")
         logging.info(f"Removing missing values from {self.dataset_name}...")
         self.df = self.df.dropna()
-        logging.info(f"Total number of rows after removing missing values from {
-                     self.dataset_name}: {self.df.shape[0]}")
+        logging.info(
+            f"Total number of rows after removing missing values from {self.dataset_name}: {self.df.shape[0]}")
 
         return self.df
 
@@ -78,8 +78,8 @@ class DatasetProcessor:
         # Identify duplicates
         num_duplicates_before = self.df.duplicated(
             subset=[self.column_name], keep=False).sum()
-        logging.info(f"Total number of rows identified as duplicates based on '{
-                     self.column_name}': {num_duplicates_before}")
+        logging.info(
+            f"Total number of rows identified as duplicates based on '{self.column_name}': {num_duplicates_before}")
 
         # Remove duplicates
         self.df = self.df.drop_duplicates(
@@ -87,13 +87,13 @@ class DatasetProcessor:
 
         # Log the number of rows after removing duplicates
         final_row_count = self.df.shape[0]
-        logging.info(f"Number of rows after removing duplicates: {
-                     final_row_count}")
+        logging.info(
+            f"Number of rows after removing duplicates: {final_row_count}")
 
         # Calculate the number of duplicates removed
         duplicates_removed = initial_row_count - final_row_count
-        logging.info(f"Number of rows removed due to duplication: {
-                     duplicates_removed}")
+        logging.info(
+            f"Number of rows removed due to duplication: {duplicates_removed}")
 
         return self.df
 
@@ -123,19 +123,19 @@ class DatasetProcessor:
             The processed DataFrame.
         """
         if os.path.exists(self.save_path):
-            logging.info(f"Processed file already exists at {
-                         self.save_path}. Loading the file...")
+            logging.info(
+                f"Processed file already exists at {self.save_path}. Loading the file...")
             self.df = pd.read_csv(self.save_path)
         else:
-            logging.info(f"Total number of rows in {
-                         self.dataset_name} DataFrame: {self.df.shape[0]}")
+            logging.info(
+                f"Total number of rows in {self.dataset_name} DataFrame: {self.df.shape[0]}")
             self.drop_unnamed_column()
             self.check_and_remove_missing_values()
             self.remove_duplicates()
-            logging.info(f"Total number of rows remaining in the {
-                         self.dataset_name}: {self.df.shape[0]}")
-            logging.debug(f"{self.dataset_name} after removing duplicates:\n{
-                          self.df.head()}\n")
+            logging.info(
+                f"Total number of rows remaining in the {self.dataset_name}: {self.df.shape[0]}")
+            logging.debug(
+                f"{self.dataset_name} after removing duplicates: \n{self.df.head()}\n")
             self.save_processed_data()
 
         return self.df

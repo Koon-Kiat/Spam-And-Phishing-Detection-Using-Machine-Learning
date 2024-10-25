@@ -23,18 +23,18 @@ def load_or_save_emails(df, output_file, df_name='CEAS_08'):
         The cleaned email data.
     """
     if os.path.exists(output_file):
-        logging.info(f"Output file {output_file} already exists. Loading data from {
-                     output_file}...\n")
+        logging.info(
+            f"Output file {output_file} already exists. Loading data from {output_file}...\n")
         df_cleaned = pd.read_csv(output_file)
     else:
-        logging.info(f"Output file {
-                     output_file} does not exist. Loading data from {df_name}...")
+        logging.info(
+            f"Output file {output_file} does not exist. Loading data from {df_name}...")
         logging.info(f"Data loaded from {df_name}. Beginning processing...")
 
         df_cleaned = process_and_save_emails(df, output_file)
 
-        logging.info(f"Data processing completed. Cleaned data saved to {
-                     output_file}.")
+        logging.info(
+            f"Data processing completed. Cleaned data saved to {output_file}.")
 
     return df_cleaned
 

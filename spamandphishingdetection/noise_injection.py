@@ -4,6 +4,7 @@ import logging
 import pandas as pd
 import numpy as np
 
+
 def generate_noisy_dataframe(data, file_path, noise_level=0.1):
     """
     Generates a noisy DataFrame by injecting noise into specified columns.
@@ -55,8 +56,8 @@ def generate_noisy_dataframe(data, file_path, noise_level=0.1):
 
     # Check if the noisy DataFrame already exists
     if os.path.exists(file_path):
-        logging.info(f"Noisy DataFrame already exists as '{
-                     file_path}'. Loading it.")
+        logging.info(
+            f"Noisy DataFrame already exists as '{file_path}'. Loading it.")
         df_noisy = pd.read_csv(file_path)
     else:
         logging.info(
