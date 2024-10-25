@@ -10,29 +10,41 @@ import spacy  # NLP library
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import (
-    OneHotEncoder, StandardScaler)  # Preprocessing
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
 import email  # Email handling
 import email.policy  # Email policies
 from imblearn.over_sampling import SMOTE  # Handling imbalanced data
 import tensorflow as tf  # TensorFlow library
 from bs4 import MarkupResemblesLocatorWarning  # HTML and XML parsing
 from datasets import load_dataset  # Load datasets
-from modules.files import load_config, get_file_paths, get_model_path, get_params_path  # File handling
-from modules.dataset_processor import DatasetProcessor  # Dataset processing
-from modules.labels import log_label_percentages  # Label processing
-from modules.missing_values import check_missing_values  # Missing value handling
-from modules.feature_engineering import feature_engineering
-from modules.data_cleaning_headers import load_or_save_emails, process_and_save_emails
-from modules.data_integration import merge_dataframes, verify_merged_dataframe, combine_dataframes, verify_combined_dataframe, save_combined_dataframe
-from modules.data_cleaning import load_or_clean_data, data_cleaning, save_dataframe_to_csv, combine_columns_for_cleaning
-from modules.noise_injection import generate_noisy_dataframe
-from modules.data_splitting import stratified_k_fold_split
-from modules.bert import BERTFeatureExtractor, BERTFeatureTransformer
-from modules.rare_category_remover import RareCategoryRemover
-from modules.pipeline import run_pipeline_or_load
-from modules.model_training import model_training
-from modules.learning_curve import plot_learning_curve
+from spamandphishingdetection import (
+    load_config,
+    get_file_paths,
+    get_model_path,
+    get_params_path,
+    DatasetProcessor,
+    log_label_percentages,
+    check_missing_values,
+    feature_engineering,
+    load_or_save_emails,
+    merge_dataframes,
+    verify_merged_dataframe,
+    combine_dataframes,
+    verify_combined_dataframe,
+    save_combined_dataframe,
+    load_or_clean_data,
+    data_cleaning,
+    save_dataframe_to_csv,
+    combine_columns_for_cleaning,
+    generate_noisy_dataframe,
+    stratified_k_fold_split,
+    BERTFeatureExtractor,
+    BERTFeatureTransformer,
+    RareCategoryRemover,
+    run_pipeline_or_load,
+    model_training,
+    plot_learning_curve
+)
 
 
 # ANSI escape codes for text formatting
@@ -126,8 +138,6 @@ def main():
         spamassassin_headers_df, ceas_headers_df = feature_engineering(
             df_processed_spamassassin, df_processed_ceas, file_paths)
 
-        logging.info(f"Feature Engineering completed.\n")
-
         # ************************* #
         #       Data Cleaning       #
         # ************************* #
@@ -135,10 +145,9 @@ def main():
             f"Beginning Data Cleaning of CEAS_08 ['sender', 'receiver']...")
         df_cleaned_ceas_headers = load_or_save_emails(
             df_processed_ceas, file_paths['cleaned_ceas_headers'])
-        # Columns in cleaned ceas email headers: ['sender', 'receiver']
 
         logging.info(
-            f"Begining merging of Cleaned Headers of CEAS_08 with Processed CEAS_08...")
+            f"Beginning merging of Cleaned Headers of CEAS_08 with Processed CEAS_08...")
         if len(df_cleaned_ceas_headers) != len(df_processed_ceas):
             logging.error(
                 "The number of rows in the Merged Cleaned Headers of CEAS_08 DataFrame does not match Processed CEAS_08.")
@@ -147,21 +156,28 @@ def main():
         else:
             df_processed_ceas.drop(
                 columns=['sender', 'receiver'], inplace=True)
-            logging.info(f"Columns in df_cleaned_ceas_headers: {
-                         df_cleaned_ceas_headers.columns.tolist()}")
-            logging.info(f"Columns in df_processed_ceas: {
-                         df_processed_ceas.columns.tolist()}")
-            df_cleaned_ceas_headers_merge = pd.concat([df_cleaned_ceas_headers.reset_index(
-                drop=True), df_processed_ceas.reset_index(drop=True)], axis=1)
-            # df_cleaned_ceas_headers_merge.fillna({'sender': 'unknown', 'receiver': 'unknown'}, inplace=True)
-            missing_in_cleaned_ceas_header_merged = df_cleaned_ceas_headers_merge[(
-                df_cleaned_ceas_headers_merge['sender'].isnull()) | (df_cleaned_ceas_headers_merge['receiver'].isnull())]
-            logging.info(f"Number of missing rows in Merged Cleaned Headers of CEAS_08 DataFrame: {
-                         len(missing_in_cleaned_ceas_header_merged)}")
-            logging.info(f'Total rows in Processed CEAS_08 Dataframe: {
-                         len(df_processed_ceas)}')
-            logging.info(f"Total rows in Merged Cleaned Headers of CEAS_08 Dataframe: {
-                         len(df_cleaned_ceas_headers_merge)}")
+
+            # Corrected logging statements below
+            logging.info(
+                f"Columns in df_cleaned_ceas_headers: {df_cleaned_ceas_headers.columns.tolist()}")
+            logging.info(
+                f"Columns in df_processed_ceas: {df_processed_ceas.columns.tolist()}")
+
+            df_cleaned_ceas_headers_merge = pd.concat(
+                [df_cleaned_ceas_headers.reset_index(drop=True),
+                 df_processed_ceas.reset_index(drop=True)], axis=1)
+
+            missing_in_cleaned_ceas_header_merged = df_cleaned_ceas_headers_merge[
+                (df_cleaned_ceas_headers_merge['sender'].isnull()) |
+                (df_cleaned_ceas_headers_merge['receiver'].isnull())]
+
+            logging.info(
+                f"Number of missing rows in Merged Cleaned Headers of CEAS_08 DataFrame: {len(missing_in_cleaned_ceas_header_merged)}")
+            logging.info(
+                f'Total rows in Processed CEAS_08 Dataframe: {len(df_processed_ceas)}')
+            logging.info(
+                f"Total rows in Merged Cleaned Headers of CEAS_08 Dataframe: {len(df_cleaned_ceas_headers_merge)}")
+
         if len(df_cleaned_ceas_headers_merge) != len(df_processed_ceas):
             logging.error(
                 "The number of rows in the Merged Cleaned Headers of CEAS_08 DataFrame does not match Processed CEAS_08.")
@@ -172,8 +188,9 @@ def main():
                 "The number of rows in the Merged Cleaned Headers of CEAS_08 DataFrame matches Processed CEAS_08.")
             df_cleaned_ceas_headers_merge.to_csv(
                 file_paths['merged_cleaned_ceas_headers'], index=False)
-            logging.info(f"Merged Cleaned Headers of CEAS_08 DataFrame successfully saved to {
-                file_paths['merged_cleaned_ceas_headers']}")
+            logging.info(
+                f"Merged Cleaned Headers of CEAS_08 DataFrame successfully saved to {file_paths['merged_cleaned_ceas_headers']}")
+
         logging.info(
             f"Data Cleaning of CEAS_08 ['sender', 'receiver'] completed.\n")
 
@@ -279,13 +296,11 @@ def main():
                     ('cat', Pipeline([
                         ('rare_cat_remover', RareCategoryRemover(
                             threshold=0.05)),  # Remove rare categories
-                        # Fill missing categorical values
                         ('imputer', SimpleImputer(strategy='most_frequent')),
                         ('encoder', OneHotEncoder(
                             sparse_output=False, handle_unknown='ignore'))
                     ]), categorical_columns),
                     ('num', Pipeline([
-                        # Fill missing numerical values
                         ('imputer', SimpleImputer(strategy='mean')),
                         ('scaler', StandardScaler())
                     ]), numerical_columns)
@@ -295,13 +310,9 @@ def main():
 
             # Define pipeline with preprocessor, BERT, and SMOTE
             pipeline = Pipeline(steps=[
-                # ('augment', DataAugmentationTransformer(categorical_columns=categorical_columns, numerical_columns=numerical_columns)),
                 ('preprocessor', preprocessor),
-                # Custom transformer for BERT
                 ('bert_features', bert_transformer),
-                # Apply SMOTE after augmentation
-                ('smote', SMOTE(random_state=42)),
-                # ('pca', PCA(n_components=777))
+                ('smote', SMOTE(random_state=42))
             ])
 
             # Call the function to either run the pipeline or load preprocessed data
@@ -314,8 +325,8 @@ def main():
                 pipeline=pipeline,
                 dir='feature_extraction',
             )
-            logging.info(f"Data for Fold {
-                         fold_idx} has been processed or loaded successfully.\n")
+            logging.info(
+                f"Data for Fold {fold_idx} has been processed or loaded successfully.\n")
 
             # ***************************************** #
             #       Model Training and Evaluation       #
@@ -334,8 +345,8 @@ def main():
                 params_path=params_path,
             )
             fold_test_accuracies.append(test_accuracy)
-            logging.info(f"Data for Fold {
-                         fold_idx} has been processed, model trained, and evaluated.\n")
+            logging.info(
+                f"Data for Fold {fold_idx} has been processed, model trained, and evaluated.\n")
 
             # Store learning curve data for later plotting
             learning_curve_data.append(
@@ -360,7 +371,7 @@ def main():
         logging.info(f"Overall Test Accuracy: {mean_test_accuracy * 100:.2f}%")
 
     except Exception as e:
-        logging.error(f"An error occurred during data preprocessing: {e}")
+        logging.error(f"An error occurred: {e}")
         return
 
 
