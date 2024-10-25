@@ -9,3 +9,6 @@ backup/
 trash/
 others/
 config.json
+
+email_generator.py
+shap_analysis.py

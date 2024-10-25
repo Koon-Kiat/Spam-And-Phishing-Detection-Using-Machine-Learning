@@ -42,7 +42,7 @@ from spamandphishingdetection import (
     BERTFeatureTransformer,
     RareCategoryRemover,
     run_pipeline_or_load,
-    model_training,
+    main_model_training,
     plot_learning_curve
 )
 
@@ -336,7 +336,7 @@ def main():
             # Train the model and evaluate the performance for each fold
             model_path = get_model_path(config, fold_idx)
             params_path = get_params_path(config, fold_idx)
-            ensemble_model, test_accuracy = model_training(
+            ensemble_model, test_accuracy = main_model_training(
                 X_train_balanced,
                 y_train_balanced,
                 X_test_combined,

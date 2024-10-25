@@ -5,6 +5,8 @@ This package provides various modules for data processing, feature engineering, 
 and evaluation in the context of spam and phishing detection.
 """
 
+import os
+
 # Importing specific classes or functions to make them available at the package level
 from .file_operations import load_config, get_file_paths, get_model_path, get_params_path
 from .dataset_processor import DatasetProcessor
@@ -30,7 +32,10 @@ from .data_splitting import stratified_k_fold_split
 from .bert import BERTFeatureExtractor, BERTFeatureTransformer
 from .rare_category_remover import RareCategoryRemover
 from .pipeline import run_pipeline_or_load
-from .model_training import model_training
 from .learning_curve import plot_learning_curve
+
+
+from .modeltraining.base_model import model_training as base_model_training
+from .modeltraining.main_model import model_training as main_model_training
 
 __version__ = "0.1.0"
