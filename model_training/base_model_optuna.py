@@ -58,7 +58,7 @@ from spamandphishingdetection import (
 
 # Main processing function
 def main():
-    nlp, loss_fn = initialize_environment()
+    nlp, loss_fn = initialize_environment(__file__)
     config = load_config("config.json")
     file_paths = get_file_paths(config)
 
