@@ -1,30 +1,10 @@
-/Data Cleaning
-/Data Integration
-/Data Splitting
-/Feature Engineering
-/Feature Extraction
-/Models & Parameters
-/Models & Parameters Backup
-/Others
-/Previous Tests
-/FlaskModel
-/Data Analysis
-/Data Preprocessing
-/__pycache__
-/modules/__pycache__
-/config.json
-/single_evaluation/config.json
-/single_evaluation/ensemble_model_fold_1.pkl
-.venv
-.DS_Store
-/Noise Injection
 *.pkl
 *.csv
 !ceas_08.csv
 *.eml
 *.npz
-/Backup
-/single_evaluation/__pycache__
-/email_generator.py
-/shap_analysis.py
-/main_backup.py
+*.env
+__pycache__/
+backup/
+trash/
+others/
