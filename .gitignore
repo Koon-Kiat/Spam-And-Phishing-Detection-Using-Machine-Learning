@@ -8,3 +8,4 @@ __pycache__/
 backup/
 trash/
 others/
+config.json
