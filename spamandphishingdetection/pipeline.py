@@ -158,7 +158,7 @@ def save_data_pipeline(data, labels, data_path, labels_path):
     """
     # Save the data using np.savez
     np.savez(data_path, data=data)
-    
+
     # Save the labels using joblib
     dump(labels, labels_path)
 
@@ -181,10 +181,10 @@ def load_data_pipeline(data_path, labels_path):
     """
     # Load the data using np.load
     data = np.load(data_path)['data']
-    
+
     # Load the labels using joblib
     labels = load(labels_path)
-    
+
     return data, labels
 
 

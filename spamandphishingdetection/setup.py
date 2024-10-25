@@ -12,6 +12,7 @@ from datetime import datetime
 BOLD = '\033[1m'
 RESET = '\033[0m'
 
+
 def initialize_environment(script_name):
     # Create log folder if it doesn't exist
     log_folder = 'logs'
@@ -34,7 +35,8 @@ def initialize_environment(script_name):
     # Also log to console
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s')
+    formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s')
     console.setFormatter(formatter)
     logging.getLogger().addHandler(console)
 
@@ -56,7 +58,8 @@ def initialize_environment(script_name):
     warnings.simplefilter("ignore")  # Ignore all warnings
 
     # Suppress specific warnings
-    warnings.filterwarnings("ignore", category=UserWarning, module='transformers')
+    warnings.filterwarnings(
+        "ignore", category=UserWarning, module='transformers')
     warnings.filterwarnings("ignore", category=FutureWarning,
                             module='transformers.tokenization_utils_base')
     warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
