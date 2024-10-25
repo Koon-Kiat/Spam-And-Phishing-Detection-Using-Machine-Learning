@@ -1,7 +1,11 @@
 # Detecting Spam and Phishing Emails Using Machine Learning
 
-![GitHub issues](https://img.shields.io/github/issues/Koon-Kiat/Phishing-Email-Detection)
 ![GitHub repo size](https://img.shields.io/github/repo-size/Koon-Kiat/Phishing-Email-Detection)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/t/Koon-Kiat/Detecting-Spam-and-Phishing-Emails-Using-Machine-Learning?style=flat)
+![GitHub issues](https://img.shields.io/github/issues/Koon-Kiat/Phishing-Email-Detection)
+![GitHub Issues or Pull Requests](https://img.shields.io/github/issues-pr/Koon-Kiat/Detecting-Spam-and-Phishing-Emails-Using-Machine-Learning)
+![GitHub Repo stars](https://img.shields.io/github/stars/Koon-Kiat/Detecting-Spam-and-Phishing-Emails-Using-Machine-Learning?style=flat)
+
 
 ## Overview
 
