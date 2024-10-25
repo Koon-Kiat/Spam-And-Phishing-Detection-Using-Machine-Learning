@@ -2,14 +2,77 @@ import os
 import json
 import logging
 import joblib
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-import optuna  # Hyperparameter optimization
+import optuna
 from optuna.samplers import TPESampler
 from xgboost import XGBClassifier
-from sklearn.svm import SVC
+from sklearn.ensemble import AdaBoostClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import BaggingClassifier, StackingClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 from tqdm import tqdm
+
+
+def load_or_save_model(model, model_path, action='load'):
+    """
+    Loads or saves the model based on the specified action.
+
+    Parameters
+    ----------
+    model : object
+        The model to be loaded or saved.
+    model_path : str
+        The file path where the model will be saved or loaded from.
+    action : str, optional
+        The action to perform ('load' or 'save'). Default is 'load'.
+
+    Returns
+    -------
+    object
+        The loaded model if action is 'load'.
+    """
+    if action == 'load':
+        if os.path.exists(model_path):
+            logging.info(f"Loading model from {model_path}")
+            return joblib.load(model_path)
+        else:
+            logging.info(
+                f"No saved model found at {model_path}. Proceeding to train a new model.")
+            return None
+    elif action == 'save':
+        logging.info(f"Saving model to {model_path}")
+        joblib.dump(model, model_path)
+
+
+def load_or_save_params(params, params_path, action='load'):
+    """
+    Loads or saves the parameters based on the specified action.
+
+    Parameters
+    ----------
+    params : dict
+        The parameters to be loaded or saved.
+    params_path : str
+        The file path where the parameters will be saved or loaded from.
+    action : str, optional
+        The action to perform ('load' or 'save'). Default is 'load'.
+
+    Returns
+    -------
+    dict
+        The loaded parameters if action is 'load'.
+    """
+    if action == 'load':
+        if os.path.exists(params_path):
+            logging.info(f"Loading parameters from {params_path}")
+            with open(params_path, 'r') as f:
+                return json.load(f)
+        else:
+            logging.info(
+                f"No saved parameters found at {params_path}. Proceeding to conduct a study.")
+            return None
+    elif action == 'save':
+        logging.info(f"Saving parameters to {params_path}")
+        with open(params_path, 'w') as f:
+            json.dump(params, f)
 
 
 def model_training(X_train, y_train, X_test, y_test, model_path, params_path):
@@ -77,76 +140,12 @@ def model_training(X_train, y_train, X_test, y_test, model_path, params_path):
     print(f"Training Accuracy: {train_accuracy * 100:.2f}%")
     print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
     print(f"Confusion Matrix:\n{confusion_matrix(y_test, y_test_pred)}")
-    print(f"Classification Report for Training Data:\n{
-          classification_report(y_train, y_train_pred, target_names=target_names)}")
-    print(f"\nClassification Report for Test Data:\n{
-          classification_report(y_test, y_test_pred, target_names=target_names)}")
+    print(
+        f"Classification Report for Training Data:\n{classification_report(y_train, y_train_pred, target_names=target_names)}")
+    print(
+        f"\nClassification Report for Test Data:\n{classification_report(y_test, y_test_pred, target_names=target_names)}")
 
     return ensemble_model, test_accuracy
-
-
-def load_or_save_model(model, model_path, action='load'):
-    """
-    Loads or saves the model based on the specified action.
-
-    Parameters
-    ----------
-    model : object
-        The model to be loaded or saved.
-    model_path : str
-        The file path where the model will be saved or loaded from.
-    action : str, optional
-        The action to perform ('load' or 'save'). Default is 'load'.
-
-    Returns
-    -------
-    object
-        The loaded model if action is 'load'.
-    """
-    if action == 'load':
-        if os.path.exists(model_path):
-            logging.info(f"Loading model from {model_path}")
-            return joblib.load(model_path)
-        else:
-            logging.info(f"No saved model found at {
-                         model_path}. Proceeding to train a new model.")
-            return None
-    elif action == 'save':
-        logging.info(f"Saving model to {model_path}")
-        joblib.dump(model, model_path)
-
-
-def load_or_save_params(params, params_path, action='load'):
-    """
-    Loads or saves the parameters based on the specified action.
-
-    Parameters
-    ----------
-    params : dict
-        The parameters to be loaded or saved.
-    params_path : str
-        The file path where the parameters will be saved or loaded from.
-    action : str, optional
-        The action to perform ('load' or 'save'). Default is 'load'.
-
-    Returns
-    -------
-    dict
-        The loaded parameters if action is 'load'.
-    """
-    if action == 'load':
-        if os.path.exists(params_path):
-            logging.info(f"Loading parameters from {params_path}")
-            with open(params_path, 'r') as f:
-                return json.load(f)
-        else:
-            logging.info(f"No saved parameters found at {
-                         params_path}. Proceeding to conduct a study.")
-            return None
-    elif action == 'save':
-        logging.info(f"Saving parameters to {params_path}")
-        with open(params_path, 'w') as f:
-            json.dump(params, f)
 
 
 def conduct_optuna_study(X_train, y_train):
@@ -168,7 +167,6 @@ def conduct_optuna_study(X_train, y_train):
     best_params = {}
 
     # Optimize XGBoost parameters
-
     def xgb_objective(trial):
         n_estimators_xgb = trial.suggest_int('n_estimators_xgb', 50, 100)
         max_depth_xgb = trial.suggest_int('max_depth_xgb', 3, 10)
@@ -196,31 +194,23 @@ def conduct_optuna_study(X_train, y_train):
     xgb_study.optimize(xgb_objective, n_trials=5)
     best_params['xgb'] = xgb_study.best_params
 
-    def svm_objective(trial):
-        try:
-            # Regularization parameter for SVM
-            C_svm = trial.suggest_float('C_svm', 0.1, 1.0)
-            kernel_svm = trial.suggest_categorical(
-                'kernel_svm', ['linear', 'rbf', 'poly'])
+    def ada_objective(trial):
+        n_estimators_ada = trial.suggest_int('n_estimators_ada', 50, 100)
+        learning_rate_ada = trial.suggest_float('learning_rate_ada', 0.01, 1.0)
 
-            model = SVC(
-                C=C_svm,
-                kernel=kernel_svm,
-                probability=True,
-                class_weight='balanced',
-                random_state=42
-            )
-            model.fit(X_train, y_train)
-            y_train_pred = model.predict(X_train)
-            return accuracy_score(y_train, y_train_pred)
-        except Exception as e:
-            logging.error(f"Error in SVM objective function: {e}")
-            return 0  # Return a low score if there's an error
+        model = AdaBoostClassifier(
+            n_estimators=n_estimators_ada,
+            learning_rate=learning_rate_ada,
+            random_state=42
+        )
+        model.fit(X_train, y_train)
+        y_train_pred = model.predict(X_train)
+        return accuracy_score(y_train, y_train_pred)
 
-    # Optimize SVM parameters
-    svm_study = optuna.create_study(direction='maximize', sampler=TPESampler())
-    svm_study.optimize(svm_objective, n_trials=5)
-    best_params['svm'] = svm_study.best_params
+    # Optimize AdaBoost parameters
+    ada_study = optuna.create_study(direction='maximize', sampler=TPESampler())
+    ada_study.optimize(ada_objective, n_trials=5)
+    best_params['ada'] = ada_study.best_params
 
     def logreg_objective(trial):
         try:
@@ -275,7 +265,7 @@ def train_ensemble_model(best_params, X_train, y_train, model_path):
     """
     Trains an ensemble model using the best hyperparameters.
 
-    This function trains a stacking ensemble model consisting of a Bagged SVM and an XGBoost model as base models,
+    This function trains a stacking ensemble model consisting of an AdaBoost and an XGBoost model as base models,
     with a Logistic Regression model as the meta-model. The best hyperparameters for each model are provided
     through the `best_params` dictionary. The trained model is saved to the specified file path.
 
@@ -287,9 +277,9 @@ def train_ensemble_model(best_params, X_train, y_train, model_path):
                 - 'learning_rate_xgb' (float): Boosting learning rate.
                 - 'reg_alpha' (float, optional): L1 regularization term on weights (default is 0.0).
                 - 'reg_lambda' (float, optional): L2 regularization term on weights (default is 1.0).
-            - 'svm': Hyperparameters for the SVM model.
-                - 'C_svm' (float): Regularization parameter.
-                - 'kernel_svm' (str): Specifies the kernel type to be used in the algorithm.
+            - 'ada': Hyperparameters for the AdaBoost model.
+                - 'n_estimators_ada' (int): Number of boosting rounds.
+                - 'learning_rate_ada' (float): Boosting learning rate.
             - 'logreg': Hyperparameters for the Logistic Regression model.
                 - 'C_logreg' (float): Inverse of regularization strength (smaller values specify stronger regularization).
                 - 'penalty' (str, optional): Used to specify the norm used in the penalization ('l1' or 'l2', default is 'l2').
@@ -318,18 +308,10 @@ def train_ensemble_model(best_params, X_train, y_train, model_path):
         n_jobs=2
     )
 
-    # Bagged SVM Model
-    bagged_svm = BaggingClassifier(
-        estimator=SVC(
-            # Regularization strength for SVM (higher C = less regularization)
-            C=best_params['svm']['C_svm'],
-            kernel=best_params['svm']['kernel_svm'],
-            probability=True,
-            class_weight='balanced',
-            random_state=42
-        ),
-        n_estimators=10,  # Number of bagged models
-        n_jobs=2,
+    # AdaBoost model
+    ada_model = AdaBoostClassifier(
+        n_estimators=best_params['ada']['n_estimators_ada'],
+        learning_rate=best_params['ada']['learning_rate_ada'],
         random_state=42
     )
 
@@ -349,9 +331,9 @@ def train_ensemble_model(best_params, X_train, y_train, model_path):
         max_iter=2000
     )
 
-    # Stacking ensemble with Bagged SVM and XGBoost as base models
+    # Stacking ensemble with AdaBoost and XGBoost as base models
     stacking_model = StackingClassifier(
-        estimators=[('bagged_svm', bagged_svm), ('xgb', xgb_model)],
+        estimators=[('ada', ada_model), ('xgb', xgb_model)],
         final_estimator=meta_model
     )
 

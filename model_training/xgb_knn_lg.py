@@ -1,6 +1,7 @@
 # Standard Libraries
 import os  # Interact with the operating system
 import logging  # Logging library
+import json  # JSON encoder and decoder
 from transformers.utils import logging as transformers_logging
 import warnings  # Warning control
 import numpy as np  # Numerical operations
@@ -43,7 +44,7 @@ from spamandphishingdetection import (
     BERTFeatureTransformer,
     RareCategoryRemover,
     run_pipeline_or_load,
-    main_model_training,
+    xgb_knn_lg_model_training,
     plot_learning_curve
 )
 
@@ -295,10 +296,15 @@ def main():
             # ***************************************** #
             logging.info(
                 f"Beginning Model Training and Evaluation for Fold {fold_idx}...")
+            with open(os.path.join(os.path.dirname(__file__), '..', 'config.json')) as config_file:
+                config = json.load(config_file)
+                base_dir = config['base_dir']
             # Train the model and evaluate the performance for each fold
-            model_path = get_model_path(config, fold_idx)
-            params_path = get_params_path(config, fold_idx)
-            ensemble_model, test_accuracy = main_model_training(
+            model_path = os.path.join(
+                base_dir, 'model_training', 'stacked_models', f'XGB_KNN_LG_Fold_{fold_idx}.pkl')
+            params_path = os.path.join(base_dir, 'model_training', 'stacked_models',
+                                       'params', f'XGB_KNN_LG_Best_Params_Fold_{fold_idx}.json')
+            ensemble_model, test_accuracy = xgb_knn_lg_model_training(
                 X_train_balanced,
                 y_train_balanced,
                 X_test_combined,
@@ -334,8 +340,8 @@ def main():
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")
-        return
 
 
+# Call the main function
 if __name__ == "__main__":
     main()

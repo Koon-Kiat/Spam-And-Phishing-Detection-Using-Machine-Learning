@@ -1,6 +1,6 @@
-# Standard Libraries
 import os  # Interact with the operating system
 import logging  # Logging library
+import sys  # System-specific parameters and functions
 from transformers.utils import logging as transformers_logging
 import warnings  # Warning control
 import numpy as np  # Numerical operations
@@ -10,11 +10,18 @@ import spacy  # NLP library
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler  # Preprocessing
 import email  # Email handling
 import email.policy  # Email policies
 from imblearn.over_sampling import SMOTE  # Handling imbalanced data
 import tensorflow as tf  # TensorFlow library
+from sklearn.linear_model import LogisticRegression  # Logistic Regression
+from xgboost import XGBClassifier  # XGBoost Classifier
+from sklearn.svm import SVC  # Support Vector Classifier
+from sklearn.ensemble import RandomForestClassifier  # Random Forest Classifier
+# K-Nearest Neighbors Classifier
+from sklearn.neighbors import KNeighborsClassifier
+from lightgbm import LGBMClassifier  # LightGBM Classifier
 from bs4 import MarkupResemblesLocatorWarning  # HTML and XML parsing
 from datasets import load_dataset  # Load datasets
 from spamandphishingdetection import (
@@ -28,6 +35,7 @@ from spamandphishingdetection import (
     check_missing_values,
     feature_engineering,
     load_or_save_emails,
+    process_and_save_emails,
     merge_dataframes,
     verify_merged_dataframe,
     combine_dataframes,
@@ -43,16 +51,14 @@ from spamandphishingdetection import (
     BERTFeatureTransformer,
     RareCategoryRemover,
     run_pipeline_or_load,
-    main_model_training,
+    base_model_training_optuna,
     plot_learning_curve
 )
 
+
 # Main processing function
-
-
 def main():
     nlp, loss_fn = initialize_environment(__file__)
-
     config = load_config("config.json")
     file_paths = get_file_paths(config)
 
@@ -296,36 +302,28 @@ def main():
             logging.info(
                 f"Beginning Model Training and Evaluation for Fold {fold_idx}...")
             # Train the model and evaluate the performance for each fold
-            model_path = get_model_path(config, fold_idx)
-            params_path = get_params_path(config, fold_idx)
-            ensemble_model, test_accuracy = main_model_training(
-                X_train_balanced,
-                y_train_balanced,
-                X_test_combined,
-                y_test,
-                model_path=model_path,
-                params_path=params_path,
-            )
+            models = {
+                "Logistic Regression": LogisticRegression(max_iter=2000),
+                "XGBoost": XGBClassifier(eval_metric='mlogloss'),
+                "SVM": SVC(probability=True),
+                "Random Forest": RandomForestClassifier(),
+                "KNN": KNeighborsClassifier(),
+                "LightGBM": LGBMClassifier()
+            }
+            for model_name, model in models.items():
+                logging.info(
+                    f"Training {model_name} model for Fold {fold_idx}...")
+                ensemble_model, test_accuracy = base_model_training_optuna(
+                    X_train_balanced,
+                    y_train_balanced,
+                    X_test_combined,
+                    y_test,
+                    model,
+                    model_name
+                )
             fold_test_accuracies.append(test_accuracy)
             logging.info(
                 f"Data for Fold {fold_idx} has been processed, model trained, and evaluated.\n")
-
-            # Store learning curve data for later plotting
-            learning_curve_data.append(
-                (X_train_balanced, y_train_balanced, ensemble_model, fold_idx))
-
-            # ********************************* #
-            #       Plot Learning Curves        #
-            # ********************************* #
-            for X_train, y_train, ensemble_model, fold_idx in learning_curve_data:
-                plot_learning_curve(
-                    estimator=ensemble_model,
-                    X=X_train,
-                    y=y_train,
-                    title=f"Learning Curve for Fold {fold_idx}",
-                    train_sizes=np.linspace(0.1, 1.0, 6),
-                    cv=6
-                )
 
         logging.info(f"Training and evaluation completed for all folds.\n")
         # Calculate and log the overall test accuracy
@@ -334,8 +332,8 @@ def main():
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")
-        return
 
 
+# Call the main function
 if __name__ == "__main__":
     main()

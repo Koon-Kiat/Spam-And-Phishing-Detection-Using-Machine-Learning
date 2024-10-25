@@ -4,7 +4,7 @@ import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 
 
-def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='data_splitting'):
+def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='data_pipeline/data_splitting'):
     """
     Performs Stratified K-Fold splitting on the DataFrame.
 
@@ -51,8 +51,8 @@ def stratified_k_fold_split(df, n_splits=3, random_state=42, output_dir='data_sp
         # Log the distribution of each split
         y_train_counts = y_train.value_counts().to_dict()
         y_test_counts = y_test.value_counts().to_dict()
-        logging.info(f"Fold {
-                     fold_idx} - y_train distribution: {y_train_counts}, Total: {len(y_train)}")
+        logging.info(
+            f"Fold {fold_idx} - y_train distribution: {y_train_counts}, Total: {len(y_train)}")
         logging.info(
             f"Fold {fold_idx} - y_test distribution: {y_test_counts}, Total: {len(y_test)}")
         logging.info(

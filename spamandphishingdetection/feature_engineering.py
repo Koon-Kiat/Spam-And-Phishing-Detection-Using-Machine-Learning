@@ -351,8 +351,8 @@ def load_or_extract_headers(df: pd.DataFrame, file_path: str, extractor_class, d
 
         return pd.read_csv(file_path)
     else:
-        logging.info(f"File {file_path} does not exist. Extracting headers for dataset: {
-                     dataset_type}.")
+        logging.info(
+            f"File {file_path} does not exist. Extracting headers for dataset: {dataset_type}.")
         header_extractor = extractor_class(df)
 
         # Check dataset type and call the corresponding extraction function
@@ -361,11 +361,11 @@ def load_or_extract_headers(df: pd.DataFrame, file_path: str, extractor_class, d
         elif dataset_type == "CEAS_08":
             headers_df = header_extractor.extract_headers_ceas()
         else:
-            raise ValueError(f"Unknown dataset type: {
-                             dataset_type}. Please specify either 'Spam Assassin' or 'CEAS_08'.")
+            raise ValueError(
+                f"Unknown dataset type: {dataset_type}. Please specify either 'Spam Assassin' or 'CEAS_08'.")
         header_extractor.save_to_csv(file_path)
-        logging.info(f"Email header extraction and saving to {
-                     file_path} completed for dataset: {dataset_type}.")
+        logging.info(
+            f"Email header extraction and saving to {file_path} completed for dataset: {dataset_type}.")
 
         return headers_df
 
@@ -395,13 +395,15 @@ def process_spamassassin_headers(df):
     df.drop(columns=['mailto', 'texturls'], inplace=True)
     return df
 
+
 def feature_engineering(df_processed_spamassassin, df_processed_ceas, file_paths):
     logging.info(f"Beginning Feature Engineering...")
 
     # Extract email headers from the SpamAssassin dataset
     spamassassin_headers_df = load_or_extract_headers(
         df_processed_spamassassin, file_paths['extracted_spam_assassin_email_header_file'], EmailHeaderExtractor, 'Spam Assassin')
-    spamassassin_headers_df = process_spamassassin_headers(spamassassin_headers_df)
+    spamassassin_headers_df = process_spamassassin_headers(
+        spamassassin_headers_df)
 
     ceas_headers_df = load_or_extract_headers(
         df_processed_ceas, file_paths['extracted_ceas_email_header_file'], EmailHeaderExtractor, 'CEAS_08')

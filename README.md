@@ -24,7 +24,9 @@ To set up the project, clone the repository and install the necessary dependenci
 ```bash
 git clone https://github.com/Koon-Kiat/Detecting-Spam-and-Phishing-Emails-Using-Machine-Learning
 cd Detecting-Spam-and-Phishing-Emails-Using-Machine-Learning
-pip install -r requirements.txt
+conda create --name <your_environment_name> python=3.8.20
+conda activate <your_environment_name>
+conda env update --file environment.yaml --prune
 ```
 
 Once the dependencies are installed, you can run the phishing email detection program using the following command:
@@ -48,23 +50,16 @@ TThe project integrates the **[Spam Assassin](https://huggingface.co/datasets/ta
 
 ```plaintext
 project_root/
-│
-├── data_cleaning/
-│
-├── data_integration/
-│
-├── data_preprocessing/
-│
-├── noise_injection/
-│
-├── data_splitting/
-│
-├── feature_engineering/
-│
-├── feature_extraction/
-│
-└── models_and_parameters/
+├── data_pipeline/
+│   ├── data_integration/
+│   ├── data_preprocessing/
+│   ├── noise_injection/
+│   ├── data_splitting/
+│   ├── feature_engineering/
+│   ├── feature_extraction/
+│   └── models_and_parameters/
 ```
+
 
 ## Model Training Methodologies
 

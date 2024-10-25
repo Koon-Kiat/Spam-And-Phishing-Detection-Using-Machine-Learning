@@ -2,7 +2,7 @@ import os
 import logging
 import joblib
 import numpy as np
-import pickle
+from joblib import dump, load
 from collections import Counter
 
 
@@ -76,12 +76,12 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, d
 
         # Check for consistent number of features
         if X_train_non_text_processed.shape[1] != X_test_non_text_processed.shape[1]:
-            logging.error(f"Feature mismatch: {X_train_non_text_processed.shape[1]} vs {
-                          X_test_non_text_processed.shape[1]}")
+            logging.error(
+                f"Feature mismatch: {X_train_non_text_processed.shape[1]} vs {X_test_non_text_processed.shape[1]}")
 
         if X_train_non_text_processed.shape[0] != y_train.shape[0]:
-            logging.error(f"Row mismatch: {X_train_non_text_processed.shape[0]} vs {
-                          y_train.shape[0]}")
+            logging.error(
+                f"Row mismatch: {X_train_non_text_processed.shape[0]} vs {y_train.shape[0]}")
         logging.info(f"Non text features processed for fold {fold_idx}.\n")
 
         # Save the preprocessor
@@ -96,8 +96,8 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, d
         logging.info(f"Extracting BERT features for X_test for {fold_idx}...")
         X_test_text_processed = pipeline.named_steps['bert_features'].transform(
             X_test['cleaned_text'].tolist())
-        logging.info(f"Number of features extracted from BERT for fold {
-                     fold_idx}: {X_train_text_processed.shape}")
+        logging.info(
+            f"Number of features extracted from BERT for fold {fold_idx}: {X_train_text_processed.shape}")
         logging.info(f"Bert features extracted for fold {fold_idx}.\n")
 
         # Combine processed features
@@ -106,31 +106,18 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, d
             [X_train_non_text_processed, X_train_text_processed])
         X_test_combined = np.hstack(
             [X_test_non_text_processed, X_test_text_processed])
-        logging.info(f"Total number of combined features for fold {
-                     fold_idx}: {X_train_combined.shape}")
+        logging.info(
+            f"Total number of combined features for fold {fold_idx}: {X_train_combined.shape}")
         logging.info(f"Combined processed features for fold {fold_idx}.\n")
-
-        logging.info(f"Class distribution before SMOTE for fold {
-                     fold_idx}: {Counter(y_train)}")
+        logging.info(
+            f"Class distribution before SMOTE for fold {fold_idx}: {Counter(y_train)}")
         logging.info(
             f"Applying SMOTE to balance the training data for fold {fold_idx}...")
         X_train_balanced, y_train_balanced = pipeline.named_steps['smote'].fit_resample(
             X_train_combined, y_train)
-        logging.info(f"Class distribution after SMOTE for fold {
-                     fold_idx}: {Counter(y_train_balanced)}")
+        logging.info(
+            f"Class distribution after SMOTE for fold {fold_idx}: {Counter(y_train_balanced)}")
         logging.info(f"SMOTE applied for fold {fold_idx}.\n")
-
-        '''
-        logging.info(f"Applying PCA for dimensionality reduction for fold {fold_idx}...")
-        X_train_balanced = pipeline.named_steps['pca'].fit_transform(X_train_balanced)
-        X_test_combined = pipeline.named_steps['pca'].transform(X_test_combined)
-
-
-        # Log the number of features after PCA
-        n_components = pipeline.named_steps['pca'].n_components_
-        logging.info(f"Number of components after PCA: {n_components}")
-        logging.info(f"Shape of X_train after PCA: {X_train_balanced.shape}")
-        '''
         logging.info(f"Shape of X_train: {X_train_balanced.shape}")
 
         # Save the preprocessed data
@@ -169,9 +156,11 @@ def save_data_pipeline(data, labels, data_path, labels_path):
     labels_path : str
         The file path to save the labels.
     """
+    # Save the data using np.savez
     np.savez(data_path, data=data)
-    with open(labels_path, 'wb') as f:
-        pickle.dump(labels, f)
+
+    # Save the labels using joblib
+    dump(labels, labels_path)
 
 
 def load_data_pipeline(data_path, labels_path):
@@ -190,9 +179,12 @@ def load_data_pipeline(data_path, labels_path):
     tuple
         A tuple containing the loaded data and labels.
     """
+    # Load the data using np.load
     data = np.load(data_path)['data']
-    with open(labels_path, 'rb') as f:
-        labels = pickle.load(f)
+
+    # Load the labels using joblib
+    labels = load(labels_path)
+
     return data, labels
 
 
