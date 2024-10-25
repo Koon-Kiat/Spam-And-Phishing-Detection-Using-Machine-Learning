@@ -50,23 +50,16 @@ TThe project integrates the **[Spam Assassin](https://huggingface.co/datasets/ta
 
 ```plaintext
 project_root/
-│
-├── data_cleaning/
-│
-├── data_integration/
-│
-├── data_preprocessing/
-│
-├── noise_injection/
-│
-├── data_splitting/
-│
-├── feature_engineering/
-│
-├── feature_extraction/
-│
-└── models_and_parameters/
+├── data_pipeline/
+│   ├── data_integration/
+│   ├── data_preprocessing/
+│   ├── noise_injection/
+│   ├── data_splitting/
+│   ├── feature_engineering/
+│   ├── feature_extraction/
+│   └── models_and_parameters/
 ```
+
 
 ## Model Training Methodologies
 
