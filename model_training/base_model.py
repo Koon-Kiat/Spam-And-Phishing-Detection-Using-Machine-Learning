@@ -56,6 +56,8 @@ from spamandphishingdetection import (
 )
 
 # Main processing function
+
+
 def main():
     nlp, loss_fn = initialize_environment(__file__)
     config = load_config("config.json")
@@ -205,7 +207,7 @@ def main():
         # ************************* #
         logging.info(f"Beginning Data Cleaning ['body']...")
         df_clean_body = load_or_clean_data(
-            'Merged Dataframe', combined_df, 'body', "data_cleaning/cleaned_data_frame.csv", data_cleaning)
+            'Merged Dataframe', combined_df, 'body', "data_pipeline/data_cleaning/cleaned_data_frame.csv", data_cleaning)
 
         # Verifying the Cleaned Combine DataFrame
         # Concatenate the Cleaned DataFrame with the Merged DataFrame
@@ -223,7 +225,7 @@ def main():
         # ***************************** #
         logging.info(f"Beginning Noise Injection...")
         noisy_df = generate_noisy_dataframe(
-            df_cleaned_combined, 'noise_injection/noisy_data_frame.csv')
+            df_cleaned_combined, 'data_pipeline/noise_injection/noisy_data_frame.csv')
         logging.info(f"Noise Injection completed.\n")
 
         # ************************* #
@@ -290,7 +292,7 @@ def main():
                 y_train=y_train,
                 y_test=y_test,
                 pipeline=pipeline,
-                dir='feature_extraction',
+                dir='data_pipeline/feature_extraction',
             )
             logging.info(
                 f"Data for Fold {fold_idx} has been processed or loaded successfully.\n")
