@@ -18,8 +18,8 @@ with open(os.path.join(os.path.dirname(__file__), '..', '..', 'config.json')) as
     base_dir = config['base_dir']
 
 # Define model_path and param_path
-model_path = os.path.join(base_dir, 'model_training', 'base_model_optuna')
-param_path = os.path.join(base_dir, 'model_training', 'base_model_optuna')
+model_path = os.path.join(base_dir, 'additional_model_training', 'base_model_optuna')
+param_path = os.path.join(base_dir, 'additional_model_training', 'base_model_optuna')
 
 
 def conduct_optuna_study(X_train, y_train, model_name):

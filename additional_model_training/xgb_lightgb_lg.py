@@ -44,7 +44,7 @@ from spamandphishingdetection import (
     BERTFeatureTransformer,
     RareCategoryRemover,
     run_pipeline_or_load,
-    xgb_ada_lg_model_training,
+    xgb_lightgb_lg_model_training,
     plot_learning_curve
 )
 
@@ -290,20 +290,21 @@ def main():
             )
             logging.info(
                 f"Data for Fold {fold_idx} has been processed or loaded successfully.\n")
+
             # ***************************************** #
             #       Model Training and Evaluation       #
             # ***************************************** #
             logging.info(
                 f"Beginning Model Training and Evaluation for Fold {fold_idx}...")
+            # Train the model and evaluate the performance for each fold
             with open(os.path.join(os.path.dirname(__file__), '..', 'config.json')) as config_file:
                 config = json.load(config_file)
                 base_dir = config['base_dir']
-            # Train the model and evaluate the performance for each fold
             model_path = os.path.join(
-                base_dir, 'model_training', 'stacked_models', f'XGB_ADA_LG_Fold_{fold_idx}.pkl')
-            params_path = os.path.join(base_dir, 'model_training', 'stacked_models',
-                                       'params', f'XGB_ADA_LG_Best_Params_Fold_{fold_idx}.json')
-            ensemble_model, test_accuracy = xgb_ada_lg_model_training(
+                base_dir, 'additional_model_training', 'stacked_models', f'XGB_LightGB_LG_Fold_{fold_idx}.pkl')
+            params_path = os.path.join(base_dir, 'additional_model_training', 'stacked_models',
+                                       'params',  f'XGB_LightGB_LG_Best_Params_Fold_{fold_idx}.json')
+            ensemble_model, test_accuracy = xgb_lightgb_lg_model_training(
                 X_train_balanced,
                 y_train_balanced,
                 X_test_combined,
