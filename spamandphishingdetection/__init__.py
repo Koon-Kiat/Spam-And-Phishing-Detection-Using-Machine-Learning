@@ -13,7 +13,7 @@ from .file_operations import load_config, get_file_paths, get_model_path, get_pa
 from .dataset_processor import DatasetProcessor
 from .label_processing import log_label_percentages
 from .missing_values import check_missing_values
-from .feature_engineering import feature_engineering
+from .feature_engineering import feature_engineering, count_urls
 from .data_cleaning_headers import load_or_save_emails, process_and_save_emails
 from .data_integration import (
     merge_dataframes,
