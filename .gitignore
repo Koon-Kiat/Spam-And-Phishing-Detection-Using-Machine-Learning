@@ -1,6 +1,7 @@
 *.pkl
 *.csv
 !ceas_08.csv
+!phishing_email.csv
 *.eml
 *.npz
 *.env
