@@ -80,12 +80,15 @@ project_root/
 ├── templates/
 ├── third_dataset_evaluation/
 ```
+
 ## Technology Stack
 
 ### Programming Languages
+
 - **Python**
 
 ### Libraries and Frameworks
+
 - **Machine Learning**: scikit-learn, TensorFlow, transformers, imbalanced-learn
 - **NLP**: NLTK
 - **Data Handling**: pandas, numpy
@@ -93,10 +96,12 @@ project_root/
 - **Optimization**: Optuna
 
 ### Tools
+
 - **Version Control**: Git
 - **Environment Management**: Anaconda
 
 ### Additional Technologies
+
 - **Feature Extraction**: BERT
 - **Ensemble Learning**: XGBoost, Bagged SVM, Logistic Regression, Stacked Ensemble Learning
 - **Data Preprocessing**: One-Hot Encoding, Standard Scaling, Imputation, Rare Category Removal, Noise Injection
@@ -105,32 +110,38 @@ project_root/
 - **Noise Injection**: Adding controlled random variations to features to improve model generalization and reduce overfitting
 - **Stacked Ensemble Learning**: Combining multiple models for robust detection
 
-
 ## Methodologies
 
 ### Data Preprocessing
+
 - **Cleaning**: Removing duplicates, handling missing values, and correcting errors.
 - **Imputation**: Filling in missing values using appropriate strategies.
 - **Scaling**: Normalizing or standardizing features to improve model performance.
 
 ### Feature Engineering
+
 - **BERT for Feature Extraction**: Enhancing contextual understanding of email content.
 - **Other Techniques**: Applying additional feature extraction methods to improve model accuracy.
 
 ### Data Integration
+
 - **Merging Datasets**: Combining SpamAssassin and CEAS datasets.
 - **Ensuring Consistency**: Aligning columns and labels for a unified dataset.
 
 ### Noise Injection
+
 - **Controlled Variations**: Adding random variations to features to improve model generalization and reduce overfitting.
 
 ### Cross-Validation
+
 - **Stratified K-fold**: Ensuring model generalization by maintaining the proportion of classes in each fold.
 
 ### Model Training
+
 - **Ensemble Learning**: Using techniques like XGBoost, Bagged SVM, and Logistic Regression for robust detection.
 
 ### Evaluation
+
 - **Metrics**: Accuracy, precision, recall, F1-score.
 - **Confusion Matrix**: Displaying the performance of each model.
 - **Learning Curves**: Visualizing model performance as a function of training data size.
@@ -179,18 +190,20 @@ The accompanying Flask application provides a user-friendly interface where user
 
 ### Key Features:
 
-- **User Interface**: 
+- **User Interface**:
+
   - The main interface is provided by `index.html` and `taskpane.html` located in the `templates` folder.
   - Users can upload or paste email content for evaluation.
 
-- **Instant Feedback**: 
+- **Instant Feedback**:
+
   - The `/evaluateEmail` endpoint processes the email content and returns immediate results, flagging malicious content.
   - This endpoint utilizes the `single_model_evaluation` module for classification.
 
-- **Integration**: 
+- **Integration**:
   - The Flask app communicates with the machine learning model backend for classification.
   - Static assets such as icons are served from the `static/assets` folder.
 
 ### Example Usage:
-To evaluate an email, users can navigate to the main interface, input the email content, and submit it for evaluation. The system will process the input and provide instant feedback on whether the email is "Safe" or "Not Safe."
 
+To evaluate an email, users can navigate to the main interface, input the email content, and submit it for evaluation. The system will process the input and provide instant feedback on whether the email is "Safe" or "Not Safe."
