@@ -6,20 +6,18 @@
 ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues-pr/Koon-Kiat/Detecting-Spam-and-Phishing-Emails-Using-Machine-Learning)
 ![GitHub Repo stars](https://img.shields.io/github/stars/Koon-Kiat/Detecting-Spam-and-Phishing-Emails-Using-Machine-Learning?style=flat)
 
-
 ## Overview
 
 This project leverages advanced machine learning algorithms to detect and classify malicious emails, focusing on spam and phishing threats. As email threats grow more sophisticated, accurate detection is critical to ensuring the security and privacy of both individuals and organizations.
 
-Our solution applies a combination of processes such as data preprocessing, feature engineering, and model training techniques to identify spam and phishing emails. While we implemented specific steps for data cleaning and feature extraction, these were not integrated into a single machine learning pipeline. The project addresses real-world challenges like imbalanced datasets by utilizing SpamAssassin and CEAS datasets for training and evaluation, ultimately enhancing the model's ability to filter phishing and spam emails effectively.
+Our solution applies a combination of processes such as data preprocessing, feature engineering, and model training techniques to identify spam and phishing emails. The project addresses real-world challenges like imbalanced datasets by utilizing SpamAssassin and CEAS datasets for training and evaluation, ultimately enhancing the model's ability to filter phishing and spam emails effectively.
 
-Key Technologies:
+## Key Technologies
 
-- **BERT for Feature Extraction**: We use Bidirectional Encoder Representations from Transformers (BERT) to enhance contextual understanding of email content.
-- **Stacked Ensemble Learning**: The model ensemble combines XGBoost, Bagged SVM, and Logistic Regression, providing a robust solution for detecting phishing emails.
-- **Optuna for Hyperparameter Tuning**: Optuna optimizes the model's performance by fine-tuning key parameters.
-
-The project also includes a Flask web application that serves as a user interface, enabling users to receive real-time classifications on their inboxes on whether emails are "Safe" or "Not Safe."
+- **BERT for Feature Extraction**: Enhances contextual understanding of email content.
+- **Stacked Ensemble Learning**: Combines XGBoost, Bagged SVM, and Logistic Regression for robust detection.
+- **Optuna for Hyperparameter Tuning**: Optimizes model performance by fine-tuning key parameters.
+- **Flask**: Provides a web interface for real-time email classification.
 
 ## Installation
 
@@ -54,6 +52,10 @@ TThe project integrates the **[Spam Assassin](https://huggingface.co/datasets/ta
 
 ```plaintext
 project_root/
+├── additional_model_training/
+│   ├── base_model_optuna.py
+│   ├── base_model.py
+├── config.json
 ├── data_pipeline/
 │   ├── data_integration/
 │   ├── data_preprocessing/
@@ -62,29 +64,78 @@ project_root/
 │   ├── feature_engineering/
 │   ├── feature_extraction/
 │   └── models_and_parameters/
+├── datasets/
+├── evaluation_on_third_dataset.py
+├── evaluationonthirddataset/
+├── flask_app.py
+├── logs/
+├── main.py
+├── manifest_python.xml
+├── multi_model_evaluation/
+├── README.md
+├── requirements.txt
+├── single_model_evaluation/
+├── spamandphishingdetection/
+├── static/
+├── templates/
+├── third_dataset_evaluation/
 ```
+## Technology Stack
+
+### Programming Languages
+- **Python**
+
+### Libraries and Frameworks
+- **Machine Learning**: scikit-learn, TensorFlow, transformers, imbalanced-learn
+- **NLP**: NLTK
+- **Data Handling**: pandas, numpy
+- **Web Framework**: Flask
+- **Optimization**: Optuna
+
+### Tools
+- **Version Control**: Git
+- **Environment Management**: Anaconda
+
+### Additional Technologies
+- **Feature Extraction**: BERT
+- **Ensemble Learning**: XGBoost, Bagged SVM, Logistic Regression, Stacked Ensemble Learning
+- **Data Preprocessing**: One-Hot Encoding, Standard Scaling, Imputation, Rare Category Removal, Noise Injection
+- **Model Evaluation**: Stratified K-fold Cross-Validation, Confusion Matrix, Classification Reports
+- **Regularization**: L1, L2
+- **Noise Injection**: Adding controlled random variations to features to improve model generalization and reduce overfitting
+- **Stacked Ensemble Learning**: Combining multiple models for robust detection
 
 
-## Model Training Methodologies
+## Methodologies
 
-The following methodologies were employed to enhance the model's performance:
+### Data Preprocessing
+- **Cleaning**: Removing duplicates, handling missing values, and correcting errors.
+- **Imputation**: Filling in missing values using appropriate strategies.
+- **Scaling**: Normalizing or standardizing features to improve model performance.
 
-- **BERT Feature Extraction**: Leveraging BERT to extract contextual features from email content, which improves the model's understanding of the text.
+### Feature Engineering
+- **BERT for Feature Extraction**: Enhancing contextual understanding of email content.
+- **Other Techniques**: Applying additional feature extraction methods to improve model accuracy.
 
-- **Ensemble Learning**: Combining multiple models (e.g., Logistic Regression, SVM, XGBoost) using meta-modeling techniques to improve predictive performance and robustness.'
+### Data Integration
+- **Merging Datasets**: Combining SpamAssassin and CEAS datasets.
+- **Ensuring Consistency**: Aligning columns and labels for a unified dataset.
 
-- **Noise Injection**: Adding controlled random variations to features to improve model generalization and reduce overfitting.
+### Noise Injection
+- **Controlled Variations**: Adding random variations to features to improve model generalization and reduce overfitting.
 
-- **Hyperparameter Optimization with Optuna**: Using Optuna to systematically tune model hyperparameters, ensuring optimal settings for better accuracy and reduced overfitting.
+### Cross-Validation
+- **Stratified K-fold**: Ensuring model generalization by maintaining the proportion of classes in each fold.
 
-- **Cross-Validation**: Implementing stratified K-fold cross-validation to ensure the model generalizes well across different subsets of data.
+### Model Training
+- **Ensemble Learning**: Using techniques like XGBoost, Bagged SVM, and Logistic Regression for robust detection.
 
-- **Preprocessing Pipelines**: Utilizing pipelines that include:
+### Evaluation
+- **Metrics**: Accuracy, precision, recall, F1-score.
+- **Confusion Matrix**: Displaying the performance of each model.
+- **Learning Curves**: Visualizing model performance as a function of training data size.
 
-  - **Rare Category Removal**: To eliminate categories with very few occurrences, enhancing model performance.
-  - **Imputation**: Filling missing values in the dataset.
-  - **Encoding**: Applying One-Hot Encoding for categorical variables.
-  - **Standard Scaling**: Normalizing numerical features for improved model performance.
+These results are stored in the `data_pipeline` folder.
 
 ## Evaluation
 
@@ -124,19 +175,22 @@ weighted avg      0.XX      0.XX      0.XX      XX
 
 ## Flask Application
 
-The accompanying Flask application provides a user-friendly interface where users can input email content for real-time phishing detection. The system returns an analysis of whether an email is "Safe" or "Not Safe."
+The accompanying Flask application provides a user-friendly interface where users can input email content for real-time spam and phishing detection. The system returns an analysis of whether an email is "Safe" or "Not Safe."
 
 ### Key Features:
 
-- **User Interface**: A simple email input form that allows users to upload or paste email content.
-- **Instant Feedback**: Provides immediate results, flagging malicious content.
-- **Integration**: The app communicates with the machine learning model backend for classification.
+- **User Interface**: 
+  - The main interface is provided by `index.html` and `taskpane.html` located in the `templates` folder.
+  - Users can upload or paste email content for evaluation.
 
-### Future Enhancements
+- **Instant Feedback**: 
+  - The `/evaluateEmail` endpoint processes the email content and returns immediate results, flagging malicious content.
+  - This endpoint utilizes the `single_model_evaluation` module for classification.
 
-The project will continue evolving with the goal of improving model scalability and enhancing integration with platforms like Microsoft Outlook for automatic phishing email detection and flagging.
+- **Integration**: 
+  - The Flask app communicates with the machine learning model backend for classification.
+  - Static assets such as icons are served from the `static/assets` folder.
 
-## Additional Files
+### Example Usage:
+To evaluate an email, users can navigate to the main interface, input the email content, and submit it for evaluation. The system will process the input and provide instant feedback on whether the email is "Safe" or "Not Safe."
 
-- **Dataset Evaluation**: Utilized for assessing the model on an additional dataset.
-- **Multi-Model Evaluation**: Employed for batch testing models on sample emails.
