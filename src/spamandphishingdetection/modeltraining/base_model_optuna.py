@@ -11,15 +11,17 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from lightgbm import LGBMClassifier
-
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
 with open(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', 'config.json')) as config_file:
     config = json.load(config_file)
     base_dir = config['base_dir']
 
 # Define model_path and param_path
-model_path = os.path.join(base_dir, 'additional_model_training', 'base_models_optuna')
-param_path = os.path.join(base_dir, 'additional_model_training', 'base_models_optuna')
+model_path = os.path.join(
+    base_dir, 'output', 'additional_models', 'base_models_optuna')
+param_path = os.path.join(
+    base_dir, 'output', 'additional_models', 'base_models_optuna')
 
 
 def conduct_optuna_study(X_train, y_train, model_name):
