@@ -122,9 +122,9 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, d
 
         # Save the preprocessed data
         logging.info(f"Saving processed data for fold {fold_idx}...")
-        save_data_pipeline(X_train_balanced, y_train_balanced,
+        save_output(X_train_balanced, y_train_balanced,
                            train_data_path, train_labels_path)
-        save_data_pipeline(X_test_combined, y_test,
+        save_output(X_test_combined, y_test,
                            test_data_path, test_labels_path)
     else:
         # Load the preprocessor
@@ -133,15 +133,15 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, d
 
         # Load the preprocessed data
         logging.info(f"Loading preprocessed data for fold {fold_idx}...")
-        X_train_balanced, y_train_balanced = load_data_pipeline(
+        X_train_balanced, y_train_balanced = load_output(
             train_data_path, train_labels_path)
-        X_test_combined, y_test = load_data_pipeline(
+        X_test_combined, y_test = load_output(
             test_data_path, test_labels_path)
 
     return X_train_balanced, X_test_combined, y_train_balanced, y_test
 
 
-def save_data_pipeline(data, labels, data_path, labels_path):
+def save_output(data, labels, data_path, labels_path):
     """
     Save the data and labels to specified file paths.
 
@@ -163,7 +163,7 @@ def save_data_pipeline(data, labels, data_path, labels_path):
     dump(labels, labels_path)
 
 
-def load_data_pipeline(data_path, labels_path):
+def load_output(data_path, labels_path):
     """
     Load the data and labels from specified file paths.
 
@@ -188,7 +188,7 @@ def load_data_pipeline(data_path, labels_path):
     return data, labels
 
 
-def get_fold_paths(fold_idx, base_dir='feature_extraction'):
+def get_fold_paths(fold_idx, base_dir='output/main_model_evaluation/feature_extraction'):
     """
     Generates file paths for the train and test data and labels for the specified fold.
 
