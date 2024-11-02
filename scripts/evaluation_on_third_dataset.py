@@ -10,7 +10,8 @@ import spacy  # NLP library
 import re  # Regular expressions
 from tqdm import tqdm  # Progress bar
 import joblib  # Joblib library
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report  # Evaluation metrics
+# Evaluation metrics
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 from tabulate import tabulate  # Pretty-print tabular data
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
@@ -30,7 +31,7 @@ from email.parser import BytesParser  # Email parser
 from typing import Dict, List, Union  # Type hints
 import pickle  # Serialization library
 from sklearn.decomposition import PCA  # Dimensionality reduction
-from spamandphishingdetection import (
+from src.spamandphishingdetection import (
     initialize_environment,
     DatasetProcessor,
     count_urls,
@@ -40,14 +41,13 @@ from spamandphishingdetection import (
     BERTFeatureExtractor,
     BERTFeatureTransformer,
 )
-from evaluationonthirddataset import (
+from src.evaluationonthirddataset import (
     load_config,
     get_file_paths,
     load_or_extract_headers,
     EmailHeaderExtractor,
     run_pipeline_or_load
 )
-
 
 
 def main():
@@ -134,8 +134,10 @@ def main():
     else:
         logging.info(
             "The number of rows in the Merge Evaluation Dataframe matches the Processed Evaluation Dataframe.")
-        merged_evaluation.to_csv(file_paths['merged_evaluation_file'], index=False)
-        logging.info(f"Data successfully saved to: {file_paths['merged_evaluation_file']}")
+        merged_evaluation.to_csv(
+            file_paths['merged_evaluation_file'], index=False)
+        logging.info(
+            f"Data successfully saved to: {file_paths['merged_evaluation_file']}")
     logging.info("Data Integration completed.\n")
 
     # ************************* #

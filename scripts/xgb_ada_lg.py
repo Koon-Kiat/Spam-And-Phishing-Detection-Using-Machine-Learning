@@ -53,8 +53,9 @@ from spamandphishingdetection import (
 
 def main():
     nlp, loss_fn = initialize_environment(__file__)
-
-    config = load_config("config.json")
+    config_path = os.path.normpath(os.path.join(
+        os.path.dirname(__file__), '..', 'config', 'config.json'))
+    config = load_config(config_path)
     file_paths = get_file_paths(config)
 
     # Load the datasets
@@ -201,7 +202,7 @@ def main():
         # ************************* #
         logging.info(f"Beginning Data Cleaning ['body']...")
         df_clean_body = load_or_clean_data(
-            'Merged Dataframe', combined_df, 'body', "data_pipeline/data_cleaning/cleaned_data_frame.csv", data_cleaning)
+            'Merged Dataframe', combined_df, 'body', "output/main_model_evaluation/data_cleaning/cleaned_data_frame.csv", data_cleaning)
 
         # Verifying the Cleaned Combine DataFrame
         # Concatenate the Cleaned DataFrame with the Merged DataFrame
@@ -219,7 +220,7 @@ def main():
         # ***************************** #
         logging.info(f"Beginning Noise Injection...")
         noisy_df = generate_noisy_dataframe(
-            df_cleaned_combined, 'data_pipeline/noise_injection/noisy_data_frame.csv')
+            df_cleaned_combined, 'output/main_model_evaluation/noise_injection/noisy_data_frame.csv')
         logging.info(f"Noise Injection completed.\n")
 
         # ************************* #
@@ -286,7 +287,7 @@ def main():
                 y_train=y_train,
                 y_test=y_test,
                 pipeline=pipeline,
-                dir='data_pipeline/feature_extraction',
+                dir='output/main_model_evaluation/feature_extraction',
             )
             logging.info(
                 f"Data for Fold {fold_idx} has been processed or loaded successfully.\n")
@@ -295,13 +296,12 @@ def main():
             # ***************************************** #
             logging.info(
                 f"Beginning Model Training and Evaluation for Fold {fold_idx}...")
-            with open(os.path.join(os.path.dirname(__file__), '..', 'config.json')) as config_file:
-                config = json.load(config_file)
-                base_dir = config['base_dir']
+
+            base_dir = config['base_dir']
             # Train the model and evaluate the performance for each fold
             model_path = os.path.join(
-                base_dir, 'additional_model_training', 'stacked_models', f'XGB_ADA_LG_Fold_{fold_idx}.pkl')
-            params_path = os.path.join(base_dir, 'additional_model_training', 'stacked_models',
+                base_dir, 'output', 'additional_models', 'stacked_models', f'XGB_ADA_LG_Fold_{fold_idx}.pkl')
+            params_path = os.path.join(base_dir, 'output', 'additional_models', 'stacked_models',
                                        'params', f'XGB_ADA_LG_Best_Params_Fold_{fold_idx}.json')
             ensemble_model, test_accuracy = xgb_ada_lg_model_training(
                 X_train_balanced,

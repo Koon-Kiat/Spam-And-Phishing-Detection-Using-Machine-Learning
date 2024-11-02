@@ -5,12 +5,14 @@ import seaborn as sns
 import json
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
-with open(os.path.join(os.path.dirname(__file__), '..', '..', 'config.json')) as config_file:
+with open(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', 'config.json')) as config_file:
     config = json.load(config_file)
     base_dir = config['base_dir']
 
+
 # Define model_path
-model_path = os.path.join(base_dir, 'additional_model_training', 'base_models')
+model_path = os.path.join(base_dir, 'output', 'additional_models', 'base_models')
+os.makedirs(model_path, exist_ok=True)
 
 
 def model_training(X_train, y_train, X_test, y_test, model, model_name):

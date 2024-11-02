@@ -122,10 +122,10 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, d
 
         # Save the preprocessed data
         logging.info(f"Saving processed data for fold {fold_idx}...")
-        save_data_pipeline(X_train_balanced, y_train_balanced,
-                           train_data_path, train_labels_path)
-        save_data_pipeline(X_test_combined, y_test,
-                           test_data_path, test_labels_path)
+        save_output(X_train_balanced, y_train_balanced,
+                    train_data_path, train_labels_path)
+        save_output(X_test_combined, y_test,
+                    test_data_path, test_labels_path)
     else:
         # Load the preprocessor
         logging.info(f"Loading preprocessor from {preprocessor_path}...")
@@ -133,15 +133,15 @@ def run_pipeline_or_load(fold_idx, X_train, X_test, y_train, y_test, pipeline, d
 
         # Load the preprocessed data
         logging.info(f"Loading preprocessed data for fold {fold_idx}...")
-        X_train_balanced, y_train_balanced = load_data_pipeline(
+        X_train_balanced, y_train_balanced = load_output(
             train_data_path, train_labels_path)
-        X_test_combined, y_test = load_data_pipeline(
+        X_test_combined, y_test = load_output(
             test_data_path, test_labels_path)
 
     return X_train_balanced, X_test_combined, y_train_balanced, y_test
 
 
-def save_data_pipeline(data, labels, data_path, labels_path):
+def save_output(data, labels, data_path, labels_path):
     """
     Save the data and labels to specified file paths.
 
@@ -163,7 +163,7 @@ def save_data_pipeline(data, labels, data_path, labels_path):
     dump(labels, labels_path)
 
 
-def load_data_pipeline(data_path, labels_path):
+def load_output(data_path, labels_path):
     """
     Load the data and labels from specified file paths.
 
@@ -188,7 +188,7 @@ def load_data_pipeline(data_path, labels_path):
     return data, labels
 
 
-def get_fold_paths(fold_idx, base_dir='feature_extraction'):
+def get_fold_paths(fold_idx, base_dir):
     """
     Generates file paths for the train and test data and labels for the specified fold.
 
@@ -204,13 +204,27 @@ def get_fold_paths(fold_idx, base_dir='feature_extraction'):
     tuple
         The file paths for the train data, test data, train labels, test labels, and preprocessor.
     """
-    train_data_path = os.path.join(base_dir, f"Fold_{fold_idx}_Train_Data.npz")
-    test_data_path = os.path.join(base_dir, f"Fold_{fold_idx}_Test_Data.npz")
-    train_labels_path = os.path.join(
-        base_dir, f"Fold_{fold_idx}_Train_Labels.pkl")
-    test_labels_path = os.path.join(
-        base_dir, f"Fold_{fold_idx}_Test_Labels.pkl")
-    preprocessor_path = os.path.join(
-        base_dir, f"Fold_{fold_idx}_Preprocessor.pkl")
+    train_data_path = os.path.normpath(os.path.join(
+        base_dir, f"Fold_{fold_idx}_Train_Data.npz"))
+    test_data_path = os.path.normpath(os.path.join(
+        base_dir, f"Fold_{fold_idx}_Test_Data.npz"))
+    train_labels_path = os.path.normpath(os.path.join(
+        base_dir, f"Fold_{fold_idx}_Train_Labels.pkl"))
+    test_labels_path = os.path.normpath(os.path.join(
+        base_dir, f"Fold_{fold_idx}_Test_Labels.pkl"))
+    preprocessor_path = os.path.normpath(os.path.join(
+        base_dir, f"Fold_{fold_idx}_Preprocessor.pkl"))
+
+    # Check if the files exist
+    if not os.path.exists(train_data_path):
+        logging.error(f"Train data file not found: {train_data_path}")
+    if not os.path.exists(test_data_path):
+        logging.error(f"Test data file not found: {test_data_path}")
+    if not os.path.exists(train_labels_path):
+        logging.error(f"Train labels file not found: {train_labels_path}")
+    if not os.path.exists(test_labels_path):
+        logging.error(f"Test labels file not found: {test_labels_path}")
+    if not os.path.exists(preprocessor_path):
+        logging.error(f"Preprocessor file not found: {preprocessor_path}")
 
     return train_data_path, test_data_path, train_labels_path, test_labels_path, preprocessor_path

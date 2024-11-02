@@ -16,7 +16,7 @@ def ensure_directory_exists(path):
 def get_file_paths(config):
     base_dir = config['base_dir']
     file_paths = {
-        'dataset': os.path.join(base_dir, 'datasets', 'phishing_email.csv'),
+        'dataset': os.path.join(base_dir, 'data', 'phishing_email.csv'),
         'preprocessed_evaluation_dataset': os.path.join(
             base_dir, 'third_dataset_evaluation', 'data_preprocessing', 'preprocessed_evaluation_dataset.csv'),
         'extracted_evaluation_header_file': os.path.join(
@@ -27,7 +27,7 @@ def get_file_paths(config):
             base_dir, 'third_dataset_evaluation', 'data_integration', 'merged_evaluation.csv'),
         'merged_cleaned_data_frame': os.path.join(
             base_dir, 'third_dataset_evaluation', 'data_cleaning', 'merged_cleaned_data_frame.csv'),
-        'main_model': os.path.join(base_dir, 'data_pipeline', 'models_and_parameters'),
+        'main_model': os.path.join(base_dir, 'output', 'models_and_parameters'),
         'base_model': os.path.join(
             base_dir, 'additional_model_training', 'base_models'),
         'base_model_optuna': os.path.join(

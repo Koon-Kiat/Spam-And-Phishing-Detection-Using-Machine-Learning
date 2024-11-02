@@ -5,13 +5,13 @@ import numpy as np
 import joblib
 
 
-def save_data_pipeline(data, labels, data_path, labels_path):
+def save_output(data, labels, data_path, labels_path):
     np.savez(data_path, data=data)
     with open(labels_path, 'wb') as f:
         pickle.dump(labels, f)
 
 
-def load_data_pipeline(data_path, labels_path):
+def load_output(data_path, labels_path):
     data = np.load(data_path)['data']
     with open(labels_path, 'rb') as f:
         labels = pickle.load(f)
@@ -76,7 +76,7 @@ def run_pipeline_or_load(data, labels, pipeline, dir):
 
         # Save the preprocessed data
         logging.info("Saving processed data...")
-        save_data_pipeline(data_combined, labels, data_path, labels_path)
+        save_output(data_combined, labels, data_path, labels_path)
     else:
         # Load the preprocessor
         logging.info(f"Loading preprocessor from {preprocessor_path}...")
@@ -84,7 +84,7 @@ def run_pipeline_or_load(data, labels, pipeline, dir):
 
         # Load the preprocessed data
         logging.info("Loading preprocessed data...")
-        data_combined, labels = load_data_pipeline(data_path, labels_path)
+        data_combined, labels = load_output(data_path, labels_path)
 
     return data_combined, labels
 
