@@ -16,8 +16,8 @@ import email.policy  # Email policies
 from imblearn.over_sampling import SMOTE  # Handling imbalanced data
 import tensorflow as tf  # TensorFlow library
 from bs4 import MarkupResemblesLocatorWarning  # HTML and XML parsing
-from datasets import load_dataset  # Load datasets
-from spamandphishingdetection import (
+from datasets import load_dataset  # Load datasets\
+from src.spamandphishingdetection import (
     initialize_environment,
     load_config,
     get_file_paths,
@@ -53,7 +53,7 @@ from spamandphishingdetection import (
 def main():
     nlp, loss_fn = initialize_environment(__file__)
 
-    config = load_config("config.json")
+    config = load_config("config/config.json")
     file_paths = get_file_paths(config)
 
     # Load the datasets
@@ -200,7 +200,7 @@ def main():
         # ************************* #
         logging.info(f"Beginning Data Cleaning ['body']...")
         df_clean_body = load_or_clean_data(
-            'Merged Dataframe', combined_df, 'body', "data_pipeline/data_cleaning/cleaned_data_frame.csv", data_cleaning)
+            'Merged Dataframe', combined_df, 'body', "output/main_model_evaluation/data_cleaning/cleaned_data_frame.csv", data_cleaning)
 
         # Verifying the Cleaned Combine DataFrame
         # Concatenate the Cleaned DataFrame with the Merged DataFrame
@@ -218,7 +218,7 @@ def main():
         # ***************************** #
         logging.info(f"Beginning Noise Injection...")
         noisy_df = generate_noisy_dataframe(
-            df_cleaned_combined, 'data_pipeline/noise_injection/noisy_data_frame.csv')
+            df_cleaned_combined, 'output/main_model_evaluation/noise_injection/noisy_data_frame.csv')
         logging.info(f"Noise Injection completed.\n")
 
         # ************************* #
@@ -285,7 +285,7 @@ def main():
                 y_train=y_train,
                 y_test=y_test,
                 pipeline=pipeline,
-                dir='data_pipeline/feature_extraction',
+                dir='output/main_model_evaluation/feature_extraction',
             )
             logging.info(
                 f"Data for Fold {fold_idx} has been processed or loaded successfully.\n")
