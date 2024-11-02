@@ -12,7 +12,7 @@ This project leverages advanced machine learning algorithms to detect and classi
 
 Our solution applies a combination of processes such as data preprocessing, feature engineering, and model training techniques to identify spam and phishing emails. The project addresses real-world challenges like imbalanced datasets by utilizing SpamAssassin and CEAS datasets for training and evaluation, ultimately enhancing the model's ability to filter phishing and spam emails effectively.
 
-### Key Technologies
+## Key Technologies
 
 - **Programming Language**: Python
 - **ML/DL Libraries**: scikit-learn, TensorFlow, transformers, imbalanced-learn
