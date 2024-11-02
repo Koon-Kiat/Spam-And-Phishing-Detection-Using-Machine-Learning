@@ -1,16 +1,51 @@
+# Data files
 *.pkl
 *.csv
 !ceas_08.csv
 !phishing_email.csv
 *.eml
 *.npz
+
+# Environment files
 *.env
+env/
+venv/
+ENV/
+
+# Log files
 *.log
+
+# Compiled files
+*.pyc
+*.pyo
+*.pyd
+
+# Python cache
 __pycache__/
+
+# Project directories
 backup/
 trash/
 others/
+downloads/
+
+# Configuration files
 config.json
 
+# Python build files
+build/
+develop-eggs/
+dist/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Specific scripts
 email_generator.py
 shap_analysis.py
