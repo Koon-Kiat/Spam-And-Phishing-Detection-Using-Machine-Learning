@@ -48,38 +48,7 @@ The project utilizes merged datasets from SpamAssassin (Hugging Face) and CEAS (
 
 TThe project integrates the **[Spam Assassin](https://huggingface.co/datasets/talby/spamassassin)** and **[CEAS 2008](https://www.kaggle.com/datasets/naserabdullahalam/phishing-email-dataset?select=CEAS_08.csv)** datasets, aligning them by columns and ensuring label consistency. This creates a robust, well-labeled dataset that improves phishing and spam detection accuracy.
 
-## File Structure for Storing Results
 
-```plaintext
-project_root/
-├── additional_model_training/
-│   ├── base_model_optuna.py
-│   ├── base_model.py
-├── config.json
-├── data_pipeline/
-│   ├── data_integration/
-│   ├── data_preprocessing/
-│   ├── noise_injection/
-│   ├── data_splitting/
-│   ├── feature_engineering/
-│   ├── feature_extraction/
-│   └── models_and_parameters/
-├── datasets/
-├── evaluation_on_third_dataset.py
-├── evaluationonthirddataset/
-├── flask_app.py
-├── logs/
-├── main.py
-├── manifest_python.xml
-├── multi_model_evaluation/
-├── README.md
-├── requirements.txt
-├── single_model_evaluation/
-├── spamandphishingdetection/
-├── static/
-├── templates/
-├── third_dataset_evaluation/
-```
 
 ## Technology Stack
 
@@ -146,7 +115,7 @@ project_root/
 - **Confusion Matrix**: Displaying the performance of each model.
 - **Learning Curves**: Visualizing model performance as a function of training data size.
 
-These results are stored in the `data_pipeline` folder.
+These results are stored in the `output` folder.
 
 ## Evaluation
 
