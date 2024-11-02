@@ -73,14 +73,6 @@ The project utilizes merged datasets from SpamAssassin (Hugging Face) and CEAS (
 
 ### Evaluation
 
-- **Metrics**: Accuracy, precision, recall, F1-score.
-- **Confusion Matrix**: Displaying the performance of each model.
-- **Learning Curves**: Visualizing model performance as a function of training data size.
-
-These results are stored in the `output` folder.
-
-## Evaluation
-
 - **Accuracy**: Measures overall prediction correctness.
 - **Precision, Recall, F1-Score:** Evaluates the balance between correct and incorrect classifications.
 - **Confusion Matrix**: Displays the performance of each model in predicting "Safe" vs. "Not Safe" emails.
