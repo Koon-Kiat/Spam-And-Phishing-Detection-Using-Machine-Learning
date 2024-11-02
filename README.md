@@ -12,65 +12,14 @@ This project leverages advanced machine learning algorithms to detect and classi
 
 Our solution applies a combination of processes such as data preprocessing, feature engineering, and model training techniques to identify spam and phishing emails. The project addresses real-world challenges like imbalanced datasets by utilizing SpamAssassin and CEAS datasets for training and evaluation, ultimately enhancing the model's ability to filter phishing and spam emails effectively.
 
-## Key Technologies
+### Key Technologies
 
-- **BERT for Feature Extraction**: Enhances contextual understanding of email content.
-- **Stacked Ensemble Learning**: Combines XGBoost, Bagged SVM, and Logistic Regression for robust detection.
-- **Optuna for Hyperparameter Tuning**: Optimizes model performance by fine-tuning key parameters.
-- **Flask**: Provides a web interface for real-time email classification.
-
-## Installation
-
-To set up the project, clone the repository and install the necessary dependencies:
-
-```bash
-git clone https://github.com/Koon-Kiat/Detecting-Spam-and-Phishing-Emails-Using-Machine-Learning
-cd Detecting-Spam-and-Phishing-Emails-Using-Machine-Learning
-conda create --name <your_environment_name> python=3.8.20
-conda activate <your_environment_name>
-conda env update --file environment.yaml --prune
-```
-
-Once the dependencies are installed, you can run the phishing email detection program using the following command:
-
-```bash
-python main.py
-```
-
-## Data
-
-The project utilizes merged datasets from SpamAssassin (Hugging Face) and CEAS (Kaggle) to enhance email threat detection:
-
-- **SpamAssassin**: Contains real-world spam and legitimate emails.
-- **CEAS 2008**: Specially curated for anti-spam research, with a focus on phishing examples.
-
-## Merging Datasets
-
-TThe project integrates the **[Spam Assassin](https://huggingface.co/datasets/talby/spamassassin)** and **[CEAS 2008](https://www.kaggle.com/datasets/naserabdullahalam/phishing-email-dataset?select=CEAS_08.csv)** datasets, aligning them by columns and ensuring label consistency. This creates a robust, well-labeled dataset that improves phishing and spam detection accuracy.
-
-
-
-## Technology Stack
-
-### Programming Languages
-
-- **Python**
-
-### Libraries and Frameworks
-
-- **Machine Learning**: scikit-learn, TensorFlow, transformers, imbalanced-learn
+- **Programming Language**: Python
+- **ML/DL Libraries**: scikit-learn, TensorFlow, transformers, imbalanced-learn
 - **NLP**: NLTK
-- **Data Handling**: pandas, numpy
-- **Web Framework**: Flask
+- **Data Processing**: pandas, numpy
+- **Development Tools**: Git, Anaconda
 - **Optimization**: Optuna
-
-### Tools
-
-- **Version Control**: Git
-- **Environment Management**: Anaconda
-
-### Additional Technologies
-
 - **Feature Extraction**: BERT
 - **Ensemble Learning**: XGBoost, Bagged SVM, Logistic Regression, Stacked Ensemble Learning
 - **Data Preprocessing**: One-Hot Encoding, Standard Scaling, Imputation, Rare Category Removal, Noise Injection
@@ -79,7 +28,20 @@ TThe project integrates the **[Spam Assassin](https://huggingface.co/datasets/ta
 - **Noise Injection**: Adding controlled random variations to features to improve model generalization and reduce overfitting
 - **Stacked Ensemble Learning**: Combining multiple models for robust detection
 
+## Features
+
+- **Advanced Spam and Phishing Detection**: Utilizes sophisticated algorithms to accurately identify malicious emails.
+- **Support for Handling Imbalanced Datasets**: Implements techniques to manage and balance skewed data distributions.
+- **Automated Model Training and Evaluation**: Streamlines the process of training and assessing machine learning models.
+
 ## Methodologies
+
+### Data Sources
+
+The project utilizes merged datasets from SpamAssassin (Hugging Face) and CEAS (Kaggle) to enhance email threat detection:
+
+- **SpamAssassin**: Contains real-world spam and legitimate emails.
+- **CEAS 2008**: Specially curated for anti-spam research, with a focus on phishing examples.
 
 ### Data Preprocessing
 
@@ -124,6 +86,25 @@ These results are stored in the `output` folder.
 - **Confusion Matrix**: Displays the performance of each model in predicting "Safe" vs. "Not Safe" emails.
 - **Learning Curve**: A plot showing model performance (accuracy/loss) as a function of training data size, helping to visualize overfitting, underfitting, and the effectiveness of adding more training data.
 
+
+## Installation
+
+To set up the project, clone the repository and install the necessary dependencies:
+
+```bash
+git clone https://github.com/Koon-Kiat/Detecting-Spam-and-Phishing-Emails-Using-Machine-Learning
+cd Detecting-Spam-and-Phishing-Emails-Using-Machine-Learning
+conda create --name <your_environment_name> python=3.8.20
+conda activate <your_environment_name>
+conda env update --file environment.yaml --prune
+```
+
+Once the dependencies are installed, you can run the phishing email detection program using the following command:
+
+```bash
+python main.py
+```
+
 ### Example Output
 
 ```
@@ -153,26 +134,12 @@ Classification Report for Test Data:
 weighted avg      0.XX      0.XX      0.XX      XX
 ```
 
-## Flask Application
+## License
 
-The accompanying Flask application provides a user-friendly interface where users can input email content for real-time spam and phishing detection. The system returns an analysis of whether an email is "Safe" or "Not Safe."
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### Key Features:
+## Acknowledgments
 
-- **User Interface**:
-
-  - The main interface is provided by `index.html` and `taskpane.html` located in the `templates` folder.
-  - Users can upload or paste email content for evaluation.
-
-- **Instant Feedback**:
-
-  - The `/evaluateEmail` endpoint processes the email content and returns immediate results, flagging malicious content.
-  - This endpoint utilizes the `single_model_evaluation` module for classification.
-
-- **Integration**:
-  - The Flask app communicates with the machine learning model backend for classification.
-  - Static assets such as icons are served from the `static/assets` folder.
-
-### Example Usage:
-
-To evaluate an email, users can navigate to the main interface, input the email content, and submit it for evaluation. The system will process the input and provide instant feedback on whether the email is "Safe" or "Not Safe."
+- SpamAssassin Public Corpus
+- CEAS 2008 Dataset Contributors
+- Open Source ML Community
