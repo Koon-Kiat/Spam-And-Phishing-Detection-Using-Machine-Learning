@@ -78,7 +78,6 @@ The project utilizes merged datasets from SpamAssassin (Hugging Face) and CEAS (
 - **Confusion Matrix**: Displays the performance of each model in predicting "Safe" vs. "Not Safe" emails.
 - **Learning Curve**: A plot showing model performance (accuracy/loss) as a function of training data size, helping to visualize overfitting, underfitting, and the effectiveness of adding more training data.
 
-
 ## Installation
 
 To set up the project, clone the repository and install the necessary dependencies:
@@ -91,6 +90,18 @@ conda activate <your_environment_name>
 conda env update --file environment.yaml --prune
 ```
 
+### Configuration
+
+Before running the project, ensure you update the `config.json` file with the correct paths to your datasets and other necessary configurations. Here is an example of what the `config.json` file should look like:
+
+```json
+{
+  "base_dir": "C:\\Path\\To\\Folder\\Location"
+}
+```
+
+Replace `C:\\Path\\To\\Folder\\Location` with the actual paths on your system.
+
 Once the dependencies are installed, you can run the phishing email detection program using the following command:
 
 ```bash
@@ -99,7 +110,7 @@ python main.py
 
 ### Example Output
 
-```
+```cmd
 Training Accuracy: XX.XX%
 Test Accuracy:    XX.XX%
 
