@@ -8,8 +8,8 @@ and evaluation in the context of spam and phishing detection.
 import os
 
 # Importing specific classes or functions to make them available at the package level
-from .setup import initialize_environment
-from .file_operations import load_config, get_file_paths, get_model_path, get_params_path
+from .initialiser.setup import initialize_environment
+from .initialiser.file_operations import load_config, check_config, get_file_paths, get_model_path, get_params_path
 from .dataset_processor import DatasetProcessor
 from .label_processing import log_label_percentages
 from .missing_values import check_missing_values
