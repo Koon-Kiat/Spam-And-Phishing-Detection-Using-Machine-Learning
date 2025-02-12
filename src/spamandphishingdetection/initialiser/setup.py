@@ -17,6 +17,11 @@ def initialize_environment(script_name):
     log_folder = 'logs'
     if not os.path.exists(log_folder):
         os.makedirs(log_folder)
+    else:
+        log_files = [f for f in os.listdir(log_folder) if f.endswith('.log')]
+        if len(log_files) > 5:
+            for f in log_files:
+                os.remove(os.path.join(log_folder, f))
 
     base_script = os.path.basename(script_name).replace('.py', '')
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')

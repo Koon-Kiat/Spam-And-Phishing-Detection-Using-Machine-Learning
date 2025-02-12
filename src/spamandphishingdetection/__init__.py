@@ -10,9 +10,11 @@ import os
 # Importing specific classes or functions to make them available at the package level
 from .initialiser.setup import initialize_environment
 from .initialiser.file_operations import load_config, check_config, get_file_paths, get_model_path, get_params_path
-from .dataset_processor import DatasetProcessor
-from .label_processing import log_label_percentages
-from .missing_values import check_missing_values
+from .datapreprocessor.dataset_processor import DatasetProcessor
+from .datapreprocessor.label_processing import log_label_percentages
+from .datapreprocessor.label_mapper import LabelMapper
+from .datapreprocessor.pipeline import DatasetProcessorTransformer, LabelLoggingTransformer, build_spamassassin_pipeline, build_ceas_pipeline
+from .checker.missing_values import check_missing_values
 from .feature_engineering import feature_engineering, count_urls
 from .data_cleaning_headers import load_or_save_emails, process_and_save_emails
 from .data_integration import (

@@ -56,7 +56,6 @@ def get_file_paths(config):
         'pipeline_path': os.path.join(base_dir, 'output', 'main_model_evaluation', 'feature_extraction')
     }
 
-    # Ensure directories exist
     for path in file_paths.values():
         ensure_directory_exists(os.path.dirname(path))
 

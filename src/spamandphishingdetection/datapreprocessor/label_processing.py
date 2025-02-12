@@ -7,20 +7,6 @@ label_descriptions = {
 
 
 def log_label_percentages(df, dataset_name):
-    """
-    Logs the percentage of each label in the DataFrame.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        The DataFrame containing the data.
-    dataset_name : str
-        The name of the dataset being processed.
-
-    Returns
-    -------
-    None
-    """
     total_count = len(df)
     total_rows, total_columns = df.shape
     label_counts = df['label'].value_counts(normalize=True) * 100

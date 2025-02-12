@@ -4,21 +4,6 @@ import os
 
 
 class DatasetProcessor:
-    """
-    A class to process datasets by removing unnamed columns, missing values, and duplicates, and saving the processed data.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        The DataFrame to be processed.
-    column_name : str
-        The column name to check for duplicates.
-    dataset_name : str
-        The name of the dataset.
-    save_path : str
-        The path to save the processed data.
-    """
-
     def __init__(self, df, column_name, dataset_name, save_path):
         self.df = df
         self.column_name = column_name
@@ -26,14 +11,6 @@ class DatasetProcessor:
         self.save_path = save_path
 
     def drop_unnamed_column(self):
-        """
-        Drop the 'Unnamed: 0' column if it exists in the DataFrame.
-
-        Returns
-        -------
-        pandas.DataFrame
-            The DataFrame with the 'Unnamed: 0' column removed if it existed.
-        """
         if 'Unnamed: 0' in self.df.columns:
             self.df = self.df.drop(columns=['Unnamed: 0'])
             logging.info(
@@ -42,18 +19,9 @@ class DatasetProcessor:
         return self.df
 
     def check_and_remove_missing_values(self):
-        """
-        Check and remove missing values from the DataFrame.
-
-        Returns
-        -------
-        pandas.DataFrame
-            The DataFrame with missing values removed.
-        """
         check_missing_values = self.df.isnull().sum()
         total_missing_values = check_missing_values.sum()
         logging.info(f"Total missing values: {total_missing_values}")
-        logging.info(f"Removing missing values from {self.dataset_name}...")
         self.df = self.df.dropna()
         logging.info(
             f"Total number of rows after removing missing values from {self.dataset_name}: {self.df.shape[0]}")
@@ -61,16 +29,6 @@ class DatasetProcessor:
         return self.df
 
     def remove_duplicates(self):
-        """
-        Remove duplicate rows based on the specified column.
-
-        Returns
-        -------
-        pandas.DataFrame
-            The DataFrame with duplicates removed.
-        """
-        logging.info(f"Removing duplicate data....")
-
         # Log the initial number of rows
         initial_row_count = self.df.shape[0]
         logging.info(f"Initial number of rows: {initial_row_count}")
@@ -87,8 +45,6 @@ class DatasetProcessor:
 
         # Log the number of rows after removing duplicates
         final_row_count = self.df.shape[0]
-        logging.info(
-            f"Number of rows after removing duplicates: {final_row_count}")
 
         # Calculate the number of duplicates removed
         duplicates_removed = initial_row_count - final_row_count
@@ -98,13 +54,6 @@ class DatasetProcessor:
         return self.df
 
     def save_processed_data(self):
-        """
-        Save the processed DataFrame to a CSV file.
-
-        Returns
-        -------
-        None
-        """
         try:
             self.df.to_csv(self.save_path, index=False)
             logging.info(f"Processed data saved to {self.save_path}\n")
@@ -114,14 +63,7 @@ class DatasetProcessor:
             logging.error(f"An error occurred while saving the file: {e}")
 
     def process_dataset(self):
-        """
-        Process the dataset by dropping unnamed columns, removing missing values, and removing duplicates.
 
-        Returns
-        -------
-        pandas.DataFrame
-            The processed DataFrame.
-        """
         if os.path.exists(self.save_path):
             logging.info(
                 f"Processed file already exists at {self.save_path}. Loading the file...")
