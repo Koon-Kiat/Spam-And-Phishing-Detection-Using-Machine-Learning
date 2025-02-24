@@ -5,9 +5,8 @@ from sklearn.pipeline import Pipeline
 
 # Import existing modules
 from src.spamandphishingdetection.datapreprocessor.dataset_processor import DatasetProcessor
-from src.spamandphishingdetection.datapreprocessor.label_processing import log_label_percentages
 from src.spamandphishingdetection.datapreprocessor.label_mapper import LabelMapper
-
+from src.spamandphishingdetection.validator.log_label_percentage import log_label_percentages
 
 class DatasetProcessorTransformer(BaseEstimator, TransformerMixin):
     """
