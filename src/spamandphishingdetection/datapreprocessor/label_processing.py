@@ -1,4 +1,5 @@
 import logging
+import pandas as pd
 
 label_descriptions = {
     0: "Safe",
@@ -7,6 +8,22 @@ label_descriptions = {
 
 
 def log_label_percentages(df, dataset_name):
+    """
+    Logs label percentages for the given dataset.
+
+    Parameters:
+    df (pandas.DataFrame): DataFrame containing a 'label' column.
+    dataset_name (str): Name of the dataset for logging context.
+    """
+    if not isinstance(df, pd.DataFrame):
+        logging.error("log_label_percentages: Input is not a pandas DataFrame")
+        raise ValueError("Input must be a pandas DataFrame")
+
+    if 'label' not in df.columns:
+        logging.warning(
+            "log_label_percentages: 'label' column not found in DataFrame")
+        return
+
     total_count = len(df)
     total_rows, total_columns = df.shape
     label_counts = df['label'].value_counts(normalize=True) * 100
