@@ -11,56 +11,52 @@ from tqdm import tqdm
 
 class EmailHeaderExtractor:
     """
-    A class to extract email headers and other relevant information from email data.
+    A class to extract various email header features for spam detection from email datasets.
 
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        The DataFrame containing the email data.
+    Attributes:
+        df (pd.DataFrame): DataFrame containing email text or body to extract from.
+        headers_df (pd.DataFrame): DataFrame storing the extracted header features.
     """
 
     def __init__(self, df: pd.DataFrame):
+        """
+        Initialize the EmailHeaderExtractor with a DataFrame.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing the emails.
+        """
         self.df = df
         self.headers_df = pd.DataFrame()
         logging.info("Initializing EmailHeaderExtractor...")
 
     def clean_links(self, links: List[str]) -> List[str]:
         """
-        Clean the extracted links by removing unwanted characters and spaces.
+        Clean a list of URL strings by removing unwanted characters.
 
-        Parameters
-        ----------
-        links : List[str]
-            The list of links to be cleaned.
+        Args:
+            links (List[str]): List of URL strings.
 
-        Returns
-        -------
-        List[str]
-            The cleaned list of links.
+        Returns:
+            List[str]: List of cleaned URL strings.
         """
         cleaned_links = []
         for link in links:
             link = re.sub(r'[\'\[\]\s]+', '', link)
             link = re.sub(r'\\n+', ' ', link)
-            link = link.strip()  # Trim leading and trailing spaces
-            if link:  # Avoid appending empty links
+            link = link.strip()
+            if link:
                 cleaned_links.append(link)
-
         return cleaned_links
 
     def extract_inline_headers(self, email_text: str) -> Dict[str, Union[str, None]]:
         """
-        Extract inline headers (From, To, Mail-To) from the email text.
+        Extract inline email headers (From, To, Mail-To) from raw email text using regex.
 
-        Parameters
-        ----------
-        email_text : str
-            The email text to extract headers from.
+        Args:
+            email_text (str): Raw email text.
 
-        Returns
-        -------
-        Dict[str, Union[str, None]]
-            A dictionary containing the extracted headers.
+        Returns:
+            Dict[str, Union[str, None]]: Dictionary with keys 'From', 'To', and 'Mail-To'.
         """
         from_match = re.search(
             r'From:.*?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', email_text)
@@ -71,70 +67,52 @@ class EmailHeaderExtractor:
         from_header = from_match.group(1) if from_match else None
         to_header = to_match.group(1) if to_match else None
         mail_to_header = mail_to_match.group(1) if mail_to_match else None
-
         return {'From': from_header, 'To': to_header, 'Mail-To': mail_to_header}
 
     def extract_body_content(self, email_message: EmailMessage) -> str:
         """
-        Extract the body content from an email message.
+        Extract the body content from an EmailMessage object, handling both plain text and HTML parts.
 
-        Parameters
-        ----------
-        email_message : EmailMessage
-            The email message to extract the body content from.
+        Args:
+            email_message (EmailMessage): Parsed email message.
 
-        Returns
-        -------
-        str
-            The extracted body content.
+        Returns:
+            str: Combined email body content.
         """
         body_content = ""
         if email_message.is_multipart():
             for part in email_message.iter_parts():
-                if part.get_content_type() == 'text/plain':
-                    body_content += part.get_payload(
-                        decode=True).decode(errors='ignore')
-                elif part.get_content_type() == 'text/html':
+                if part.get_content_type() in ['text/plain', 'text/html']:
                     body_content += part.get_payload(
                         decode=True).decode(errors='ignore')
         else:
             body_content = email_message.get_payload(
                 decode=True).decode(errors='ignore')
-
         return body_content
 
     def count_https_http(self, text: str) -> Dict[str, int]:
         """
-        Count the occurrences of 'https' and 'http' in the text.
+        Count occurrences of 'http://' and 'https://' in the given text.
 
-        Parameters
-        ----------
-        text : str
-            The text to count the occurrences in.
+        Args:
+            text (str): Text to search.
 
-        Returns
-        -------
-        Dict[str, int]
-            A dictionary containing the counts of 'https' and 'http'.
+        Returns:
+            Dict[str, int]: Dictionary with counts for 'https_count' and 'http_count'.
         """
         https_count = len(re.findall(r'https://', text))
         http_count = len(re.findall(r'http://', text))
-
         return {'https_count': https_count, 'http_count': http_count}
 
     def contains_blacklisted_keywords(self, text: str) -> int:
         """
-        Count the occurrences of blacklisted keywords in the text.
+        Count occurrences of pre-defined blacklisted keywords that are common in spam messages.
 
-        Parameters
-        ----------
-        text : str
-            The text to count the occurrences in.
+        Args:
+            text (str): Text to search.
 
-        Returns
-        -------
-        int
-            The count of blacklisted keywords in the text.
+        Returns:
+            int: Total count of blacklisted keyword occurrences.
         """
         blacklisted_keywords = [
             'click now', 'verify now', 'urgent', 'free', 'winner',
@@ -152,22 +130,17 @@ class EmailHeaderExtractor:
         for keyword in blacklisted_keywords:
             keyword_count += len(re.findall(re.escape(keyword),
                                  text, re.IGNORECASE))
-
         return keyword_count
 
     def detect_url_shorteners(self, links: List[str]) -> int:
         """
-        Detect the number of URL shorteners in the list of links.
+        Detect URL shorteners in a list of URLs based on known shortener domains.
 
-        Parameters
-        ----------
-        links : List[str]
-            The list of links to check for URL shorteners.
+        Args:
+            links (List[str]): List of URL strings.
 
-        Returns
-        -------
-        int
-            The count of URL shorteners in the list of links.
+        Returns:
+            int: Count of URLs that are shortened using known shortener domains.
         """
         shortener_domains = [
             'bit.ly', 'tinyurl.com', 'goo.gl', 'ow.ly', 't.co', 'is.gd', 'buff.ly',
@@ -181,36 +154,31 @@ class EmailHeaderExtractor:
 
     def count_ip_addresses(self, text: str) -> int:
         """
-        Count the occurrences of IP addresses in the text.
+        Count occurrences of IP addresses in the given text using a regex pattern.
 
-        Parameters
-        ----------
-        text : str
-            The text to count the occurrences in.
+        Args:
+            text (str): Text to search.
 
-        Returns
-        -------
-        int
-            The count of IP addresses in the text.
+        Returns:
+            int: Count of IP addresses found.
         """
         ip_pattern = r'https?://(\d{1,3}\.){3}\d{1,3}'
-
         return len(re.findall(ip_pattern, text))
 
     def extract_headers_spamassassin(self) -> pd.DataFrame:
         """
-        Extract headers and other relevant information from the email data for SpamAssassin dataset.
+        Extract email header features from the SpamAssassin dataset.
+        Processes the raw email text to retrieve headers and body features.
 
-        Returns
-        -------
-        pandas.DataFrame
-            A DataFrame containing the extracted headers and information.
+        Returns:
+            pd.DataFrame: DataFrame containing extracted features.
         """
         headers_list: List[Dict[str, Union[str, List[str], int]]] = []
         for email_text in tqdm(self.df['text'], desc="Extracting headers"):
             try:
                 email_message = BytesParser(policy=policy.default).parsebytes(
                     email_text.encode('utf-8'))
+                subject = email_message['Subject'] if email_message['Subject'] else None
                 from_header = email_message['From'] if 'From' in email_message else None
                 to_header = email_message['To'] if 'To' in email_message else None
                 mail_to_header = email_message.get(
@@ -222,18 +190,22 @@ class EmailHeaderExtractor:
                     to_header = inline_headers['To'] or to_header
                     mail_to_header = inline_headers['Mail-To'] or mail_to_header
 
-                from_header = from_header if from_header else None
-                to_header = to_header if to_header else None
-                mail_to_header = mail_to_header if mail_to_header else None
                 body_content = self.extract_body_content(email_message)
                 logging.debug(f"Email body content: {body_content}")
+
+                # Additional robust feature extraction
+                exclamation_count = body_content.count('!')
+                uppercase_count = len(re.findall(
+                    r'\b[A-Z]{2,}\b', body_content))
+                body_length = len(body_content)
+                special_chars_count = len(re.findall(r'[^\w\s]', body_content))
 
                 # Extract URLs from body content
                 url_pattern = r'https?:\/\/[^\s\'"()<>]+'
                 links = re.findall(url_pattern, body_content)
                 links = self.clean_links(links)
 
-                # Count blacklisted keywords, http/https, short URLs, and IP addresses in the email body
+                # Count occurrences
                 https_http_counts = self.count_https_http(body_content)
                 blacklisted_keyword_count = self.contains_blacklisted_keywords(
                     body_content)
@@ -244,43 +216,66 @@ class EmailHeaderExtractor:
                     'sender': from_header,
                     'receiver': to_header,
                     'mailto': mail_to_header,
+                    'subject': subject,
                     'texturls': links,
                     'https_count': https_http_counts['https_count'],
                     'http_count': https_http_counts['http_count'],
                     'blacklisted_keywords_count': blacklisted_keyword_count,
                     'short_urls': short_urls,
-                    'has_ip_address': has_ip_address
+                    'has_ip_address': has_ip_address,
+                    'exclamation_count': exclamation_count,
+                    'uppercase_count': uppercase_count,
+                    'body_length': body_length,
+                    'special_chars_count': special_chars_count
                 })
             except Exception as e:
                 logging.error(f"Error parsing email: {e}")
-                headers_list.append(
-                    {'sender': None, 'receiver': None, 'mailto': None, 'texturls': [], 'blacklisted_keywords_count': 0, 'short_urls': [], 'has_ip_address': 0})
+                headers_list.append({
+                    'sender': None,
+                    'receiver': None,
+                    'mailto': None,
+                    'subject': None,
+                    'texturls': [],
+                    'https_count': 0,
+                    'http_count': 0,
+                    'blacklisted_keywords_count': 0,
+                    'short_urls': 0,
+                    'has_ip_address': 0,
+                    'exclamation_count': 0,
+                    'uppercase_count': 0,
+                    'body_length': 0,
+                    'special_chars_count': 0
+                })
         self.headers_df = pd.DataFrame(headers_list)
-
         return self.headers_df
 
     def extract_headers_ceas(self) -> pd.DataFrame:
         """
-        Extract headers and other relevant information from the email data for CEAS dataset.
+        Extract email header features from the CEAS_08 dataset.
+        Assumes that the DataFrame contains email bodies directly in the 'body' column.
 
-        Returns
-        -------
-        pandas.DataFrame
-            A DataFrame containing the extracted headers and information.
+        Returns:
+            pd.DataFrame: DataFrame containing extracted features.
         """
         headers_list: List[Dict[str, int]] = []
-
         for email_text in tqdm(self.df['body'], desc="Extracting headers"):
             try:
-                body_content = email_text  # Assuming 'email_text' contains the email body directly
+                body_content = email_text
                 logging.debug(f"Email body content: {body_content}")
 
-                # Count blacklisted keywords and http/https occurrences in the email body
+                # Additional robust feature extraction
+                exclamation_count = body_content.count('!')
+                uppercase_count = len(re.findall(
+                    r'\b[A-Z]{2,}\b', body_content))
+                body_length = len(body_content)
+                special_chars_count = len(re.findall(r'[^\w\s]', body_content))
+
                 https_http_counts = self.count_https_http(body_content)
                 blacklisted_keyword_count = self.contains_blacklisted_keywords(
                     body_content)
-                short_urls = self.detect_url_shorteners(self.clean_links(
-                    re.findall(r'https?:\/\/[^\s\'"()<>]+', body_content)))
+                links = self.clean_links(re.findall(
+                    r'https?:\/\/[^\s\'"()<>]+', body_content))
+                short_urls = self.detect_url_shorteners(links)
                 has_ip_address = self.count_ip_addresses(body_content)
 
                 headers_list.append({
@@ -288,7 +283,11 @@ class EmailHeaderExtractor:
                     'http_count': https_http_counts['http_count'],
                     'blacklisted_keywords_count': blacklisted_keyword_count,
                     'short_urls': short_urls,
-                    'has_ip_address': has_ip_address
+                    'has_ip_address': has_ip_address,
+                    'exclamation_count': exclamation_count,
+                    'uppercase_count': uppercase_count,
+                    'body_length': body_length,
+                    'special_chars_count': special_chars_count
                 })
             except Exception as e:
                 logging.error(f"Error processing email: {e}")
@@ -296,26 +295,25 @@ class EmailHeaderExtractor:
                     'https_count': 0,
                     'http_count': 0,
                     'blacklisted_keywords_count': 0,
-                    'short_urls': [],
-                    'has_ip_address': 0
+                    'short_urls': 0,
+                    'has_ip_address': 0,
+                    'exclamation_count': 0,
+                    'uppercase_count': 0,
+                    'body_length': 0,
+                    'special_chars_count': 0
                 })
         self.headers_df = pd.DataFrame(headers_list)
-
         return self.headers_df
 
     def save_to_csv(self, file_path: str):
         """
-        Save the extracted headers DataFrame to a CSV file.
+        Save the extracted header features to a CSV file.
 
-        Parameters
-        ----------
-        file_path : str
-            The path to save the CSV file.
+        Args:
+            file_path (str): Path where the CSV file will be saved.
 
-        Raises
-        ------
-        ValueError
-            If no header information has been extracted.
+        Raises:
+            ValueError: If no header information has been extracted.
         """
         if not self.headers_df.empty:
             self.headers_df.to_csv(file_path, index=False)
@@ -327,35 +325,28 @@ class EmailHeaderExtractor:
 
 def load_or_extract_headers(df: pd.DataFrame, file_path: str, extractor_class, dataset_type: str) -> pd.DataFrame:
     """
-    Loads the email headers from the specified file path or extracts them if the file does not exist.
+    Load pre-extracted email headers from a CSV file or extract them using the provided extractor class.
 
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        The DataFrame containing the data.
-    file_path : str
-        The file path where the extracted headers will be saved.
-    extractor_class : class
-        The class used to extract the headers.
-    dataset_type : str
-        The type of dataset being processed.
+    Args:
+        df (pd.DataFrame): DataFrame with email data.
+        file_path (str): Path to the CSV file for storing header data.
+        extractor_class: Class for extracting headers.
+        dataset_type (str): Type of dataset ('Spam Assassin' or 'CEAS_08').
 
-    Returns
-    -------
-    pandas.DataFrame
-        The DataFrame with extracted headers.
+    Returns:
+        pd.DataFrame: DataFrame with email header features.
+
+    Raises:
+        ValueError: If an unknown dataset type is provided.
     """
     logging.info("Loading or extracting email headers...")
     if os.path.exists(file_path):
         logging.info(f"File {file_path} already exists. Loading from file.")
-
         return pd.read_csv(file_path)
     else:
         logging.info(
             f"File {file_path} does not exist. Extracting headers for dataset: {dataset_type}.")
         header_extractor = extractor_class(df)
-
-        # Check dataset type and call the corresponding extraction function
         if dataset_type == "Spam Assassin":
             headers_df = header_extractor.extract_headers_spamassassin()
         elif dataset_type == "CEAS_08":
@@ -365,48 +356,65 @@ def load_or_extract_headers(df: pd.DataFrame, file_path: str, extractor_class, d
                 f"Unknown dataset type: {dataset_type}. Please specify either 'Spam Assassin' or 'CEAS_08'.")
         header_extractor.save_to_csv(file_path)
         logging.info(
-            f"Email header extraction and saving to {file_path} completed for dataset: {dataset_type}.")
-
+            f"Email header extraction and saving to {file_path} completed for dataset: {dataset_type}.\n")
         return headers_df
 
 
-def count_urls(urls_list):
+def count_urls(urls_list: list) -> int:
     """
-    Counts the number of URLs in the provided list.
+    Count the number of URLs in a list.
 
-    Parameters
-    ----------
-    urls_list : list
-        The list of URLs.
+    Args:
+        urls_list (list): List containing URLs.
 
-    Returns
-    -------
-    int
-        The number of URLs in the list.
+    Returns:
+        int: Count of URLs if list; otherwise 0.
     """
-    if isinstance(urls_list, list):
-        return len(urls_list)
-    else:
-        return 0
+    return len(urls_list) if isinstance(urls_list, list) else 0
 
 
-def process_spamassassin_headers(df):
+def process_spamassassin_headers(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Process SpamAssassin header DataFrame by counting URLs and dropping unnecessary columns.
+
+    Args:
+        df (pd.DataFrame): DataFrame with spamassassin header features.
+
+    Returns:
+        pd.DataFrame: Processed DataFrame with updated features.
+    """
     df['urls'] = df['texturls'].apply(count_urls)
     df.drop(columns=['mailto', 'texturls'], inplace=True)
     return df
 
 
-def feature_engineering(df_processed_spamassassin, df_processed_ceas, file_paths):
-    logging.info(f"Beginning Feature Engineering...")
+def feature_engineering(df_processed_spamassassin: pd.DataFrame, df_processed_ceas: pd.DataFrame, file_paths: dict) -> tuple:
+    """
+    Perform feature engineering by extracting and processing email header features from both SpamAssassin and CEAS datasets.
 
-    # Extract email headers from the SpamAssassin dataset
+    Args:
+        df_processed_spamassassin (pd.DataFrame): DataFrame with SpamAssassin raw email data.
+        df_processed_ceas (pd.DataFrame): DataFrame with CEAS_08 raw email bodies.
+        file_paths (dict): Dictionary containing file paths for saving extracted headers.
+
+    Returns:
+        tuple: A tuple containing processed SpamAssassin and CEAS header DataFrames.
+    """
+
     spamassassin_headers_df = load_or_extract_headers(
-        df_processed_spamassassin, file_paths['extracted_spam_assassin_email_header_file'], EmailHeaderExtractor, 'Spam Assassin')
+        df_processed_spamassassin,
+        file_paths['extracted_spam_assassin_email_header_file'],
+        EmailHeaderExtractor,
+        'Spam Assassin'
+    )
     spamassassin_headers_df = process_spamassassin_headers(
         spamassassin_headers_df)
 
     ceas_headers_df = load_or_extract_headers(
-        df_processed_ceas, file_paths['extracted_ceas_email_header_file'], EmailHeaderExtractor, 'CEAS_08')
+        df_processed_ceas,
+        file_paths['extracted_ceas_email_header_file'],
+        EmailHeaderExtractor,
+        'CEAS_08'
+    )
 
-    logging.info(f"Feature Engineering completed.\n")
     return spamassassin_headers_df, ceas_headers_df
