@@ -341,7 +341,12 @@ def load_or_extract_headers(df: pd.DataFrame, file_path: str, extractor_class, d
     """
     logging.info("Loading or extracting email headers...")
     if os.path.exists(file_path):
-        logging.info(f"File {file_path} already exists. Loading from file.")
+        if dataset_type == "CEAS_08":
+            logging.info(
+                f"File {file_path} already exists. Loading from file.\n")
+        else:
+            logging.info(
+                f"File {file_path} already exists. Loading from file.")
         return pd.read_csv(file_path)
     else:
         logging.info(f"File {file_path} does not exist.")
