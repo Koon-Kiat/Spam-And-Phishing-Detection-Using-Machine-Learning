@@ -7,62 +7,73 @@ import tensorflow as tf
 from transformers import logging as transformers_logging
 from bs4 import MarkupResemblesLocatorWarning
 from datetime import datetime
+from pathlib import Path
+
 
 BOLD = '\033[1m'
 RESET = '\033[0m'
 
 
 def initialize_environment(script_name):
-    # Create log folder if it doesn't exist
-    log_folder = 'logs'
-    if not os.path.exists(log_folder):
-        os.makedirs(log_folder)
-    else:
-        log_files = [f for f in os.listdir(log_folder) if f.endswith('.log')]
-        if len(log_files) > 5:
-            for f in log_files:
-                os.remove(os.path.join(log_folder, f))
+    """Initializes the environment including logging configuration, NLTK resource downloads, and warning suppression.
 
-    base_script = os.path.basename(script_name).replace('.py', '')
+    Args:
+        script_name (str): Name of the script to set a base for the log file name.
+
+    Returns:
+        str: The path to the created log file.
+    """
+    log_folder = Path('logs')
+    # Create log folder if it doesn't exist
+    log_folder.mkdir(exist_ok=True)
+
+    # Remove oldest log files if more than 5 exist
+    log_files = list(log_folder.glob('*.log'))
+    if len(log_files) > 5:
+        log_files.sort(key=lambda f: f.stat().st_mtime)
+        for f in log_files[:-5]:
+            try:
+                f.unlink()
+            except Exception as e:
+                logging.warning(f'Failed to remove log file {f}: {e}')
+
+    base_script = Path(script_name).stem
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     log_filename = f"{base_script}_{timestamp}.log"
-    log_path = os.path.join(log_folder, log_filename)
+    log_path = log_folder / log_filename
 
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
         handlers=[
-            logging.FileHandler(log_path),
+            logging.FileHandler(str(log_path)),
             logging.StreamHandler()
         ]
     )
 
-    # Download necessary NLTK resources
-    nltk.download('punkt', quiet=True)
-    nltk.download('stopwords', quiet=True)
-    nltk.download('wordnet', quiet=True)
-    nltk.download('omw-1.4', quiet=True)
+    try:
+        # Download necessary NLTK resources quietly
+        for resource in ['punkt', 'stopwords', 'wordnet', 'omw-1.4']:
+            nltk.download(resource, quiet=True)
+    except Exception as e:
+        logging.error(f'Error downloading NLTK resources: {e}')
 
     # Suppress TensorFlow logs
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    # Set TensorFlow logger to suppress warnings
     tf.get_logger().setLevel('CRITICAL')
-    # Configure the logging library to suppress TensorFlow logs
     logging.getLogger('tensorflow').setLevel(logging.ERROR)
 
-    # Suppress warnings globally
-    warnings.simplefilter("ignore")
-
-    # Suppress specific warnings
+    # Suppress warnings globally and for specific modules
+    warnings.simplefilter('ignore')
     warnings.filterwarnings(
-        "ignore", category=UserWarning, module='transformers')
-    warnings.filterwarnings("ignore", category=FutureWarning,
+        'ignore', category=UserWarning, module='transformers')
+    warnings.filterwarnings('ignore', category=FutureWarning,
                             module='transformers.tokenization_utils_base')
-    warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
-    warnings.filterwarnings("ignore", category=UserWarning,
-                            module='tensorflow.keras')
+    warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
+    warnings.filterwarnings(
+        'ignore', category=UserWarning, module='tensorflow.keras')
 
-    # Configure transformers logging
     transformers_logging.set_verbosity_error()
 
-    return log_path
+    logging.info(f'Environment initialized with log file at {log_path}')
+    return str(log_path)
