@@ -8,23 +8,19 @@ and evaluation in the context of spam and phishing detection.
 import os
 
 # Importing specific classes or functions to make them available at the package level
-from .initialiser.setup import initialize_environment
-from .initialiser.file_operations import load_config, check_config, get_file_paths, get_model_path, get_params_path
+from .initializer.setup import initialize_environment
+from .initializer.file_operations import load_config, check_config, get_file_paths, get_model_path, get_params_path
 from .datapreprocessor.dataset_processor import DatasetProcessor
-from .datapreprocessor.label_processing import log_label_percentages
+from .validator.log_label_percentage import log_label_percentages
 from .datapreprocessor.label_mapper import LabelMapper
-from .datapreprocessor.pipeline import DatasetProcessorTransformer, LabelLoggingTransformer, build_spamassassin_pipeline, build_ceas_pipeline
-from .checker.missing_values import check_missing_values
-from .feature_engineering import feature_engineering, count_urls
-from .data_cleaning_headers import load_or_save_emails, process_and_save_emails
-from .data_integration import (
-    merge_dataframes,
-    verify_merged_dataframe,
-    combine_dataframes,
-    verify_combined_dataframe,
-    save_combined_dataframe
-)
-from .data_cleaning import (
+from .datapreprocessor.dataset_processor_transformer import DatasetProcessorTransformer, LabelLoggingTransformer, build_spamassassin_pipeline, build_ceas_pipeline
+from .validator.check_missing_values import check_missing_values
+from .featureengineering.email_header_extractor import feature_engineering, count_urls
+from .datacleaning.headers_cleaner import get_email_headers, save_email_headers, get_merged_email_headers
+from .dataintegration.data_integrator import integrate_datasets
+from .validator.verify_dataframe import verify_dataframe
+
+from .datacleaning.data_cleaning import (
     load_or_clean_data,
     data_cleaning,
     save_dataframe_to_csv,
