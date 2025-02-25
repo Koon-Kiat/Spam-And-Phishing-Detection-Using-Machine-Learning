@@ -1,9 +1,47 @@
 import os
 import logging
 import pandas as pd
- 
-from src.spamandphishingdetection import get_email_headers
+
 from src.spamandphishingdetection.validator.verify_dataframe import verify_dataframe
+
+
+def _get_email_headers(df, headers_csv_path, dataset_label='CEAS_08'):
+    """Retrieve email header data from CSV if available; otherwise, process and save header data.
+
+    Parameters:
+        df (pd.DataFrame): DataFrame containing 'sender' and 'receiver' columns.
+        headers_csv_path (str): Path to CSV file for header data.
+        dataset_label (str): Label for logging context.
+
+    Returns:
+        pd.DataFrame: DataFrame with extracted header email addresses.
+
+    Raises:
+        ValueError: If required columns are missing.
+    """
+    if os.path.exists(headers_csv_path):
+        logging.info(
+            f"CSV file {headers_csv_path} exists. Attempting to load header data...")
+        try:
+            headers_data = pd.read_csv(headers_csv_path)
+            # Check if the required columns are present
+            if not all(col in headers_data.columns for col in ['sender', 'receiver']):
+                logging.warning(
+                    f"CSV file {headers_csv_path} is missing required columns. Reprocessing header data for {dataset_label}...")
+                headers_data = save_email_headers(df, headers_csv_path)
+            else:
+                logging.info(
+                    f"Header data loaded successfully from {headers_csv_path}.")
+        except Exception as err:
+            logging.error(
+                f"Error reading {headers_csv_path}: {err}. Reprocessing header data for {dataset_label}...")
+            headers_data = save_email_headers(df, headers_csv_path)
+    else:
+        logging.info(
+            f"CSV file {headers_csv_path} not found. Processing header data for {dataset_label}...")
+        headers_data = save_email_headers(df, headers_csv_path)
+        logging.info(f"Header data processed and saved to {headers_csv_path}.")
+    return headers_data
 
 
 def _integrate_ceas(processed_ceas_df, ceas_features, config_paths):
@@ -11,7 +49,7 @@ def _integrate_ceas(processed_ceas_df, ceas_features, config_paths):
     Integrate the CEAS dataset by merging cleaned headers, processed data, and extracted features.
     """
     logging.info("Integrating CEAS dataset...")
-    cleaned_ceas_headers_df = get_email_headers(
+    cleaned_ceas_headers_df = _get_email_headers(
         processed_ceas_df, config_paths['cleaned_ceas_headers'])
 
     if len(cleaned_ceas_headers_df) != len(processed_ceas_df):
